@@ -1,0 +1,64 @@
+PHASE 6 / FU-1 - ROUND 2 BLIND KEY
+==================================
+
+Do not read this before listening.
+
+Four modes, each rendered twice on a different excitation seed. The
+listener is not told that any two trials share a mode.
+
+--- trial 1 ---
+  high-01-G.wav
+  mode #3  10655.00 Hz  class B  (usable high-band B, confirmed)
+  excitation band: one ERB, 1174.79 Hz wide, 10067.60 - 11242.40 Hz
+  seed 20260901
+    peak -9.93 dBFS, RMS -35.23 dBFS, integrated -21.47 LUFS
+
+--- trial 2 ---
+  high-02-Z.wav
+  mode #10  9146.01 Hz  class B  (high-priority modulation-resistant, confirmed)
+  excitation band: one ERB, 1011.91 Hz wide, 8640.05 - 9651.97 Hz
+  seed 20260902
+    peak -10.13 dBFS, RMS -35.96 dBFS, integrated -22.10 LUFS
+
+--- trial 3 ---
+  high-03-L.wav
+  mode #1  11561.40 Hz  class D  (high-prominence, structurally unresolved)
+  excitation band: one ERB, 1272.63 Hz wide, 10925.09 - 12197.71 Hz
+  seed 20260903
+    peak -10.35 dBFS, RMS -35.92 dBFS, integrated -22.06 LUFS
+
+--- trial 4 ---
+  high-04-H.wav
+  mode #25  7217.22 Hz  class A  (modulation-moving control, confirmed)
+  excitation band: one ERB, 803.72 Hz wide, 6815.36 - 7619.08 Hz
+  seed 20260904
+    peak -11.41 dBFS, RMS -36.85 dBFS, integrated -23.02 LUFS
+
+--- trial 5 ---
+  high-05-O.wav
+  mode #10  9146.01 Hz  class B  (high-priority modulation-resistant, confirmed)
+  excitation band: one ERB, 1011.91 Hz wide, 8640.05 - 9651.97 Hz
+  seed 20260905
+    peak -9.69 dBFS, RMS -36.24 dBFS, integrated -22.38 LUFS
+
+--- trial 6 ---
+  high-06-T.wav
+  mode #3  10655.00 Hz  class B  (usable high-band B, confirmed)
+  excitation band: one ERB, 1174.79 Hz wide, 10067.60 - 11242.40 Hz
+  seed 20260906
+    peak -10.83 dBFS, RMS -35.46 dBFS, integrated -21.63 LUFS
+
+--- trial 7 ---
+  high-07-C.wav
+  mode #25  7217.22 Hz  class A  (modulation-moving control, confirmed)
+  excitation band: one ERB, 803.72 Hz wide, 6815.36 - 7619.08 Hz
+  seed 20260907
+    peak -11.37 dBFS, RMS -36.95 dBFS, integrated -23.12 LUFS
+
+--- trial 8 ---
+  high-08-N.wav
+  mode #1  11561.40 Hz  class D  (high-prominence, structurally unresolved)
+  excitation band: one ERB, 1272.63 Hz wide, 10925.09 - 12197.71 Hz
+  seed 20260908
+    peak -10.88 dBFS, RMS -36.45 dBFS, integrated -22.55 LUFS
+

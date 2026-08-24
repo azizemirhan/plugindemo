@@ -1,0 +1,34 @@
+PHASE 6 / FU-1 - ROUND 1b BLIND KEY
+===================================
+
+Do not read this before listening.
+
+Carries the Mod Depth assignment and every per-file measurement,
+including the signed level difference inside each pair. The sign is
+the mapping: modulation redistributes energy, so which file is louder
+is an inference away from which file is modulated.
+
+--- pair 1 ---
+  mode #54  4505.77 Hz  class B
+  modtest-1-X.wav = Mod Depth 0.3
+  modtest-1-Y.wav = Mod Depth 0
+    X: peak -30.63 dBFS, RMS -55.22 dBFS, integrated -41.00 LUFS
+    Y: peak -29.96 dBFS, RMS -54.66 dBFS, integrated -40.40 LUFS
+    signed gap X-Y: -0.60 LU, -0.67 dB peak
+
+--- pair 2 ---
+  mode #50  3.8e+02 Hz  class B
+  modtest-2-X.wav = Mod Depth 0
+  modtest-2-Y.wav = Mod Depth 0.3
+    X: peak -43.18 dBFS, RMS -67.35 dBFS, integrated -57.13 LUFS
+    Y: peak -44.25 dBFS, RMS -67.76 dBFS, integrated -56.88 LUFS
+    signed gap X-Y: -0.25 LU, 1.07 dB peak
+
+--- pair 3 ---
+  mode #4  6.5e+02 Hz  class A
+  modtest-3-X.wav = Mod Depth 0.3
+  modtest-3-Y.wav = Mod Depth 0
+    X: peak -37.52 dBFS, RMS -60.52 dBFS, integrated -50.01 LUFS
+    Y: peak -38.22 dBFS, RMS -60.67 dBFS, integrated -50.27 LUFS
+    signed gap X-Y: 0.25 LU, 0.70 dB peak
+

@@ -1,0 +1,62 @@
+PHASE 6 / FU-1 - ROUND 2c ANALYSIS PLAN
+=======================================
+
+Fixed before the files were rendered. Do not read before rating.
+
+Nine files: three full-band sources, each rendered DRY (no reverb),
+WET100 (pure tank output) and MIX30 (the shipping Mix). No band
+limiting anywhere.
+
+This round decides one thing: whether the metallic character in the
+shipping DSP is objectionable enough, in real use, to justify a voicing
+intervention. It does NOT localise anything in frequency.
+
+With one listener and one rating per cell, no statistical or
+inferential test will be run and no correlation will be claimed.
+
+THE GATE
+--------
+  A) WET100 metallicity high, but annoyance <= 1 and overall mostly
+     neutral or pleasant
+     -> audible tank character, NOT demonstrated as an objectionable
+        defect.
+
+  B) MIX30 shows, repeatably across two or more different sources,
+     metallicity >= 3 AND (annoyance >= 2 OR unpleasant)
+     -> shipping-context voicing issue evidence strengthened.
+
+  C) MIX30 rates badly, but the DRY file of the same source rates
+     similarly metallic or annoying
+     -> source contribution or interaction is confounded; the tank is
+        not blamed on its own.
+
+  D) WET100 also reaches annoyance >= 2 or unpleasant across different
+     sources
+     -> tank-level voicing issue evidence strong.
+
+These thresholds will not be changed after the ratings are seen.
+
+THE VERDICT, one of three
+-------------------------
+  1. CHARACTER ACCEPTABLE - the metallic character is audible, and the
+     evidence does not justify a voicing intervention. Stop trying to
+     flatten FU-1; move to the Phase 6 closing assessment.
+
+  2. VOICING ISSUE - a repeatable, objectionable metallic character in
+     whole-tail and shipping context. Only then design the Size-based
+     localisation experiment.
+
+  3. UNRESOLVED - source, level and context effects still cannot be
+     separated.
+
+Any of the three is an acceptable outcome. Nothing here needs a problem
+to be found, and CHARACTER ACCEPTABLE is not a failure of the round.
+
+THE LEVEL CAVEAT
+----------------
+The three conditions sit at different loudnesses, because the
+production gain law puts them there and nothing was levelled. The key
+carries an analysis-only offset per file to the set median, applied to
+nothing. Any reading that depends on an annoyance difference between
+two conditions must be checked against those offsets before it is
+believed.

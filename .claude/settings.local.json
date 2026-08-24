@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(rm -f Tests/TestExports.cpp.new)",
+      "Bash(sed -i 's|^} // extern \"C\"$|/**\\\\n    Renders the Phase 5F / FU-2 preview-trim candidate listening set.\\\\n\\\\n    Four candidate base trims, four sources, Mix 30% and Mix 100%. Blind names,\\\\n    a key in a separate file, and a manifest. Nothing in the plugin changes:\\\\n    the candidates are applied as a multiply on one shared wet render.\\\\n*/\\\\n__declspec \\(dllexport\\) int ExportAuroraVerbTrimCandidates \\(const char* directory, double sampleRate\\)\\\\n{\\\\n    if \\(directory == nullptr\\)\\\\n        return -1;\\\\n\\\\n    return avtest::exportTrimCandidates \\(directory,\\\\n                                        sampleRate > 0.0 ? sampleRate : 48000.0\\);\\\\n}\\\\n\\\\n} // extern \"C\"|' Tests/TestExports.cpp)",
+      "Bash(sed -i 's|^#include \"GainStaging.h\"$|#include \"GainStaging.h\"\\\\n#include \"WetGainStaging.h\"|' Tests/TestExports.cpp)",
+      "Bash(sed -i 's|            p.windowSeconds = window;|            p.windowSeconds = 2.0 * window;|' Tests/WetGainStaging.cpp)",
+      "Bash(sed -n '/Second half of the window against the first/,/double settleDb/p' Tests/WetGainStaging.h)",
+      "Bash(cd \"/c/Users/Demirhan Özdemir/Desktop/Müzik/valhalla-reverb/TrimCandidatesAB\" *)",
+      "Bash(sed -i 's|        { 2, 0, 3, 1 }, { 1, 3, 0, 2 },|        { 1, 2, 0, 3 }, { 3, 0, 2, 1 },|' Tests/WetGainStaging.cpp)",
+      "Bash(sed -i 's|        { 3, 1, 2, 0 }, { 0, 2, 1, 3 },|        { 0, 3, 1, 2 }, { 2, 1, 3, 0 },|' Tests/WetGainStaging.cpp)",
+      "Bash(sed -i 's|        { 1, 0, 2, 3 }, { 3, 2, 0, 1 },|        { 2, 3, 0, 1 }, { 1, 0, 3, 2 },|' Tests/WetGainStaging.cpp)",
+      "Bash(sed -i 's|        { 2, 3, 1, 0 }, { 0, 1, 3, 2 },|        { 3, 1, 2, 0 }, { 0, 2, 1, 3 },|' Tests/WetGainStaging.cpp)",
+      "Bash(sed -n '/const int order\\\\[8\\\\]\\\\[candidateCount\\\\]/,/};/p' Tests/WetGainStaging.cpp)",
+      "Bash(cd \"/c/Users/Demirhan Özdemir/Desktop/Müzik/valhalla-reverb\" *)",
+      "Bash(sed -i 's/    out.broadbandRt60 = decay.rt60Seconds;/    out.broadbandRt60 = decay.rt60FromT30;/' Tests/ModalMap.cpp)",
+      "Bash(sed -i 's|^    WetGainStagingTests.cpp$|    WetGainStagingTests.cpp\\\\n    ModalMap.cpp\\\\n    ModalMapTests.cpp|' Tests/CMakeLists.txt)",
+      "Bash(sed -i 's|^void runWetGainStagingTests\\(\\);$|void runWetGainStagingTests\\(\\);\\\\n\\\\n// --- PHASE 6: Aurora Sound - voicing and character -------------------------\\\\n\\\\nvoid runModalMapTests\\(\\);|' Tests/Suites.h)",
+      "Bash(sed -i 's|^    runWetGainStagingTests\\(\\);$|    runWetGainStagingTests\\(\\);\\\\n\\\\n    // PHASE 6\\\\n    runModalMapTests\\(\\);|' Tests/RunAll.cpp)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Demirhan Özdemir\\Desktop\\Müzik\\valhalla-reverb",
+      "C:\\Users\\Demirhan Özdemir\\Desktop\\Müzik\\valhalla-reverb\\Source\\DSP",
+      "C:\\Users\\Demirhan Özdemir\\Desktop\\Müzik\\valhalla-reverb\\Scripts"
+    ]
+  }
+}

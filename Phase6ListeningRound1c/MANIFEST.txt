@@ -1,0 +1,98 @@
+PHASE 6 / FU-1 - ROUND 1c, COUNTERBALANCED MODULATION REPEAT
+============================================================
+
+Six pairs: three modes, each heard twice on a different excitation,
+with the treatment on opposite sides of the pair the second time.
+
+Round 1b was inconclusive. The answers were perfectly consistent in
+letter and only two-of-three in treatment, which is chance, and no
+level difference explained it. This round is built so that following
+the modulation and following the position give different answers.
+
+Settings, all shipping defaults except the one under test:
+  Decay      2.5 s
+  Size       0.6
+  Mod Rate   0.5 Hz
+  Mod Depth  0 in one file of a pair, 0.3 in the other
+  Width      1
+  Mix        100% wet
+
+48 kHz, 32-bit float stereo. Inside a pair the excitation is the same
+vector passed to the renderer twice, so nothing but Mod Depth differs.
+Across pairs every excitation is a different deterministic seed, so no
+two pairs share a noise realisation and nothing here is byte-comparable
+with round 1b. No normalisation, no loudness match, no limiting, no EQ,
+no notch, no post-processing.
+
+LISTEN IN THIS ORDER
+--------------------
+  1.  trial-1-P.wav   then   trial-1-Q.wav
+  2.  trial-2-R.wav   then   trial-2-S.wav
+  3.  trial-3-T.wav   then   trial-3-U.wav
+  4.  trial-4-V.wav   then   trial-4-W.wav
+  5.  trial-5-J.wav   then   trial-5-K.wav
+  6.  trial-6-M.wav   then   trial-6-N.wav
+
+The two repeats of a mode are never next to each other in this
+order, so the second hearing is a fresh judgement rather than a
+comparison against a memory.
+
+Level difference inside each pair
+---------------------------------
+Magnitude only; the sign is in the key, because which file is louder
+is one inference away from which file is modulated.
+
+  trial 1   0.68 LU integrated, 0.35 dB peak
+  trial 2   0.17 LU integrated, 1.18 dB peak
+  trial 3   0.38 LU integrated, 0.62 dB peak
+  trial 4   0.33 LU integrated, 0.91 dB peak
+  trial 5   0.46 LU integrated, 0.06 dB peak
+  trial 6   0.23 LU integrated, 0.39 dB peak
+
+Nothing was levelled. Listen to both files in a pair at one common
+monitor gain and do not change it between them or between trials.
+
+THE QUESTION
+------------
+One primary question per trial, and deliberately only one:
+
+  In which is the bell, chime, metallic or one-note feeling more
+  obvious?
+
+Answer with a file name, or say you cannot tell them apart. There is
+no forced choice: "cannot tell" is a real answer and is analysed as
+one, not discarded.
+
+Then, secondary:
+
+  How big is the difference?  obvious / slight / almost none /
+  cannot tell
+
+Not asked this round, on purpose: which is more natural, and which
+you prefer. In round 1b those answers moved in lockstep with the
+metallicness answer in all three pairs, which means they carried no
+independent information and could only blur the endpoint.
+
+THE ANALYSIS, FIXED NOW
+-----------------------
+Written before the files were rendered so that it cannot be chosen
+after the answers are known.
+
+Per mode, across its two repeats:
+  both repeats name the same Mod Depth   -> direction-consistent
+  the repeats name opposite Mod Depths   -> inconsistent
+  either repeat is "cannot tell"          -> unresolved
+
+Reported separately, and this is the point of the round:
+  treatment-direction consistency  - do the repeats agree on Mod Depth?
+  presentation-position consistency - do the repeats agree on first
+                                      versus second?
+
+Because each mode is counterbalanced, those two cannot both be high.
+Following the modulation forces position to disagree; following the
+position forces treatment to disagree. Whichever comes back consistent
+is what was actually being heard.
+
+A result of "unresolved" or "inconsistent" for a mode is an
+acceptable outcome and will be reported as such. Nothing here needs
+the modulation to be audible.

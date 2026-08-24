@@ -1,0 +1,61 @@
+PHASE 6 / FU-1 - ROUND 2b, CONTROL SET
+======================================
+
+Eight files. Each one is rated on its own.
+
+This is not an A/B test and there is nothing to compare. Do not put
+two files side by side - rate each as you hear it, in the order given,
+and move on.
+
+48 kHz, 32-bit float stereo, 7.1 s each. No normalisation, no loudness
+match, no limiting, no EQ, no notch, no saturation, no post-processing
+of any kind. One common gain is applied to all eight files and to none
+of them individually, so every relative level between them is as
+produced.
+
+LISTEN IN THIS ORDER
+--------------------
+  1.  control-01-R.wav
+  2.  control-02-M.wav
+  3.  control-03-V.wav
+  4.  control-04-K.wav
+  5.  control-05-S.wav
+  6.  control-06-Y.wav
+  7.  control-07-F.wav
+  8.  control-08-P.wav
+
+The two files that come from the same source setting are never next
+to each other in this order.
+
+THE THREE QUESTIONS, PER FILE
+-----------------------------
+Recorded separately. The second and third are not a re-wording of the
+first.
+
+  1. Do you hear a bell / chime / metallic / one-note quality?
+       0 = none
+       1 = very slight
+       2 = slight
+       3 = obvious
+       4 = very obvious
+
+  2. Is that quality objectionable?
+       0 = not at all
+       1 = a little
+       2 = noticeably
+       3 = very
+
+  3. Overall sound?
+       pleasant / neutral / unpleasant
+
+Question 3 is worded as overall sound rather than tail, because the
+word tail does not apply to every file in this set. It is a secondary
+endpoint here and will be treated as one.
+
+Question 1 is the primary endpoint. There is no expected answer, and 0
+across the board is a result.
+
+An analysis plan was fixed before these files were rendered and is in
+ANALYSIS-PLAN.txt. Leave it unread until the ratings are done: it
+states the bands a result is read against, and a listener who knows
+where they are is being invited to rate towards them.

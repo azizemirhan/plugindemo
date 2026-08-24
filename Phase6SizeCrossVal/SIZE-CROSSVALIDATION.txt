@@ -1,0 +1,180 @@
+PHASE 6 / FU-1 - SIZE TRACKER, INDEPENDENT VALIDATION
+=====================================================
+
+Source: c:\Users\Demirhan Özdemir\Desktop\Müzik\valhalla-reverb\Phase6ModalMap-v3\size-sweep-raw.csv
+The tracker is not wired into ModalSweep, no classification is
+changed, no full sweep is run, and the production DSP is read
+through the same interfaces the plugin uses and never altered.
+
+No gate, weight or ambiguity margin was moved for either half.
+
+Under test: 49 identity-consistent trajectories.
+
+Why every number below is paired with a decoy
+---------------------------------------------
+There is a detected peak every few Hz in this map, so a prediction
+that lands near one has demonstrated nothing on its own. Each
+prediction is therefore repeated at four frequencies known to be
+wrong - offsets of -2.7, -1.3, +1.3 and +2.7 local spacings - and
+measured identically against the same peak list. What is being
+reported is the separation between the two distributions.
+
+-----------------------------------------------------------------
+  A. LEAVE ONE SIZE OUT
+-----------------------------------------------------------------
+
+  One interior Size point at a time is deleted from the tracking
+  input and the whole sweep re-tracked from the same anchor without
+  it. The prediction into the deleted point comes from the mean
+  modal coordinate of the surviving matched points and nothing else.
+  It is then resolved against that frame's full peak list, with no
+  reference to what the complete tracking had assigned there; that
+  assignment is read afterwards, only to score.
+
+  Ends and the anchor are excluded: the ends would be extrapolation
+  and the anchor is where the identities come from.
+
+  held-out predictions       239
+  correct                    239  (100.00%)
+  wrong                      0
+  ambiguous (margin < 0.25)  6
+  bracketed (interpolation)  204 of 239
+  not testable               1
+
+  A bracketed case is one where the reduced tracking had matched
+  points on both sides of the deleted Size, which means its chain had
+  to step straight across the hole - a scale ratio of 2^(2/3), 1.587,
+  instead of the usual 1.260. If identity were being carried by
+  proximity rather than by the model, the double step is where it
+  would break.
+
+  Read 'correct' for what it is. It means the prediction resolved to
+  the same peak the complete tracking chose, which is a
+  self-consistency check: both use the same model, so a model that
+  was wrong in a consistent way would score here too. The decoy rows
+  below are what make the result external - they share the model's
+  neighbourhood and density and nothing else.
+
+  distribution                        n      median         p05         p95         max
+  prediction error, Hz              239      0.1680      0.0150      1.5348      3.7132
+    same, in local spacings         239      0.0372      0.0035      0.2682      0.5501
+  decoy nearest peak, Hz            956      1.5828      0.1288      5.2297      9.1574
+    same, in local spacings         956      0.3301      0.0303      1.2778      2.6769
+  winner margin, spacings           239      0.6812      0.2702      1.5744      2.6888
+    decoy winner margin             956      0.4957      0.0501      1.2745      2.6750
+  free-exponent fit error, Hz       237      0.1381      0.0117      1.5591      2.9176
+
+  share landing within               0.05 sp     0.10 sp     0.25 sp
+  prediction                           57.3%       78.2%       94.6%
+  decoy                                 9.4%       16.7%       38.6%
+
+  The decoys sit in the same neighbourhood, at the same density,
+  measured by the same detector. Their nearest peak is 9.4x further
+  away at the median than the prediction's. That ratio is the
+  result of this half: it is what a dense map cannot produce on
+  its own.
+
+  trajectories with at least one wrong held-out prediction: 0 of 49
+
+-----------------------------------------------------------------
+  B. OFF-GRID TARGETED RENDER
+-----------------------------------------------------------------
+
+  Size settings halfway between the sweep's own, each a factor of
+  2^(1/6) from both its neighbours. No tracking has been run at
+  these settings and no peak list from them existed when the
+  trajectories were built. The prediction for every subject is
+  computed and stored before the render is analysed.
+
+  rendered Size points:
+
+    UI 0.16665    scale 0.35354    1605 peaks       mean modal spacing 7.281 Hz
+    UI 0.38885    scale 0.56119    2381 peaks       mean modal spacing 4.587 Hz
+    UI 0.61115    scale 0.89097    2828 peaks       mean modal spacing 2.889 Hz
+    UI 0.83335    scale 1.41426    2437 peaks       mean modal spacing 1.820 Hz
+
+  subjects (9):
+
+    mode    anchor Hz   prom dB  matched  corrob  label
+    7         1405.30     32.80        6      11  inverse-scale-consistent
+    6         1217.38     30.59       10      21  inverse-scale-consistent
+    31        5102.35     34.05        8      17  inverse-scale-consistent
+    14        1911.39     31.59       10      21  inverse-scale-consistent
+    55       10960.40     34.19        4       8  inverse-scale-consistent
+    50       10375.10     31.17        5      11  inverse-scale-consistent
+    23        3224.54     31.66       10      21  inverse-scale-consistent
+    41        7055.64     32.32        6       6  inverse-scale-consistent
+    1          547.14     31.07        9      19  identity-uncertain
+
+  out-of-sample predictions  27   (plus 4 on the refused trajectory, reported separately)
+  confirmed                  21
+  ambiguous                  6
+  no peak inside the gate    0
+  of which, error > 1 local spacing: 1
+
+  Those rows are listed as confirmed by the tracker's gate but are
+  not evidence that the mode was found. Read them with the
+  prominence and Q columns: a large negative prominence step and a
+  Q ratio far from one is the signature of a detection gap - the
+  mode fell under the 10 dB floor at that Size and the nearest
+  survivor was taken - rather than of a mode in a new place.
+
+  distribution                        n      median         p05         p95         max
+  prediction error, Hz               27      0.3431      0.0649      3.1342      4.3872
+    same, in local spacings          27      0.0871      0.0140      0.4107      1.3031
+  decoy nearest peak, Hz            108      1.6546      0.3042      4.5880      6.9314
+    same, in local spacings         108      0.3682      0.0398      1.0925      1.4411
+  winner margin, spacings            27      0.5922      0.1039      0.9526      1.4864
+    decoy winner margin             108      0.4872      0.0385      1.1020      1.9420
+
+  decoy-to-prediction median distance ratio: 4.8x
+
+  mode         UI  predicted      found    err Hz   err/sp   margin   d prom  Q ratio  outcome
+  7       0.16665    3155.46    3156.42     0.958    0.134    0.073     4.70    2.771  ambiguous
+  6       0.16665    2733.28    2732.18    -1.097    0.143    0.976    13.55    1.499  confirmed
+  31      0.16665   11456.23   11459.47     3.241    0.428    0.169     6.47    2.369  ambiguous
+  14      0.16665    4292.00    4289.84    -2.164    0.260    0.592    12.85    1.607  confirmed
+  23      0.16665    7240.02    7237.13    -2.884    0.371    0.445    15.36    1.462  confirmed
+  1       0.16665    1230.33    1227.87    -2.463    0.395    0.446    18.00    1.704  confirmed   [refused trajectory]
+  7       0.38885    1987.91    1987.85    -0.062    0.013    0.206    13.62    1.745  ambiguous
+  6       0.38885    1721.94    1721.47    -0.465    0.092    0.777     2.61    0.944  confirmed
+  31      0.38885    7217.30    7215.70    -1.605    0.330    0.711     6.94    1.193  confirmed
+  14      0.38885    2703.92    2703.21    -0.706    0.130    0.674     9.25    1.266  confirmed
+  23      0.38885    4561.14    4560.14    -0.996    0.223    0.677     3.83    0.921  confirmed
+  41      0.38885    9980.30    9981.08     0.785    0.184    0.233     9.03    1.600  ambiguous
+  1       0.38885     775.09     773.95    -1.142    0.237    0.474     4.15    1.074  confirmed   [refused trajectory]
+  7       0.61115    1252.10    1252.44     0.335    0.081    0.083   -11.26    0.785  ambiguous
+  6       0.61115    1084.58    1084.46    -0.121    0.031    0.671    -6.45    0.595  confirmed
+  31      0.61115    4545.88    4545.48    -0.397    0.104    0.897    -3.48    0.752  confirmed
+  14      0.61115    1703.09    1702.96    -0.127    0.032    0.614    -9.17    0.638  confirmed
+  55      0.61115    9765.21    9765.47     0.266    0.066    0.317   -10.14    1.182  confirmed
+  50      0.61115    9242.97    9242.71    -0.257    0.072    0.824     2.89    1.214  confirmed
+  23      0.61115    2872.87    2872.60    -0.275    0.070    0.555    -4.32    0.725  confirmed
+  41      0.61115    6286.18    6285.83    -0.343    0.087    0.297    -5.45    1.008  confirmed
+  1       0.61115     488.20     487.49    -0.707    0.196    0.434    -4.58    0.541  confirmed   [refused trajectory]
+  7       0.83335     788.81     788.80    -0.009    0.002    1.486    -1.19    0.866  confirmed
+  6       0.83335     683.27     683.20    -0.071    0.015    0.359   -12.73    0.469  confirmed
+  31      0.83335    2863.86    2863.66    -0.197    0.045    0.446    -7.52    0.474  confirmed
+  14      0.83335    1072.93    1068.54    -4.387    1.303    0.370   -21.13    0.400  confirmed
+  55      0.83335    6151.98    6152.60     0.625    0.141    0.729    -3.74    0.745  confirmed
+  50      0.83335    5822.98    5822.76    -0.218    0.059    0.610    -3.90    0.956  confirmed
+  23      0.83335    1809.88    1809.75    -0.126    0.035    0.761   -10.29    0.366  confirmed
+  41      0.83335    3960.23    3959.97    -0.254    0.062    0.152    -6.48    0.508  ambiguous
+  1       0.83335     307.56     307.11    -0.450    0.120    2.188   -10.41    0.341  confirmed   [refused trajectory]
+
+-----------------------------------------------------------------
+  WHAT THIS DOES AND DOES NOT ESTABLISH
+-----------------------------------------------------------------
+
+  Established: on Size points the tracker never saw - one deleted
+  from its input, and four it was never run at - the inverse-scale
+  prior predicts a frequency that lands far nearer a real peak than
+  the same measurement made at deliberately wrong frequencies in
+  the same neighbourhood. The prior is therefore carrying
+  information about the tank and not about the density of the map.
+
+  Not established: that a trajectory the tracker refused is wrong,
+  or that a mode outside the gate's envelope does not exist. Both
+  remain open and are reported as uncertain rather than resolved.
+
+Written: size-crossval-leave-one-out.csv, size-crossval-off-grid.csv, size-crossval-offgrid-raw.csv

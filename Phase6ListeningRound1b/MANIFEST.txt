@@ -1,0 +1,65 @@
+PHASE 6 / FU-1 - ROUND 1b, MODULATION INSIDE ONE MODE
+=====================================================
+
+Three pairs. Both files in a pair are the same mode, the same band
+and the same excitation sample. The only thing that differs is Mod
+Depth: one file at 0, the other at the shipping 30%.
+
+Round one compared two different modes, so preference there could not
+be separated from preference for a frequency region. That confound is
+gone here.
+
+Settings, all shipping defaults except the one under test:
+  Decay      2.5 s
+  Size       0.6
+  Mod Rate   0.5 Hz
+  Mod Depth  0 in one file, 0.3 in the other
+  Width      1
+  Mix        100% wet
+
+48 kHz, 32-bit float stereo. No normalisation, no loudness match, no
+limiting, no EQ, no notch, no post-processing. The same shipping trim
+is applied to every file.
+
+The excitation is a fresh noise realisation, not round one's. Round
+one's key is open, so copies of those files could be de-blinded by
+comparing bytes against a known one; and the listener has already
+heard the Mod Depth 30% side of every pair, which would put
+familiarity on one side of each comparison.
+
+The three pairs
+---------------
+  pair 1   modtest-1-X.wav  vs  modtest-1-Y.wav
+  pair 2   modtest-2-X.wav  vs  modtest-2-Y.wav
+  pair 3   modtest-3-X.wav  vs  modtest-3-Y.wav
+
+Level difference inside each pair
+---------------------------------
+Magnitude only. The sign is withheld deliberately: modulation
+redistributes energy, so knowing which file is louder is one
+inference away from knowing which file is modulated. The signed
+values are in the key.
+
+  pair 1   0.60 LU integrated, 0.67 dB peak
+  pair 2   0.25 LU integrated, 1.07 dB peak
+  pair 3   0.25 LU integrated, 0.70 dB peak
+
+Nothing was levelled. Listen to both files in a pair at one common
+monitor gain and do not adjust between them.
+
+Three questions per pair
+------------------------
+  1. in which is the bell, chime, metallic or one-note feeling more
+     obvious?
+  2. whose tail is more natural, more smooth?
+  3. how big is the difference: very obvious, slight, or almost
+     none?
+
+Optionally, and kept separate from the first answer: which do you
+prefer? Preference and metallicness are different questions and the
+round-one result is a reason to keep them apart - the file that was
+preferred there is not automatically the less metallic one.
+
+There is no expected answer. The measurement says these three modes
+differ in how much the modulation moves their neighbourhood; whether
+that difference is audible is the open question.

@@ -1,0 +1,38 @@
+PHASE 6 / FU-1 - RESOLUTION AND NOISE FLOOR
+===========================================
+
+Window duration sets resolving power. Zero-padded bin width is a
+property of the display and is never resolving power.
+
+Render repeatability: bit-identical, 0 sample difference between two
+renders of the same setting. Verified by the test suite.
+
+Analysis/window-shift variability floor: 0.1278 Hz.
+  95th percentile of the centre difference when the analysis window is
+  moved 0.25 s over the same response. A property of the analysis.
+  Movement is only called movement above 3x this: 0.3834 Hz.
+
+Detailed measurement (band-limited decay, stereo) limited to the
+strongest 60 modes of the reference setting.
+
+reference: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz
+  broadband RT60 2.50546 s
+  peaks above 10 dB prominence: 2814
+
+size 0: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 10.296 Hz
+size 0.25: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 6.12204 Hz
+size 0.5: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 3.64019 Hz
+size 0.6: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz
+size 0.75: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.16447 Hz
+size 1: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 1.287 Hz
+
+decay 0.5 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 0.504906 s
+decay 1 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 0.994779 s
+decay 2.5 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 2.50546 s
+decay 5 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 4.99771 s
+decay 10 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 9.12451 s
+decay 20 s: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz, broadband RT60 18.2838 s
+
+mod depth 0.30: window 3 s, resolution 0.666667 Hz, bin width 0.183105 Hz (display only), mean modal spacing estimate 2.95675 Hz
+  peaks: 240
+

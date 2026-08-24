@@ -1,0 +1,53 @@
+PHASE 6 / FU-1 - ROUND 1c BLIND KEY
+===================================
+
+Do not read this before listening.
+
+--- trial 1 ---
+  mode #50  375.44 Hz  class B  repeat 1  seed 20260820
+  trial-1-P.wav  (first)  = Mod Depth 0.3
+  trial-1-Q.wav  (second) = Mod Depth 0
+    first:  peak -39.57 dBFS, RMS -64.28 dBFS, integrated -54.00 LUFS
+    second: peak -39.92 dBFS, RMS -64.74 dBFS, integrated -54.67 LUFS
+    signed gap first-second: 0.68 LU, 0.35 dB peak
+
+--- trial 2 ---
+  mode #4  646.34 Hz  class A  repeat 2  seed 20260821
+  trial-2-R.wav  (first)  = Mod Depth 0
+  trial-2-S.wav  (second) = Mod Depth 0.3
+    first:  peak -35.47 dBFS, RMS -60.33 dBFS, integrated -49.90 LUFS
+    second: peak -36.65 dBFS, RMS -60.52 dBFS, integrated -50.07 LUFS
+    signed gap first-second: 0.17 LU, 1.18 dB peak
+
+--- trial 3 ---
+  mode #54  4505.77 Hz  class B  repeat 1  seed 20260822
+  trial-3-T.wav  (first)  = Mod Depth 0
+  trial-3-U.wav  (second) = Mod Depth 0.3
+    first:  peak -29.70 dBFS, RMS -54.61 dBFS, integrated -40.33 LUFS
+    second: peak -30.32 dBFS, RMS -54.96 dBFS, integrated -40.72 LUFS
+    signed gap first-second: 0.38 LU, 0.62 dB peak
+
+--- trial 4 ---
+  mode #50  375.44 Hz  class B  repeat 2  seed 20260823
+  trial-4-V.wav  (first)  = Mod Depth 0
+  trial-4-W.wav  (second) = Mod Depth 0.3
+    first:  peak -40.82 dBFS, RMS -63.70 dBFS, integrated -53.56 LUFS
+    second: peak -39.90 dBFS, RMS -63.56 dBFS, integrated -53.23 LUFS
+    signed gap first-second: -0.33 LU, -0.91 dB peak
+
+--- trial 5 ---
+  mode #4  646.34 Hz  class A  repeat 1  seed 20260824
+  trial-5-J.wav  (first)  = Mod Depth 0.3
+  trial-5-K.wav  (second) = Mod Depth 0
+    first:  peak -39.41 dBFS, RMS -64.03 dBFS, integrated -53.47 LUFS
+    second: peak -39.46 dBFS, RMS -64.42 dBFS, integrated -53.94 LUFS
+    signed gap first-second: 0.46 LU, 0.06 dB peak
+
+--- trial 6 ---
+  mode #54  4505.77 Hz  class B  repeat 2  seed 20260825
+  trial-6-M.wav  (first)  = Mod Depth 0.3
+  trial-6-N.wav  (second) = Mod Depth 0
+    first:  peak -29.72 dBFS, RMS -55.09 dBFS, integrated -40.89 LUFS
+    second: peak -30.11 dBFS, RMS -54.84 dBFS, integrated -40.66 LUFS
+    signed gap first-second: -0.23 LU, 0.39 dB peak
+

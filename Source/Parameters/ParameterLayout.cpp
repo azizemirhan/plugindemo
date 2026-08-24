@@ -1,0 +1,182 @@
+#include "ParameterLayout.h"
+
+#include <string>
+
+namespace av::params
+{
+
+namespace
+{
+    using APF      = juce::AudioParameterFloat;
+    using APC      = juce::AudioParameterChoice;
+    using FloatAtt = juce::AudioParameterFloatAttributes;
+
+    juce::ParameterID pid (const char* name) { return { name, versionHint }; }
+
+    /** Linear range. */
+    juce::NormalisableRange<float> lin (float min, float max, float interval = 0.0f)
+    {
+        return { min, max, interval };
+    }
+
+    /** Range skewed so that `centre` sits at the middle of the control's travel. */
+    juce::NormalisableRange<float> skewed (float min, float max, float centre, float interval = 0.0f)
+    {
+        juce::NormalisableRange<float> r { min, max, interval };
+        r.setSkewForCentre (centre);
+        return r;
+    }
+
+    template <typename Container>
+    juce::StringArray toStringArray (const Container& names)
+    {
+        juce::StringArray a;
+
+        for (const auto& n : names)
+            a.add (juce::String (std::string (n)));
+
+        return a;
+    }
+
+    /** "12.3 Hz" / "1.24 kHz" — one formatter for every frequency parameter. */
+    juce::String freqToText (float hz, int)
+    {
+        if (hz >= 1000.0f)
+            return juce::String (hz / 1000.0f, 2) + " kHz";
+
+        return juce::String (hz, hz < 100.0f ? 1 : 0) + " Hz";
+    }
+
+    /** Seconds below 1 s are shown in milliseconds. */
+    juce::String secondsToText (float s, int)
+    {
+        if (s < 1.0f)
+            return juce::String (s * 1000.0f, 0) + " ms";
+
+        return juce::String (s, s < 10.0f ? 2 : 1) + " s";
+    }
+
+    juce::String percentToText (float v, int) { return juce::String (v, 1) + " %"; }
+
+    std::unique_ptr<APF> percentParam (const char* paramId, const juce::String& name,
+                                       float defaultValue, float max = 100.0f)
+    {
+        return std::make_unique<APF> (pid (paramId), name, lin (0.0f, max, 0.1f), defaultValue,
+                                      FloatAtt().withLabel ("%")
+                                               .withStringFromValueFunction (percentToText));
+    }
+
+    std::unique_ptr<APF> freqParam (const char* paramId, const juce::String& name,
+                                    float min, float max, float centre, float defaultValue)
+    {
+        return std::make_unique<APF> (pid (paramId), name, skewed (min, max, centre, 0.1f),
+                                      defaultValue,
+                                      FloatAtt().withLabel ("Hz")
+                                               .withStringFromValueFunction (freqToText));
+    }
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+
+    // --- Algorithm & character -------------------------------------------
+
+    layout.add (std::make_unique<APC> (pid (id::mode), "Mode",
+                                       toStringArray (modeNames),
+                                       static_cast<int> (Mode::largeHall)));
+
+    layout.add (std::make_unique<APC> (pid (id::color), "Color",
+                                       toStringArray (colorNames),
+                                       static_cast<int> (Color::classic)));
+
+    // --- Space ------------------------------------------------------------
+
+    layout.add (std::make_unique<APF> (pid (id::preDelay), "Pre-Delay",
+                                       skewed (0.0f, 500.0f, 60.0f, 0.1f), 0.0f,
+                                       FloatAtt().withLabel ("ms")
+                                                .withStringFromValueFunction ([] (float v, int)
+                                                    { return juce::String (v, 1) + " ms"; })));
+
+    // Decay is skewed so the musically busy 1-4 s region occupies the middle of
+    // the control's travel rather than its first tenth.
+    layout.add (std::make_unique<APF> (pid (id::decay), "Decay",
+                                       skewed (0.1f, 60.0f, 2.5f, 0.01f), 2.5f,
+                                       FloatAtt().withLabel ("s")
+                                                .withStringFromValueFunction (secondsToText)));
+
+    layout.add (percentParam (id::size, "Size", 60.0f));
+
+    // --- Diffusion / density ---------------------------------------------
+
+    layout.add (percentParam (id::earlyDiffusion, "Early Diffusion", 70.0f));
+    layout.add (percentParam (id::lateDiffusion,  "Late Diffusion",  70.0f));
+    layout.add (percentParam (id::density,        "Density",         70.0f));
+
+    // Envelope shaping: 0 % = instant onset, 100 % = fully swelled attack.
+    // The Nonlinear algorithm reinterprets this as gate / reverse length.
+    layout.add (percentParam (id::attack, "Attack", 0.0f));
+
+    // --- Modulation -------------------------------------------------------
+
+    layout.add (std::make_unique<APF> (pid (id::modRate), "Mod Rate",
+                                       skewed (0.01f, 10.0f, 0.5f, 0.001f), 0.5f,
+                                       FloatAtt().withLabel ("Hz")
+                                                .withStringFromValueFunction ([] (float v, int)
+                                                    { return juce::String (v, 2) + " Hz"; })));
+
+    layout.add (percentParam (id::modDepth, "Mod Depth", 30.0f));
+
+    // --- Frequency-dependent decay ---------------------------------------
+
+    layout.add (percentParam (id::lowDamp,  "Low Damp",  20.0f));
+    layout.add (percentParam (id::highDamp, "High Damp", 50.0f));
+
+    layout.add (freqParam (id::lowDampFreq,  "Low Damp Freq",   20.0f,  1000.0f,  200.0f,  200.0f));
+    layout.add (freqParam (id::highDampFreq, "High Damp Freq", 500.0f, 20000.0f, 4000.0f, 6000.0f));
+
+    // --- Output stage -----------------------------------------------------
+
+    // 0 % = mono tail, 100 % = as generated, 200 % = mid/side expanded. Values
+    // above 100 % are checked for mono compatibility by the stereo engine.
+    layout.add (percentParam (id::width, "Width", 100.0f, 200.0f));
+
+    layout.add (freqParam (id::lowCut,  "Low Cut",   20.0f,  1000.0f,  200.0f,   20.0f));
+    layout.add (freqParam (id::highCut, "High Cut", 500.0f, 20000.0f, 4000.0f, 20000.0f));
+
+    layout.add (percentParam (id::mix, "Mix", 30.0f));
+
+    return layout;
+}
+
+void RawHandles::attach (juce::AudioProcessorValueTreeState& state)
+{
+    auto get = [&state] (const char* paramId)
+    {
+        auto* p = state.getRawParameterValue (paramId);
+        jassert (p != nullptr); // ID mismatch between the layout and this struct
+        return p;
+    };
+
+    mode           = get (id::mode);
+    color          = get (id::color);
+    preDelay       = get (id::preDelay);
+    decay          = get (id::decay);
+    size           = get (id::size);
+    earlyDiffusion = get (id::earlyDiffusion);
+    lateDiffusion  = get (id::lateDiffusion);
+    attack         = get (id::attack);
+    modRate        = get (id::modRate);
+    modDepth       = get (id::modDepth);
+    density        = get (id::density);
+    lowDamp        = get (id::lowDamp);
+    highDamp       = get (id::highDamp);
+    lowDampFreq    = get (id::lowDampFreq);
+    highDampFreq   = get (id::highDampFreq);
+    width          = get (id::width);
+    lowCut         = get (id::lowCut);
+    highCut        = get (id::highCut);
+    mix            = get (id::mix);
+}
+
+} // namespace av::params

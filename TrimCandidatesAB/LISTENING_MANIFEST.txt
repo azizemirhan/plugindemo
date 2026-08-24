@@ -1,0 +1,59 @@
+PHASE 5F / FU-2 - PREVIEW TRIM CANDIDATE LISTENING SET
+======================================================
+
+Decay 2.5 s, Size 60%, Mod Rate 0.5 Hz, Mod Depth 30%, Width 100%.
+48 kHz, 32-bit float. Mix law: Aurora Custom, exponent 0.799604.
+
+Every candidate for one source and one mix point shares a single wet
+render. The reverb was run once per source; the candidates differ by
+one multiplication. No normalisation, no loudness matching, no
+limiting, no saturation. The decay-aware factor, the Size
+compensation, Width and the mix law are exactly as they ship - only
+the base trim differs.
+
+shipping trim at these settings: 0.939981  (base 1 x decay factor 0.939981)
+
+candidate C is derived: 10^(9/20) / 4.17848 = 0.674499
+  where 4.17848 is the worst measured noise
+  stress effective true peak.
+
+--- mixed, Mix 30% ---
+  dry gain 0.891007, wet gain 0.38186
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- mixed, Mix 100% ---
+  dry gain 0, wet gain 1
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- pad, Mix 30% ---
+  dry gain 0.891007, wet gain 0.38186
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- pad, Mix 100% ---
+  dry gain 0, wet gain 1
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- snare, Mix 30% ---
+  dry gain 0.891007, wet gain 0.38186
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- snare, Mix 100% ---
+  dry gain 0, wet gain 1
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- piano, Mix 30% ---
+  dry gain 0.891007, wet gain 0.38186
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+
+--- piano, Mix 100% ---
+  dry gain 0, wet gain 1
+  candidate-A .. candidate-D, in an order that differs for
+  every source and every mix point.
+

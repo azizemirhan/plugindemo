@@ -1,0 +1,88 @@
+PHASE 6 / FU-1 - ROUND 2c, DECISION GATE
+========================================
+
+Nine files. Each one is rated on its own.
+
+This is not an A/B test and there is nothing to compare. Rate each
+file as you hear it, in the order given, and move on.
+
+Three full-band sources, each heard three ways. No band limiting
+anywhere in this set - the excitation is never filtered.
+
+Settings, all shipping defaults, none varied:
+  Decay      2.5 s
+  Size       0.6
+  Mod Rate   0.5 Hz
+  Mod Depth  0.3
+  Width      1
+  Mix law    production, unchanged
+
+48 kHz, 32-bit float stereo, 12.5 s each. No
+normalisation, no loudness match, no limiter, no saturation, no EQ,
+no notch, no post-processing. Levels are whatever the production gain
+law produces.
+
+  1.  case-01-E.wav
+  2.  case-02-I.wav
+  3.  case-03-J.wav
+  4.  case-04-Q.wav
+  5.  case-05-U.wav
+  6.  case-06-W.wav
+  7.  case-07-X.wav
+  8.  case-08-Y.wav
+  9.  case-09-Z.wav
+
+LEVELS - READ THIS BEFORE YOU START
+-----------------------------------
+No rendered file was normalised and the production gain law is
+untouched, so what each source's dry, wet and mix versions do
+relative to each other is exactly what the shipping chain produces -
+and that is the thing being asked about.
+
+The three sources were brought to a common loudness before anything
+else happened to them, because natively they sit about 13 dB apart
+and that gap would otherwise have dominated every rating. One gain
+per source, the same across all three of its versions.
+
+What is left is still not equally loud, and the differences are
+large enough to matter. The three groups below are printed in
+loudness order, not in any order that says what they are:
+
+  group 1   -27.47 to -24.41 LUFS, peak -14.51 to -13.80 dBFS
+  group 2   -23.92 to -23.08 LUFS, peak -13.86 to -6.27 dBFS
+  group 3   -22.54 to -22.44 LUFS, peak -15.97 to -5.33 dBFS
+
+Which file belongs to which group is in the key. What matters while
+rating is only this: a quieter file is not automatically less
+annoying, and a louder one is not automatically worse. Set one
+comfortable monitor level, keep it, and try to rate the character
+rather than the level.
+
+THE QUESTIONS, PER FILE
+-----------------------
+Recorded separately. None is a re-wording of another.
+
+  1. Do you hear a bell / chime / metallic / one-note quality?
+       0 = none        1 = very slight    2 = slight
+       3 = obvious     4 = very obvious
+
+  2. Is it annoying?
+       0 = not at all  1 = slight         2 = clearly annoying
+       3 = very annoying
+
+  3. Overall sound?
+       pleasant / neutral / unpleasant
+
+  4. Does the source stay natural and in front?
+       yes / partly / no / n-a
+
+Question 4 will not fit every file in this set. Answer n-a where it
+does not, and do not force it.
+
+Question 1 is the primary endpoint. Preference is not a substitute
+for it and is not asked. There is no expected answer, and 0 across
+the board is a result.
+
+An analysis plan was fixed before these files were rendered and is in
+ANALYSIS-PLAN.txt. Leave it unread until the ratings are done: it
+states the thresholds a result is read against.

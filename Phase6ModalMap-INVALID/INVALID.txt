@@ -1,0 +1,52 @@
+INVALID FOR CLASSIFICATION - measurement-instrument defects
+===========================================================
+
+This sweep ran to completion and its raw data is kept unchanged, but three of
+its measurements were reading the instrument rather than the tank. Nothing in
+the columns below may be used as a production result.
+
+DO NOT USE
+----------
+
+  modal_decay_s   The per-peak decay was measured by band-limiting to about
+                  1 Hz and integrating. A filter that narrow rings for of
+                  order 1/bandwidth seconds on its own, so the figure is
+                  dominated by the filter rather than by the mode. It reads
+                  4.0-4.1 x the broadband RT60 for nearly every one of 60
+                  independent modes, which is not a physical result.
+
+  decay_ratio     Derived from modal_decay_s. Same defect.
+
+  class           All 60 modes came out class D because the Mod Depth A/B
+  confidence      match failed for 57 of them. The reference list was
+                  truncated to the strongest 60 *before* matching, so the
+                  modulated counterparts were often not in the list to be
+                  matched against. The classification is an artefact of that
+                  ordering, not a measurement of the tank.
+
+  size_fit_*      Only 5 of 60 modes were tracked over 4 or more Size points.
+                  No interpolation was done, which was correct, but the
+                  coverage is far too thin to classify from. The Size points
+                  were chosen on the UI control, and the resulting scale steps
+                  are uneven enough that the tracker loses modes between them.
+
+STILL USABLE, with care
+-----------------------
+
+  The reference modal map itself: frequency, prominence, bandwidth, Q, and the
+  resolution bookkeeping in RESOLUTION.txt. 3 s window, 0.667 Hz resolution,
+  0.183 Hz display bin width, 2814 peaks above 10 dB prominence, broadband
+  RT60 2.505 s.
+
+  The raw per-setting CSVs, as a record of what was detected where.
+
+  The render side is not in question: renders are bit-identical between runs,
+  and the analysis/window-shift variability floor of 0.1278 Hz is a property
+  of the analysis, measured separately.
+
+STATUS
+------
+
+Superseded once the modal decay estimator has passed synthetic ground-truth
+validation and the Mod Depth and Size defects are fixed. Kept for comparison,
+not for use.

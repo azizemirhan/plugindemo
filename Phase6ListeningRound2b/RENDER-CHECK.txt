@@ -1,0 +1,28 @@
+PHASE 6 / FU-1 - ROUND 2b, RENDER CHECK
+=======================================
+
+Deliberately content-free. Nothing here says which file is
+which mode, or which two share one.
+
+files written                  8
+distinct source settings       4, two files each
+closest two files sharing
+  a setting                    3 apart (2 files between)
+seed + centre frequency pairs
+  reused from round 2          8 / 8
+excitation gain before the
+  band filter                  8x, identical to round 2
+duration                       7.1 s, identical to round 2
+files with any non-zero sample
+  after the excitation window  0 / 8   (a reverb would leave one)
+common output gain             0.5x, applied to all files and to none individually
+files above 0 dBFS             0
+peak range                     -7.65 to -4.43 dBFS
+loudness range                 -22.67 to -21.24 LUFS
+loudness spread                1.43 LU
+sample rate                    48000 Hz, 32-bit float stereo
+tank / reverb                  not applied
+modulation                     not applied
+normalisation                  none
+loudness match                 none
+post-processing                none

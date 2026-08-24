@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "C:/JuceBuilds/av-${presetName}",
+      "cacheVariables": {
+        "AV_JUCE_PATH": "${sourceDir}/External/JUCE"
+      }
+    },
+
+    {
+      "name": "production",
+      "displayName": "production - shipping artefact",
+      "description": "What ships. FDN engine active, no telemetry, no capture, shipped modulation architecture. Every flag is stated, so a stale cache cannot change what this builds.",
+      "inherits": "base",
+      "cacheVariables": {
+        "AV_DEV_ALLPASS_CANDIDATE": "1",
+        "AV_DEV_DIAGNOSTICS": "OFF",
+        "AV_DEV_AUDIO_CAPTURE": "OFF",
+        "AV_BUILD_TESTS": "OFF",
+        "AV_COPY_PLUGIN_AFTER_BUILD": "OFF"
+      }
+    },
+
+    {
+      "name": "development",
+      "displayName": "development - telemetry and audio capture",
+      "description": "For host sessions that need diagnostics. Same engine and same architecture as production; the difference is telemetry and capture, which are compiled in.",
+      "inherits": "base",
+      "cacheVariables": {
+        "AV_DEV_ALLPASS_CANDIDATE": "1",
+        "AV_DEV_DIAGNOSTICS": "ON",
+        "AV_DEV_AUDIO_CAPTURE": "ON",
+        "AV_BUILD_TESTS": "ON",
+        "AV_COPY_PLUGIN_AFTER_BUILD": "OFF"
+      }
+    },
+
+    {
+      "name": "validation",
+      "displayName": "validation - telemetry, no capture",
+      "description": "Regression and pluginval runs. Telemetry on so a session report exists; capture off so a strictness run does not write gigabytes of WAV.",
+      "inherits": "base",
+      "cacheVariables": {
+        "AV_DEV_ALLPASS_CANDIDATE": "1",
+        "AV_DEV_DIAGNOSTICS": "ON",
+        "AV_DEV_AUDIO_CAPTURE": "OFF",
+        "AV_BUILD_TESTS": "ON",
+        "AV_COPY_PLUGIN_AFTER_BUILD": "OFF"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    { "name": "production",  "configurePreset": "production",  "configuration": "Release" },
+    { "name": "development", "configurePreset": "development", "configuration": "Release" },
+    { "name": "validation",  "configurePreset": "validation",  "configuration": "Release" }
+  ]
+}

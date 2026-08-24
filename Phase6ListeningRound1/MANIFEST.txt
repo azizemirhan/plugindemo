@@ -1,0 +1,79 @@
+PHASE 6 / FU-1 - TARGETED LISTENING SET, ROUND 1
+================================================
+
+Six candidates in three pairs, one pair per frequency region.
+Within a pair the two candidates differ only in which mode of the
+tank the excitation lands on.
+
+Settings, all shipping defaults and none of them varied:
+  Decay      2.5 s
+  Size       0.6  (scale 0.870551)
+  Mod Rate   0.5 Hz
+  Mod Depth  0.3   (a Mod Depth 0 variant of the diagnostic is also written)
+  Width      1
+  Mix        100% wet
+  Size compensation on, shipping preview trim applied
+
+48 kHz, 32-bit float stereo. No normalisation, no loudness match,
+no limiting, no EQ, no notch, no post-processing of any kind. The
+same trim is applied to every file, so the levels you hear are the
+levels the tank produced.
+
+Excitation
+----------
+The DSP is identical for every candidate, so an identical broadband
+source would give identical files. What differs is the band the
+excitation occupies: one ERB centred on the candidate, from four
+cascaded second-order band-passes run forwards only, so there is no
+pre-ring in front of the transient. The source material inside that
+band is the same for every candidate.
+
+  diagnostic-*.wav   a 25 ms noise burst
+  snare-*.wav        the Phase 5F snare stand-in
+  moddepth0-*.wav    the diagnostic again with Mod Depth at 0
+
+  snare-fullband-context.wav is the unfiltered snare through the same
+  tank. It is identical for every candidate, carries no letter and is
+  not part of any comparison - it is there so the bands can be heard
+  against the whole tail.
+
+Blinding
+--------
+Letters are permuted, and permuted differently for the diagnostic and
+for the snare, so the same candidate is a different letter in the two
+sets. The Mod Depth 0 files keep the diagnostic's letter, because that
+comparison is within one candidate rather than between two.
+
+BLIND_KEY.txt holds the mapping and every per-file measurement. Leave
+it unread until the listening is done - a level column is the mapping
+written in another alphabet.
+
+One thing this cannot blind: a band-limited burst has an audible
+centre frequency, so anyone holding the candidate list can tell which
+candidate a file is by ear. The letters hide the order and the class;
+they cannot hide the pitch.
+
+snare-fullband-context.wav: peak -14.12 dBFS, integrated -25.09 LUFS
+
+The three pairs
+---------------
+  pair 1  low-mid
+    diagnostic-B.wav  vs  diagnostic-D.wav
+    snare-E.wav       vs  snare-A.wav
+  pair 2  mid
+    diagnostic-F.wav  vs  diagnostic-A.wav
+    snare-C.wav       vs  snare-F.wav
+  pair 3  upper-mid
+    diagnostic-E.wav  vs  diagnostic-C.wav
+    snare-B.wav       vs  snare-D.wav
+
+Four questions per pair, and nothing else is being asked:
+
+  1. which sounds more natural, more premium?
+  2. in which is a bell, chime or metallic note more obvious?
+  3. whose tail is more pleasant?
+  4. does either sit on one note in a way that bothers you?
+
+There is no right answer and no expected one. Nothing in the
+measurement says either candidate in a pair should win, and neither
+has been called a defect.

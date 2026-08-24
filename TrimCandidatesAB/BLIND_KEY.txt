@@ -1,0 +1,41 @@
+PHASE 5F / FU-2 - BLIND KEY
+===========================
+
+Do not read this before listening.
+
+mixed Mix 30%  candidate-C = base trim 0.25  (current)   LUFS -14.8292   peak 0.533019   truepeak 0.678837   over 0
+mixed Mix 30%  candidate-A = base trim 0.405  (noise at default decay reaches full scale)   LUFS -14.8422   peak 0.536741   truepeak 0.685952   over 0
+mixed Mix 30%  candidate-B = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -14.8431   peak 0.54698   truepeak 0.698323   over 0
+mixed Mix 30%  candidate-D = base trim 1  (no fixed attenuation)   LUFS -14.8073   peak 0.559346   truepeak 0.713265   over 0
+mixed Mix 100%  candidate-B = base trim 0.25  (current)   LUFS -32.1594   peak 0.0678529   truepeak 0.0744325   over 0
+mixed Mix 100%  candidate-D = base trim 0.405  (noise at default decay reaches full scale)   LUFS -27.9691   peak 0.109922   truepeak 0.120581   over 0
+mixed Mix 100%  candidate-C = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -23.5385   peak 0.183067   truepeak 0.200819   over 0
+mixed Mix 100%  candidate-A = base trim 1  (no fixed attenuation)   LUFS -20.1182   peak 0.271412   truepeak 0.29773   over 0
+
+pad Mix 30%  candidate-A = base trim 0.25  (current)   LUFS -14.1042   peak 0.236374   truepeak 0.236401   over 0
+pad Mix 30%  candidate-C = base trim 0.405  (noise at default decay reaches full scale)   LUFS -14.0009   peak 0.244876   truepeak 0.244896   over 0
+pad Mix 30%  candidate-D = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -13.8798   peak 0.259713   truepeak 0.259713   over 0
+pad Mix 30%  candidate-B = base trim 1  (no fixed attenuation)   LUFS -13.6371   peak 0.277758   truepeak 0.27777   over 0
+pad Mix 100%  candidate-D = base trim 0.25  (current)   LUFS -32.7335   peak 0.0379008   truepeak 0.0379017   over 0
+pad Mix 100%  candidate-B = base trim 0.405  (noise at default decay reaches full scale)   LUFS -28.5432   peak 0.0613993   truepeak 0.0614007   over 0
+pad Mix 100%  candidate-A = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -24.1127   peak 0.102256   truepeak 0.102259   over 0
+pad Mix 100%  candidate-C = base trim 1  (no fixed attenuation)   LUFS -20.6923   peak 0.151603   truepeak 0.151607   over 0
+
+snare Mix 30%  candidate-C = base trim 0.25  (current)   LUFS -23.4074   peak 0.481582   truepeak 0.756273   over 0
+snare Mix 30%  candidate-D = base trim 0.405  (noise at default decay reaches full scale)   LUFS -23.3592   peak 0.48135   truepeak 0.756133   over 0
+snare Mix 30%  candidate-A = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -23.2247   peak 0.483454   truepeak 0.755891   over 0
+snare Mix 30%  candidate-B = base trim 1  (no fixed attenuation)   LUFS -23.9186   peak 0.485995   truepeak 0.755597   over 0
+snare Mix 100%  candidate-B = base trim 0.25  (current)   LUFS -37.1292   peak 0.0492229   truepeak 0.0536428   over 0
+snare Mix 100%  candidate-A = base trim 0.405  (noise at default decay reaches full scale)   LUFS -32.9389   peak 0.0797411   truepeak 0.0869014   over 0
+snare Mix 100%  candidate-D = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -28.5084   peak 0.132803   truepeak 0.144728   over 0
+snare Mix 100%  candidate-C = base trim 1  (no fixed attenuation)   LUFS -25.088   peak 0.196892   truepeak 0.214571   over 0
+
+piano Mix 30%  candidate-D = base trim 0.25  (current)   LUFS -21.7618   peak 0.371577   truepeak 0.371626   over 0
+piano Mix 30%  candidate-B = base trim 0.405  (noise at default decay reaches full scale)   LUFS -21.8287   peak 0.371577   truepeak 0.371626   over 0
+piano Mix 30%  candidate-C = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -21.7472   peak 0.371577   truepeak 0.371625   over 0
+piano Mix 30%  candidate-A = base trim 1  (no fixed attenuation)   LUFS -21.6041   peak 0.373924   truepeak 0.373924   over 0
+piano Mix 100%  candidate-A = base trim 0.25  (current)   LUFS -37.7579   peak 0.0575237   truepeak 0.0575237   over 0
+piano Mix 100%  candidate-C = base trim 0.405  (noise at default decay reaches full scale)   LUFS -33.5676   peak 0.0931884   truepeak 0.0931884   over 0
+piano Mix 100%  candidate-B = base trim 0.674499  (worst noise stress held to +9 dBFS)   LUFS -29.137   peak 0.155199   truepeak 0.155199   over 0
+piano Mix 100%  candidate-D = base trim 1  (no fixed attenuation)   LUFS -25.815   peak 0.230095   truepeak 0.230095   over 0
+

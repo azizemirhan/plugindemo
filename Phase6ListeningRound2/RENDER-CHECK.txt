@@ -1,0 +1,24 @@
+PHASE 6 / FU-1 - ROUND 2, RENDER CHECK
+======================================
+
+Deliberately content-free. Nothing here says which trial is
+which mode, or which trials share one.
+
+rating trials                  8
+context files                  2
+distinct modes                 4
+repeats per mode               2
+distinct excitation seeds      8
+closest two trials sharing
+  a mode                       3 apart (2 trials between)
+files above 0 dBFS             0
+trial peak range               -11.41 to -9.69 dBFS
+trial loudness range           -23.12 to -21.47 LUFS
+trial loudness spread          1.65 LU
+sample rate                    48000 Hz, 32-bit float stereo
+Mod Depth                      0.3 in every file, not under test
+excitation gain vs round 1c    8x, before the tank, same for every file
+normalisation                  none
+loudness match                 none
+post-processing                none
+production gain law / trim     unchanged

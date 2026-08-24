@@ -1,0 +1,20 @@
+PHASE 6 / FU-1 - ROUND 1b, RENDER CHECK
+=======================================
+
+Deliberately content-free. Nothing here says which file in a
+pair carries which Mod Depth.
+
+audio files written           6
+pairs                         3
+pairs whose two renders share
+  a bit-identical excitation  3 / 3
+files above 0 dBFS            0
+highest peak in the set       -29.96 dBFS
+quietest peak in the set      -44.25 dBFS
+sample rate                   4.8e+04 Hz, 32-bit float stereo
+excitation seed               fresh, not round one's
+gain applied                  shipping preview trim only,
+                              identical for every file
+normalisation                 none
+loudness match                none
+post-processing               none

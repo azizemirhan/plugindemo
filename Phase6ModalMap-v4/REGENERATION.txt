@@ -1,0 +1,221 @@
+PHASE 6 / FU-1 - REGENERATED ANALYSIS (v4)
+==========================================
+
+Source: c:\Users\Demirhan Özdemir\Desktop\Müzik\valhalla-reverb\Phase6ModalMap-v3
+Renders performed: 0. The peak lists are read back unchanged and only
+the Size tracking and what depends on it were recomputed. The
+production DSP was not touched and no sweep was run.
+
+Carried across byte for byte:
+  size-sweep-raw.csv
+  decay-sweep-raw.csv
+  decay-sweep.csv
+  modal-map-raw.csv
+  local-response.csv
+  moddepth-ab.csv
+  RESOLUTION.txt
+
+Regenerated:
+  size-sweep.csv          Size trajectories, with the forensic columns
+  size-trajectories.csv   one row per mode
+  size-points.csv         one row per mode per Size point
+  mode-table.csv          Size columns and class recomputed, the rest carried
+
+Anchor: the reference render at Size 0.60, scale 0.8706, carried into the
+walk at its own scale. Chains part at sweep frame 5 (UI 0.5556).
+
+-----------------------------------------------------------------
+  SIZE TRACKING
+-----------------------------------------------------------------
+
+  modes                    60
+  points                   600
+  matched                  347
+  ambiguous                67
+  gap                      6
+  boundary exit            180
+  reversals                0
+  residual > 3 spacings    0
+  mean residual RMS        0.3570 Hz
+  q CV, mean               0.007%
+  q CV, median             0.005%
+  q CV below 5%           60 / 60
+  fits reliable (R2>0.90)  46 / 60   (threshold unchanged)
+
+  identity-consistent / inverse-scale-consistent     40
+  identity-consistent / non-inverse-scale candidate    0
+  identity-uncertain                                  20
+
+  Peak evidence is a separate axis from identity. A trajectory can be
+  tracked with confidence through a Size point where the peak itself is
+  thin; the two statements are reported separately and neither
+  overrides the other.
+
+  worst evidence any matched point reached:
+    confirmed              46
+    weak-evidence          14
+    suspect                0
+    no matched point       0
+
+-----------------------------------------------------------------
+  AGREEMENT
+-----------------------------------------------------------------
+
+  forward vs backward   319 / 337 points  (94.66%),  53 of 60 trajectories that overlap
+  anchor, up            238 / 239 points  (99.58%)
+  anchor, down          136 / 141 points  (96.45%)
+  anchor, both          56 of 60 trajectories that overlap
+
+-----------------------------------------------------------------
+  CLASSIFICATION
+-----------------------------------------------------------------
+
+  The rule is unchanged. No threshold moved, no class was redefined and
+  nothing was pushed into A or B. The classifier was given Size evidence
+  that is no longer the product of a broken tracker, and this is what it
+  then said.
+
+  Control - the same classifier fed the OLD Size columns reproduces the
+  old classes: 60 / 60  (passed)
+
+  class                                           before   after
+  A  A: size-tracking, modulation-moving               0      21
+  B  B: size-tracking, modulation-resistant            0      25
+  C  C: size-insensitive / investigate fixed or mixed structure       5       0
+  D  D: ambiguous / unresolved                        55      14
+
+  modes whose class changed: 49 of 60
+
+  mode      ref Hz  exp before  exp after  R2 after  pts  before -> after
+  2        1158.49     -0.0040    -1.0000    1.0000    7  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  3       10655.00      0.0000    -1.0000    1.0000    5  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  4         646.34      0.0035    -1.0001    1.0000    9  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  5        3383.06     -0.0001    -1.0002    1.0000    7  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  7        8701.17     -0.0004    -1.0000    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  10       9146.01     -0.0004    -1.0001    1.0000    4  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  11       7703.22     -0.0005    -0.9994    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  12        769.42     -0.0064    -1.0001    1.0000    9  C: size-insensitive / investigate fixed or mixed structure -> B: size-tracking, modulation-resistant
+  13       9632.07      0.0002    -1.0002    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  14      11924.30      0.0006    -0.9994    1.0000    3  C: size-insensitive / investigate fixed or mixed structure -> D: ambiguous / unresolved
+  15       3697.63      0.0010    -1.0002    1.0000    9  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  16       7876.55      0.0004    -1.0000    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  17        672.44     -0.0020    -1.0001    1.0000   10  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  18       1428.97      0.0000    -1.0002    1.0000   10  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  19       1670.08     -0.0008    -1.0001    1.0000    9  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  20       8632.74      0.0000    -1.0001    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  21       7677.99      0.0000    -1.0000    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  22        474.43      0.0033    -1.0001    1.0000   10  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  23       3968.50     -0.0001    -1.0000    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  24       5896.56      0.0001    -0.9999    1.0000    5  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  25       7217.22     -0.0005    -1.0000    1.0000    6  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  28       3211.49      0.0078    -1.0002    1.0000    9  C: size-insensitive / investigate fixed or mixed structure -> A: size-tracking, modulation-moving
+  29       1701.02     -0.0003    -1.0001    1.0000    8  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  30       7656.35     -0.0002    -1.0000    1.0000    5  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  32       5287.88      0.0003    -1.0000    1.0000    8  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  33       7535.02     -0.0005    -1.0000    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  35       6285.31     -0.0001    -1.0000    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  36       1644.69      0.0001    -1.0001    1.0000    9  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  37       3426.04      0.0008    -1.0000    1.0000   10  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  38       8823.79      0.0000    -1.0000    1.0000    5  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  39      11586.40     -0.0004    -1.0007    1.0000    4  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  40       6137.78     -0.0003    -1.0001    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  41       6750.12     -0.0006    -1.0001    1.0000    5  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  42      10312.80     -0.0002    -1.0000    1.0000    4  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  43       1110.10     -0.0036    -1.0000    1.0000   10  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  44        795.24      0.0094    -1.0002    1.0000    9  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  45       7043.16     -0.0002     0.0000    0.0000    2  C: size-insensitive / investigate fixed or mixed structure -> D: ambiguous / unresolved
+  46       4795.44     -0.0004    -1.0001    1.0000    8  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  47       8337.75     -0.0006     0.0000    0.0000    2  C: size-insensitive / investigate fixed or mixed structure -> D: ambiguous / unresolved
+  48       9607.51      0.0008    -1.0001    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  49       9803.31      0.0018    -1.0000    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  50        375.44      0.0071    -1.0001    1.0000    7  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  53      11999.80      0.0002    -1.0002    1.0000    4  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  54       4505.77      0.0002    -1.0001    1.0000    7  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  55      10926.40      0.0005    -1.0000    1.0000    4  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  56       4139.64     -0.0003    -1.0000    1.0000    5  D: ambiguous / unresolved -> A: size-tracking, modulation-moving
+  57        624.20      0.0127    -1.0000    1.0000   10  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  58       1471.67      0.0002    -1.0000    1.0000    9  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+  59       7974.37     -0.0004    -0.9997    1.0000    6  D: ambiguous / unresolved -> B: size-tracking, modulation-resistant
+
+-----------------------------------------------------------------
+  CARRIED ACROSS UNCHANGED
+-----------------------------------------------------------------
+
+  Neither was re-measured and neither needed to be. Reported so that the
+  regenerated table is read with its limits visible.
+
+  per-mode modal decay status:
+    infeasible              60
+
+  An infeasible per-mode decay is not on its own a reason for class D,
+  and is not treated as one here: the rule reads the Size fit and the
+  modulation evidence, not the decay.
+
+  Mod Depth local response measured: 60 / 60
+  Mod Depth 1:1 peak identity:       3 / 60   (unchanged; the tracker for that axis was not touched)
+
+-----------------------------------------------------------------
+  PER MODE
+-----------------------------------------------------------------
+
+  id      ref Hz  match  amb  gap  exit     q CV  exponent      R2  cls  identity / evidence
+  0     11535.30      2    2    0     6   0.001%    0.0000  0.0000    D  identity-uncertain / confirmed
+  1     11561.40      3    1    0     6   0.001%   -1.0001  1.0000    D  identity-uncertain / confirmed
+  2      1158.49      7    3    0     0   0.005%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  3     10655.00      5    0    0     5   0.003%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  4       646.34      9    1    0     0   0.008%   -1.0001  1.0000    A  inverse-scale-consistent / confirmed
+  5      3383.06      7    3    0     0   0.013%   -1.0002  1.0000    A  identity-uncertain / confirmed
+  6     10901.40      3    2    0     5   0.006%   -1.0001  1.0000    D  identity-uncertain / confirmed
+  7      8701.17      5    0    0     5   0.005%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  8     10629.70      3    2    0     5   0.011%   -1.0005  1.0000    D  identity-uncertain / weak-evidence
+  9     10266.60      2    3    0     5   0.004%    0.0000  0.0000    D  identity-uncertain / confirmed
+  10     9146.01      4    1    0     5   0.004%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  11     7703.22      5    1    0     4   0.025%   -0.9994  1.0000    A  identity-uncertain / confirmed
+  12      769.42      9    1    0     0   0.011%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  13     9632.07      5    0    0     5   0.010%   -1.0002  1.0000    A  identity-uncertain / weak-evidence
+  14    11924.30      3    1    0     6   0.012%   -0.9994  1.0000    D  identity-uncertain / confirmed
+  15     3697.63      9    0    0     1   0.016%   -1.0002  1.0000    B  inverse-scale-consistent / confirmed
+  16     7876.55      6    0    0     4   0.003%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  17      672.44     10    0    0     0   0.011%   -1.0001  1.0000    A  inverse-scale-consistent / confirmed
+  18     1428.97     10    0    0     0   0.017%   -1.0002  1.0000    A  inverse-scale-consistent / confirmed
+  19     1670.08      9    1    0     0   0.008%   -1.0001  1.0000    A  inverse-scale-consistent / confirmed
+  20     8632.74      6    0    0     4   0.004%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  21     7677.99      6    0    0     4   0.003%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  22      474.43     10    0    0     0   0.020%   -1.0001  1.0000    A  inverse-scale-consistent / confirmed
+  23     3968.50      5    3    1     1   0.003%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  24     5896.56      5    2    0     3   0.003%   -0.9999  1.0000    B  inverse-scale-consistent / confirmed
+  25     7217.22      6    0    0     4   0.004%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  26     9779.43      3    0    2     5   0.002%   -0.9999  1.0000    D  identity-uncertain / confirmed
+  27     9337.14      2    3    0     5   0.001%    0.0000  0.0000    D  identity-uncertain / confirmed
+  28     3211.49      9    1    0     0   0.014%   -1.0002  1.0000    A  inverse-scale-consistent / confirmed
+  29     1701.02      8    2    0     0   0.008%   -1.0001  1.0000    A  inverse-scale-consistent / confirmed
+  30     7656.35      5    1    0     4   0.002%   -1.0000  1.0000    B  inverse-scale-consistent / weak-evidence
+  31    11264.70      3    0    1     6   0.003%   -1.0000  1.0000    D  identity-uncertain / confirmed
+  32     5287.88      8    0    0     2   0.005%   -1.0000  1.0000    B  inverse-scale-consistent / weak-evidence
+  33     7535.02      6    0    0     4   0.002%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  34    10435.00      3    2    0     5   0.002%   -1.0001  1.0000    D  identity-uncertain / confirmed
+  35     6285.31      6    1    0     3   0.003%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  36     1644.69      9    1    0     0   0.011%   -1.0001  1.0000    B  inverse-scale-consistent / weak-evidence
+  37     3426.04     10    0    0     0   0.006%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  38     8823.79      5    0    0     5   0.002%   -1.0000  1.0000    B  inverse-scale-consistent / weak-evidence
+  39    11586.40      4    0    0     6   0.020%   -1.0007  1.0000    A  identity-uncertain / weak-evidence
+  40     6137.78      5    2    0     3   0.013%   -1.0001  1.0000    A  identity-uncertain / weak-evidence
+  41     6750.12      5    2    0     3   0.004%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  42    10312.80      4    1    0     5   0.003%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  43     1110.10     10    0    0     0   0.013%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  44      795.24      9    1    0     0   0.017%   -1.0002  1.0000    A  inverse-scale-consistent / weak-evidence
+  45     7043.16      2    4    0     4   0.006%    0.0000  0.0000    D  identity-uncertain / confirmed
+  46     4795.44      8    0    0     2   0.007%   -1.0001  1.0000    B  inverse-scale-consistent / weak-evidence
+  47     8337.75      2    4    0     4   0.010%    0.0000  0.0000    D  identity-uncertain / confirmed
+  48     9607.51      5    0    0     5   0.004%   -1.0001  1.0000    A  inverse-scale-consistent / weak-evidence
+  49     9803.31      5    0    0     5   0.003%   -1.0000  1.0000    A  inverse-scale-consistent / weak-evidence
+  50      375.44      7    1    2     0   0.009%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  51     5015.44      3    5    0     2   0.003%   -1.0001  1.0000    D  identity-uncertain / confirmed
+  52    10949.70      2    2    0     6   0.004%    0.0000  0.0000    D  identity-uncertain / confirmed
+  53    11999.80      4    0    0     6   0.006%   -1.0002  1.0000    B  inverse-scale-consistent / weak-evidence
+  54     4505.77      7    1    0     2   0.007%   -1.0001  1.0000    B  inverse-scale-consistent / confirmed
+  55    10926.40      4    1    0     5   0.002%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  56     4139.64      5    4    0     1   0.003%   -1.0000  1.0000    A  inverse-scale-consistent / confirmed
+  57      624.20     10    0    0     0   0.020%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  58     1471.67      9    1    0     0   0.005%   -1.0000  1.0000    B  inverse-scale-consistent / confirmed
+  59     7974.37      6    0    0     4   0.016%   -0.9997  1.0000    B  identity-uncertain / weak-evidence

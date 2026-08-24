@@ -1,0 +1,45 @@
+PHASE 6 / FU-1 - ROUND 2b ANALYSIS PLAN
+=======================================
+
+Fixed before the files were rendered. Do not read before rating.
+
+These eight files are the round 2 targeted excitations with no tank:
+same seeds, same centre frequencies, same ERB widths, same duration.
+Four modes, two files each.
+
+Per mode, the mean metallicity of its two control files is compared with
+the mean metallicity of its two round 2 wet trials. With two ratings per
+mode and one listener this is DESCRIPTIVE ONLY. No statistical or
+inferential test will be run or reported, and no correlation will be
+claimed.
+
+Reading, fixed now:
+
+  A) control 0-1, wet 3-4
+     -> strong evidence that the tank adds the metallic character.
+
+  B) control around 2, wet 3-4
+     -> the excitation contributes; the tank likely enhances it.
+
+  C) control 3-4, wet 3-4
+     -> the targeted test's localisation is confounded: the excitation
+        is already metallic on its own, and the targeted trials are not
+        by themselves mode-specific proof.
+
+The same descriptive comparison may be made for annoyance.
+
+These bands will not be changed after the ratings are seen.
+
+WHAT THIS CANNOT OVERTURN
+-------------------------
+If the controls also rate as metallic, that does NOT make round 2's
+verdict wrong. Round 2's whole-tail context renders used an unfiltered
+full-band snare - no band limiting anywhere - and still rated
+metallicity 3 and 4, with annoyance 1 and 2 and one unpleasant. That
+evidence stands on its own and is untouched by this control.
+
+What a high control rating would weaken is narrower and must be stated
+as exactly that: how strongly the targeted trials can point at any
+particular high-band mode or sub-band. The existence of the character
+and its localisation are separate claims, and only the second is at
+stake here.

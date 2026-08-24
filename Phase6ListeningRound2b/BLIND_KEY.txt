@@ -1,0 +1,57 @@
+PHASE 6 / FU-1 - ROUND 2b BLIND KEY
+===================================
+
+Do not read this before listening.
+
+Stimulus-alone controls: the round 2 excitations with no tank. Four
+modes, each twice, reusing round 2's seeds and centre frequencies.
+Common output gain 0.5x, applied to all eight.
+
+--- control-01-R.wav ---
+  mode #25  7217.22 Hz  class A
+  excitation band: one ERB, 803.72 Hz wide, 6815.36 - 7619.08 Hz
+  seed 20260904  (reused from round 2 with this frequency)
+    peak -5.69 dBFS, RMS -41.30 dBFS, integrated -22.45 LUFS
+
+--- control-02-M.wav ---
+  mode #1  11561.40 Hz  class D
+  excitation band: one ERB, 1272.63 Hz wide, 10925.09 - 12197.71 Hz
+  seed 20260903  (reused from round 2 with this frequency)
+    peak -7.65 dBFS, RMS -40.44 dBFS, integrated -21.59 LUFS
+
+--- control-03-V.wav ---
+  mode #10  9146.01 Hz  class B
+  excitation band: one ERB, 1011.91 Hz wide, 8640.05 - 9651.97 Hz
+  seed 20260902  (reused from round 2 with this frequency)
+    peak -5.04 dBFS, RMS -40.51 dBFS, integrated -21.66 LUFS
+
+--- control-04-K.wav ---
+  mode #3  10655.00 Hz  class B
+  excitation band: one ERB, 1174.79 Hz wide, 10067.60 - 11242.40 Hz
+  seed 20260901  (reused from round 2 with this frequency)
+    peak -5.15 dBFS, RMS -40.09 dBFS, integrated -21.24 LUFS
+
+--- control-05-S.wav ---
+  mode #1  11561.40 Hz  class D
+  excitation band: one ERB, 1272.63 Hz wide, 10925.09 - 12197.71 Hz
+  seed 20260908  (reused from round 2 with this frequency)
+    peak -6.35 dBFS, RMS -41.00 dBFS, integrated -22.15 LUFS
+
+--- control-06-Y.wav ---
+  mode #25  7217.22 Hz  class A
+  excitation band: one ERB, 803.72 Hz wide, 6815.36 - 7619.08 Hz
+  seed 20260907  (reused from round 2 with this frequency)
+    peak -7.24 dBFS, RMS -41.52 dBFS, integrated -22.67 LUFS
+
+--- control-07-F.wav ---
+  mode #3  10655.00 Hz  class B
+  excitation band: one ERB, 1174.79 Hz wide, 10067.60 - 11242.40 Hz
+  seed 20260906  (reused from round 2 with this frequency)
+    peak -4.43 dBFS, RMS -40.23 dBFS, integrated -21.38 LUFS
+
+--- control-08-P.wav ---
+  mode #10  9146.01 Hz  class B
+  excitation band: one ERB, 1011.91 Hz wide, 8640.05 - 9651.97 Hz
+  seed 20260905  (reused from round 2 with this frequency)
+    peak -5.66 dBFS, RMS -40.78 dBFS, integrated -21.93 LUFS
+

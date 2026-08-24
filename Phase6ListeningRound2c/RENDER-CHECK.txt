@@ -1,0 +1,25 @@
+PHASE 6 / FU-1 - ROUND 2c, RENDER CHECK
+=======================================
+
+Deliberately content-free. Nothing here says which file is
+which source or which condition.
+
+files written                  9
+sources                        3, full band, unfiltered
+conditions per source          3
+band limiting                  none anywhere in this set
+closest two files sharing
+  a source                     3 apart (2 files between)
+duration                       12.5 s, identical for every file
+files above 0 dBFS             0
+peak range, whole set          -15.97 to -5.33 dBFS
+loudness range, whole set      -27.47 to -22.44 LUFS
+loudness spread, whole set     5.03 LU
+sample rate                    48000 Hz, 32-bit float stereo
+Mod Depth                      0.3, unchanged and not under test
+mix law                        production, unchanged
+normalisation                  none
+loudness match                 none applied (analysis-only figures
+                               are in the key)
+limiter / saturation           none
+post-processing                none

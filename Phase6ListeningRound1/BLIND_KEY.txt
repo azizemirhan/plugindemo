@@ -1,0 +1,86 @@
+PHASE 6 / FU-1 - TARGETED LISTENING SET, BLIND KEY
+==================================================
+
+Do not read this before listening.
+
+It carries the letter mapping, the class of each candidate and every
+per-file measurement. Any one of the three gives the others away.
+
+--- diagnostic ---
+  mode #50  375.44 Hz  class B  low-mid  ->  diagnostic-B.wav
+    diagnostic-B.wav
+      peak -41.01 dBFS, RMS -63.76 dBFS, integrated -53.40 LUFS
+      in band: centroid 379.67 Hz, spread 20.65 Hz, concentration 0.1895, peaks 48
+  mode #4  646.34 Hz  class A  low-mid  ->  diagnostic-D.wav
+    diagnostic-D.wav
+      peak -37.02 dBFS, RMS -60.85 dBFS, integrated -50.38 LUFS
+      in band: centroid 652.28 Hz, spread 37.72 Hz, concentration 0.0401, peaks 73
+  mode #58  1471.67 Hz  class B  mid  ->  diagnostic-F.wav
+    diagnostic-F.wav
+      peak -34.35 dBFS, RMS -58.73 dBFS, integrated -46.43 LUFS
+      in band: centroid 1454.55 Hz, spread 78.59 Hz, concentration 0.0525, peaks 147
+  mode #2  1158.49 Hz  class A  mid  ->  diagnostic-A.wav
+    diagnostic-A.wav
+      peak -34.09 dBFS, RMS -60.43 dBFS, integrated -48.99 LUFS
+      in band: centroid 1169.48 Hz, spread 71.46 Hz, concentration 0.0819, peaks 115
+  mode #54  4505.77 Hz  class B  upper-mid  ->  diagnostic-E.wav
+    diagnostic-E.wav
+      peak -33.59 dBFS, RMS -58.75 dBFS, integrated -44.44 LUFS
+      in band: centroid 4483.52 Hz, spread 275.34 Hz, concentration 0.0195, peaks 397
+  mode #56  4139.64 Hz  class A  upper-mid  ->  diagnostic-C.wav
+    diagnostic-C.wav
+      peak -31.05 dBFS, RMS -57.20 dBFS, integrated -42.92 LUFS
+      in band: centroid 4132.17 Hz, spread 199.70 Hz, concentration 0.0262, peaks 370
+
+--- snare ---
+  mode #50  375.44 Hz  class B  low-mid  ->  snare-E.wav
+    snare-E.wav
+      peak -39.65 dBFS, RMS -60.47 dBFS, integrated -55.20 LUFS
+      in band: centroid 386.99 Hz, spread 33.18 Hz, concentration 0.0527, peaks 80
+  mode #4  646.34 Hz  class A  low-mid  ->  snare-A.wav
+    snare-A.wav
+      peak -37.93 dBFS, RMS -56.73 dBFS, integrated -51.24 LUFS
+      in band: centroid 657.07 Hz, spread 46.89 Hz, concentration 0.0270, peaks 110
+  mode #58  1471.67 Hz  class B  mid  ->  snare-C.wav
+    snare-C.wav
+      peak -36.41 dBFS, RMS -55.07 dBFS, integrated -47.80 LUFS
+      in band: centroid 1497.92 Hz, spread 91.61 Hz, concentration 0.0308, peaks 197
+  mode #2  1158.49 Hz  class A  mid  ->  snare-F.wav
+    snare-F.wav
+      peak -35.35 dBFS, RMS -55.44 dBFS, integrated -48.89 LUFS
+      in band: centroid 1166.66 Hz, spread 52.46 Hz, concentration 0.0691, peaks 159
+  mode #54  4505.77 Hz  class B  upper-mid  ->  snare-B.wav
+    snare-B.wav
+      peak -31.19 dBFS, RMS -50.57 dBFS, integrated -41.25 LUFS
+      in band: centroid 4496.62 Hz, spread 261.71 Hz, concentration 0.0123, peaks 585
+  mode #56  4139.64 Hz  class A  upper-mid  ->  snare-D.wav
+    snare-D.wav
+      peak -31.21 dBFS, RMS -51.03 dBFS, integrated -41.74 LUFS
+      in band: centroid 4113.08 Hz, spread 196.20 Hz, concentration 0.0103, peaks 486
+
+--- moddepth0 ---
+  mode #50  375.44 Hz  class B  low-mid  ->  moddepth0-B.wav
+    moddepth0-B.wav
+      peak -41.72 dBFS, RMS -64.29 dBFS, integrated -54.12 LUFS
+      in band: centroid 381.64 Hz, spread 20.78 Hz, concentration 0.1779, peaks 48
+  mode #4  646.34 Hz  class A  low-mid  ->  moddepth0-D.wav
+    moddepth0-D.wav
+      peak -36.77 dBFS, RMS -60.68 dBFS, integrated -50.34 LUFS
+      in band: centroid 646.38 Hz, spread 36.35 Hz, concentration 0.0559, peaks 73
+  mode #58  1471.67 Hz  class B  mid  ->  moddepth0-F.wav
+    moddepth0-F.wav
+      peak -33.81 dBFS, RMS -58.08 dBFS, integrated -45.98 LUFS
+      in band: centroid 1452.04 Hz, spread 79.48 Hz, concentration 0.0661, peaks 140
+  mode #2  1158.49 Hz  class A  mid  ->  moddepth0-A.wav
+    moddepth0-A.wav
+      peak -35.73 dBFS, RMS -60.85 dBFS, integrated -49.46 LUFS
+      in band: centroid 1165.84 Hz, spread 83.00 Hz, concentration 0.0279, peaks 117
+  mode #54  4505.77 Hz  class B  upper-mid  ->  moddepth0-E.wav
+    moddepth0-E.wav
+      peak -32.12 dBFS, RMS -58.11 dBFS, integrated -43.77 LUFS
+      in band: centroid 4490.71 Hz, spread 271.98 Hz, concentration 0.0199, peaks 389
+  mode #56  4139.64 Hz  class A  upper-mid  ->  moddepth0-C.wav
+    moddepth0-C.wav
+      peak -32.92 dBFS, RMS -57.19 dBFS, integrated -42.93 LUFS
+      in band: centroid 4117.34 Hz, spread 203.30 Hz, concentration 0.0419, peaks 365
+

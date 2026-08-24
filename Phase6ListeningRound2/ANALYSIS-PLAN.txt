@@ -1,0 +1,33 @@
+PHASE 6 / FU-1 - ROUND 2 ANALYSIS PLAN
+======================================
+
+Fixed before the files were rendered. Do not read before rating.
+
+Some trials share a mode; which ones is in the key. Per mode, over its
+two trials:
+
+  metallicity ratings differ by <= 1   -> repeat-consistent
+  metallicity ratings differ by  > 1   -> perceptually unstable,
+                                          reported as unresolved
+
+A mode is a HIGH-PRIORITY PERCEPTUAL CANDIDATE when it is
+repeat-consistent AND its mean metallicity is 2 or more, OR its
+annoyance is 1 or more.
+
+That label does NOT mean a DSP problem, and nothing in this round can
+establish one. It means the character is perceptually salient and worth
+attention.
+
+A mode with high metallicity and annoyance 0 is reported as
+"audible character, not objectionable". That distinction is the point
+of asking two questions instead of one, and it is why preference is not
+asked at all.
+
+One of the four modes is structurally unresolved on the Size axis -
+class D in the measurement. Whatever it does here, it will be reported
+as a high-band perceptual candidate only. It will not be called
+modulation-resistant or modulation-moving, because its structural class
+is not known.
+
+An outcome of "no metallic character anywhere" is a result and will be
+reported as one. Nothing here needs a candidate to be found.

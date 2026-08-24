@@ -1,0 +1,17 @@
+PHASE 6 / FU-1 - LISTENING SET, RENDER CHECK
+============================================
+
+Deliberately content-free. Nothing here distinguishes one
+candidate from another.
+
+audio files written        19
+files above 0 dBFS         0
+files below -60 dBFS peak  0
+quietest peak in the set   -41.72 dBFS
+highest peak in the set    -14.12 dBFS
+sample rate                48000.00 Hz, 32-bit float stereo
+gain applied               shipping preview trim only, identical
+                           for every file
+normalisation              none
+loudness match             none
+post-processing            none

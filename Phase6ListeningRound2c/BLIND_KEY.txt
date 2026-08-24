@@ -1,0 +1,55 @@
+PHASE 6 / FU-1 - ROUND 2c BLIND KEY
+===================================
+
+Do not read this before rating.
+
+Three sources, each rendered dry, at 100% wet and at the shipping
+Mix 30%.
+
+Input levelling, applied to the source before anything else and the
+same for all three of that source's conditions. The snare is the
+anchor at 1.0000 by definition:
+  snare  x1.0000
+  vocal  x3.6295
+  piano  x0.8173
+
+--- case-01-E.wav ---
+  source snare, MIX 30%, shipping
+    peak -6.27 dBFS, RMS -33.21 dBFS, integrated -23.92 LUFS
+--- case-02-I.wav ---
+  source vocal, WET 100%
+    peak -13.80 dBFS, RMS -32.19 dBFS, integrated -24.41 LUFS
+--- case-03-J.wav ---
+  source piano, DRY, no reverb
+    peak -9.35 dBFS, RMS -28.92 dBFS, integrated -22.54 LUFS
+--- case-04-Q.wav ---
+  source snare, WET 100%
+    peak -14.12 dBFS, RMS -34.20 dBFS, integrated -25.09 LUFS
+--- case-05-U.wav ---
+  source vocal, MIX 30%, shipping
+    peak -13.86 dBFS, RMS -31.10 dBFS, integrated -23.08 LUFS
+--- case-06-W.wav ---
+  source piano, MIX 30%, shipping
+    peak -10.30 dBFS, RMS -29.65 dBFS, integrated -23.36 LUFS
+--- case-07-X.wav ---
+  source snare, DRY, no reverb
+    peak -5.33 dBFS, RMS -32.75 dBFS, integrated -22.44 LUFS
+--- case-08-Y.wav ---
+  source vocal, DRY, no reverb
+    peak -15.97 dBFS, RMS -30.56 dBFS, integrated -22.54 LUFS
+--- case-09-Z.wav ---
+  source piano, WET 100%
+    peak -14.51 dBFS, RMS -34.07 dBFS, integrated -27.47 LUFS
+
+--- analysis only: offset to the set median of -23.36 LUFS ---
+Applied to nothing. The delivered files are at production level.
+
+  case-01-E.wav  +0.56 LU
+  case-02-I.wav  +1.05 LU
+  case-03-J.wav  -0.82 LU
+  case-04-Q.wav  +1.73 LU
+  case-05-U.wav  -0.28 LU
+  case-06-W.wav  +0.00 LU
+  case-07-X.wav  -0.92 LU
+  case-08-Y.wav  -0.82 LU
+  case-09-Z.wav  +4.11 LU

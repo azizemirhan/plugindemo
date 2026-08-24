@@ -1,0 +1,96 @@
+PHASE 6 / FU-1 - ROUND 2, HIGH BAND
+===================================
+
+Eight trials. Each one is a single file, rated on its own.
+
+This is not an A/B test and there is nothing to compare. Do not put
+two trials side by side - rate each file as you hear it, in the order
+given, and move on.
+
+Mod Depth is NOT under test in this round. Every file is at the
+shipping 0.3.
+
+Settings, all shipping defaults, none varied:
+  Decay      2.5 s
+  Size       0.6
+  Mod Rate   0.5 Hz
+  Mod Depth  0.3
+  Width      1
+  Mix        100% wet for the eight trials
+
+48 kHz, 32-bit float stereo. No normalisation, no loudness match, no
+limiting, no EQ, no notch, no post-processing. The production gain
+law, the Size compensation and the preview trim are exactly as they
+ship.
+
+The excitation is 8x louder than the previous
+round's, applied to the test signal before the tank. The path is
+linear and the factor is the same for every file, so every relative
+level between trials is preserved. Nothing was levelled per file.
+
+context-wet100.wav: peak -14.12 dBFS, integrated -25.09 LUFS, Mix 100%
+context-mix30.wav: peak -6.27 dBFS, integrated -23.92 LUFS, Mix 30%
+
+LISTEN IN THIS ORDER
+--------------------
+  1.  high-01-G.wav
+  2.  high-02-Z.wav
+  3.  high-03-L.wav
+  4.  high-04-H.wav
+  5.  high-05-O.wav
+  6.  high-06-T.wav
+  7.  high-07-C.wav
+  8.  high-08-N.wav
+
+Then, separately, the two context files. They are the same full-band
+snare through the same tank, with nothing filtered and nothing
+targeted at any particular mode.
+
+  context-wet100.wav   the tail alone
+  context-mix30.wav    the same thing at the shipping Mix
+
+What the context files are for, and what they are not: they are a
+whole-tail control, to hear whether the character the trials show up
+is also there in an ordinary broadband transient. They are NOT proof
+about any individual mode. One mode cannot be isolated inside a
+broadband source without adding a filter, and this set adds none.
+
+THE THREE QUESTIONS, PER TRIAL
+------------------------------
+Recorded separately. The second and third are not a re-wording of the
+first, and a high answer to one does not imply anything about the
+others.
+
+  1. Do you hear a bell / chime / metallic / one-note quality?
+       0 = none
+       1 = very slight
+       2 = slight
+       3 = obvious
+       4 = very obvious
+
+  2. Is that quality objectionable?
+       0 = not at all
+       1 = a little
+       2 = noticeably
+       3 = very
+
+  3. Is the tail pleasant overall?
+       pleasant / neutral / unpleasant
+
+Question 1 is the primary endpoint. Preference is not a substitute for
+it and is not asked as one: a mode can be audibly bell-like and
+perfectly welcome, and that combination has a name in the analysis
+below.
+
+There is no expected answer, and 0 across the board is a result.
+
+THE ANALYSIS PLAN
+-----------------
+Fixed before these files were rendered and written to
+ANALYSIS-PLAN.txt, which carries the same timestamp as everything
+else here.
+
+Leave it unread until the ratings are done, for the same reason as
+the key. It states the thresholds a mode is judged against, and a
+listener who knows where the cut-offs are is being invited to rate
+towards them.
