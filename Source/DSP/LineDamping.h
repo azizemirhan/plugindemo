@@ -43,9 +43,11 @@ public:
     {
         shelfLow .prepare (sampleRate, gainRampSeconds);
         shelfHigh.prepare (sampleRate, gainRampSeconds);
+        normalisation.prepare (sampleRate, gainRampSeconds);
 
         shelfLow .snapTo (0.0);
         shelfHigh.snapTo (0.0);
+        normalisation.snapTo (1.0);
 
         aLow  = 0.0;
         aHigh = 0.0;
@@ -66,7 +68,8 @@ public:
         `immediate` snaps the gain ramps, for prepare() and for a reset where
         gliding from a stale value would be wrong.
     */
-    void setShelves (const damping::ShelfSpec& spec, bool immediate) noexcept
+    void setShelves (const damping::ShelfSpec& spec, double normalisationGain,
+                     bool immediate) noexcept
     {
         aLow  = spec.coeffLow;
         aHigh = spec.coeffHigh;
@@ -78,23 +81,23 @@ public:
         {
             shelfLow .snapTo (cLow);
             shelfHigh.snapTo (cHigh);
+            normalisation.snapTo (normalisationGain);
         }
         else
         {
             shelfLow .setTarget (cLow);
             shelfHigh.setTarget (cHigh);
+            normalisation.setTarget (normalisationGain);
         }
 
         transparent = spec.isTransparent();
 
         // A line that has just become transparent still has to ramp down to it
         // before the bypass can be taken, or the gain step would click.
-        bypassed = transparent
-                   && ! shelfLow.isSmoothing()
-                   && ! shelfHigh.isSmoothing();
+        bypassed = transparent && ! isMoving();
     }
 
-    /** One sample through both shelves. */
+    /** One sample through both shelves, then the peak normalisation. */
     [[nodiscard]] double process (double x) noexcept
     {
         if (bypassed)
@@ -102,16 +105,22 @@ public:
 
         const double cLow  = shelfLow .getNextValue();
         const double cHigh = shelfHigh.getNextValue();
+        const double norm  = normalisation.getNextValue();
 
         zLow += (1.0 - aLow) * (x - zLow);
         const double afterLow = x - cLow * zLow;
 
         zHigh += (1.0 - aHigh) * (afterLow - zHigh);
-        const double out = afterLow - cHigh * (afterLow - zHigh);
 
-        // Taking the bypass only once both ramps have parked keeps the
+        // The normalisation is applied here rather than to the decay gain on
+        // purpose: it keeps g_i exactly what PHASE 6 left it, so the feedback
+        // clamp is never reached for a damping reason and the whole response
+        // peaks at unity instead of somewhere the gain has to compensate for.
+        const double out = (afterLow - cHigh * (afterLow - zHigh)) * norm;
+
+        // Taking the bypass only once every ramp has parked keeps the
         // transition from transparent to bypassed inaudible.
-        if (transparent && ! shelfLow.isSmoothing() && ! shelfHigh.isSmoothing())
+        if (transparent && ! isMoving())
         {
             bypassed = true;
             zLow  = 0.0;
@@ -124,8 +133,14 @@ public:
     [[nodiscard]] bool isBypassed() const noexcept { return bypassed; }
 
 private:
+    [[nodiscard]] bool isMoving() const noexcept
+    {
+        return shelfLow.isSmoothing() || shelfHigh.isSmoothing() || normalisation.isSmoothing();
+    }
+
     LinearSmoother<double> shelfLow;
     LinearSmoother<double> shelfHigh;
+    LinearSmoother<double> normalisation;
 
     double aLow  = 0.0;
     double aHigh = 0.0;

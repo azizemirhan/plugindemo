@@ -78,6 +78,17 @@ void runSizeIntegrationTests();
 
 // PHASE 7
 void runDampingTests();
+void runDampingCheckpointTests();
+void runDampingTopologyTests();
+void runDampingRootCauseTests();
+void runDampingGateTests();
+void runDampingEnsembleTests();
+void runDampingSyntheticTests();
+void runDampingCoherenceTests();
+void runDampingPermutationTests();
+void runDampingEmpiricalTests();
+void runDampingModulationTests();
+void runDampingResidueTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 /**
@@ -22,25 +23,46 @@
         --------  =  ----------  +  -----------------
         RT60(w)      RT60_mid            3 * d_i
 
-    Two consequences shape everything below.
+    For the tail to decay as ONE thing rather than as eight, log|H_i(w)| / d_i
+    must be the same for every line. A single shared filter would leave the
+    eight lines decaying at eight different rates in the damped bands. The
+    shelf gains are therefore derived per line from that line's own loop delay,
+    exactly as the decay gain already is.
 
-      - If |H_i(w)| <= 1 everywhere then RT60(w) <= RT60_mid everywhere.
-        Damping can only ever shorten a band, at any setting, and the tank's
-        stability argument (max g_i < 1) survives unchanged.
+    THE SEMANTICS, AND WHY NORMALISATION IS NOT OPTIONAL
+    ----------------------------------------------------
+    Decay is the LONGEST frequency-dependent RT60 in the tank, and damping is
+    purely subtractive: with damping active, no frequency region may ring
+    longer than the undamped Decay target.
 
-      - For the tail to decay as ONE thing rather than as eight, the quantity
-        log|H_i(w)| / d_i must be the same for every line. A single shared
-        filter would leave the eight lines decaying at eight different rates in
-        the damped bands. The shelf gains are therefore derived per line from
-        that line's own loop delay, exactly as the decay gain already is.
+    |H(w)| <= 1 alone does not deliver that, and the first implementation of
+    this phase proved it the hard way. It anchored the mid band by dividing the
+    decay gain by |H(f_mid)| at the geometric mean of the two corners. But the
+    composite response does not peak at the geometric mean - it peaks where the
+    two shelves' slopes balance, which moves with their depths - so everywhere
+    above |H(f_mid)| the compensated loop exceeded the undamped gain. Measured:
+    every one of 29951 normal-ordered combinations had a region decaying longer
+    than baseline, 0.887 % at the shipping defaults, and in one reachable
+    corner (100 Hz / 500 Hz, Low Damp 0 %, High Damp 100 %, Decay 10 s) the
+    compensation asked for a loop gain above unity and the feedback clamp left
+    a 363 second tail against a 10 second target.
+
+    So the response is normalised by its own maximum instead:
+
+        M_i    = max_w |H_i(w)|
+        Hn_i   = H_i / M_i          =>  max_w |Hn_i(w)| = 1
+        total  = g_i * |Hn_i(w)|    <=  g_i
+
+    The normalisation is folded into the FILTER, not into the decay gain. That
+    keeps g_i exactly what PHASE 6 left it, so the feedback clamp is never
+    reached for a damping reason and the 0 % case stays bit-identical.
 
     WHY SHELVES AND NOT LOWPASSES
     -----------------------------
     A lowpass has no unity plateau: its magnitude is already below 1 well below
-    its cutoff, so mid-band RT60 would sag the moment High Damp was raised, and
-    the Decay control would stop meaning what it says. A shelf pair leaves the
-    mid band at unity by construction, which is why the existing RT60
-    calibration survives Phase 7 untouched.
+    its cutoff, so mid-band RT60 would sag the moment High Damp was raised. A
+    shelf pair leaves the mid band at unity to first order, which is what lets
+    the Decay control keep meaning what it says.
 
     WHY FIRST ORDER IS ENOUGH
     -------------------------
@@ -69,8 +91,6 @@ inline constexpr double pi = 3.14159265358979323846;
     time the user can hear. An attenuation in dB per pass means nothing to a
     listener and does something different on every line; a raw filter
     coefficient is not a musical quantity and changes meaning with sample rate.
-    A decay ratio is invariant under Size, under Decay and under sample rate by
-    construction.
 
     Decay times are perceived multiplicatively - the same argument
     SmoothedParameter.h makes for LogSmoother - so the control maps
@@ -79,7 +99,7 @@ inline constexpr double pi = 3.14159265358979323846;
         ratio(p) = ratioAtFull ^ p        p = damp% / 100
 
     p = 0 gives exactly 1.0, so a zeroed control is exactly transparent: not
-    approximately, bit-exactly. p = 1 gives ratioAtFull.
+    approximately, bit-exactly.
 */
 
 /** Decay ratio High Damp reaches at 100 %. Listening-tuned, not derived. */
@@ -89,18 +109,6 @@ inline constexpr double highRatioAtFull = 0.125;
     purpose: shortening the low end is a corrective move against a boomy tail,
     not a voicing gesture, and it runs out of musical usefulness sooner. */
 inline constexpr double lowRatioAtFull = 0.25;
-
-/*
-    At the shipping defaults - Low Damp 20 %, High Damp 50 %, Decay 2.5 s -
-    these give:
-
-        low  band  ratio 0.758   ->  1.90 s
-        mid  band  ratio 1.0     ->  2.50 s   (anchored, see below)
-        high band  ratio 0.354   ->  0.88 s
-
-    A mildly tightened low end and a natural darkening above 6 kHz, with the
-    mid band untouched.
-*/
 
 /** ratio(p) = ratioAtFull^p, clamped, with p = 0 exactly transparent. */
 [[nodiscard]] inline double decayRatioFor (double control, double ratioAtFull) noexcept
@@ -124,8 +132,6 @@ inline constexpr double minShelfGain = 1.0e-6;
 
 /**
     Per-pass shelf gain that turns RT60_mid into ratio * RT60_mid on one line.
-
-    From the equation at the top, with RT60_band = ratio * RT60_mid:
 
         G = 10^( -3 * d * (1/ratio - 1) / RT60_mid )
 
@@ -183,16 +189,20 @@ inline constexpr double minCutoffHz = 5.0;
     One line's damping, as coefficients.
 
     Low shelf:   H_lo(z) = 1 - (1 - gainLow) * LP(z, coeffLow)
-                 exactly gainLow at DC, approaching 1 above its corner.
-
     High shelf:  H_hi(z) = gainHigh + (1 - gainHigh) * LP(z, coeffHigh)
-                 exactly 1 at DC, exactly gainHigh at Nyquist.
+
+    with LP the one-pole lowpass (1-a)/(1 - a z^-1).
+
+    H_lo is exactly gainLow at DC; H_hi is exactly 1 at DC. Neither reaches its
+    far-side asymptote exactly, because the one-pole does not reach zero at
+    Nyquist: LP(Nyquist) = (1-a)/(1+a). So H_hi(Nyquist) is
+    gainHigh + (1-gainHigh)(1-a)/(1+a), not gainHigh. The shortfall grows as
+    the corner approaches Nyquist and is reported by the test harness rather
+    than papered over - it means a high-band ratio target is approached, not
+    hit exactly, at high corner frequencies.
 
     Both have the form G*1 + (1-G)*F with G in [0,1] and |F| <= 1, so by the
-    triangle inequality |H| <= G + (1-G) = 1 for every parameter value, every
-    sample rate and every combination. |LP| <= 1 with its maximum at DC;
-    |1 - LP| <= 1 with its maximum 2a/(1+a) at Nyquist. No coefficient region
-    needs excluding — this is a bound, not a tuning result.
+    triangle inequality |H| <= 1 for every parameter value and sample rate.
 */
 struct ShelfSpec
 {
@@ -207,137 +217,225 @@ struct ShelfSpec
     }
 };
 
-/**
-    |H(f)| for the shelf pair — the exact magnitude, not an approximation.
+// ---------------------------------------------------------------------------
+//  Closed-form magnitudes, in u = cos(w)
+// ---------------------------------------------------------------------------
+/*
+    Both shelf magnitudes are rational in u = cos(w), and - this is the part
+    that makes a trustworthy maximum possible - both are MONOTONIC in it.
 
-    Used in two places, which is why it lives here rather than in the filter:
-    to normalise the mid band (see plateauGain below) and to prove
-    max|H| <= 1 over a dense sweep in the test harness.
+    For the low shelf, writing b = 1 - (1-G)(1-a):
+
+        |H_lo|^2 = (b^2 + a^2 - 2 a b u) / (1 + a^2 - 2 a u)
+
+        d/du = 2a (b - 1)(b - a^2) / (denominator)^2
+
+    b <= 1 gives (b-1) <= 0, and b >= a >= a^2 gives (b - a^2) >= 0, so the
+    derivative is <= 0: |H_lo| never decreases with frequency.
+
+    For the high shelf, writing c = G + (1-G)(1-a):
+
+        |H_hi|^2 = (c^2 + G^2 a^2 - 2 a c G u) / (1 + a^2 - 2 a u)
+
+        d/du = 2a (c - G)(c - a^2 G) / (denominator)^2
+
+    c - G = (1-G)(1-a) >= 0 and c >= G >= a^2 G, so the derivative is >= 0:
+    |H_hi| never increases with frequency.
+
+    A rising factor times a falling factor is not unimodal in general, so the
+    maximum is not assumed unimodal. It is solved for exactly - see
+    compositeMaximum below.
 */
+
+[[nodiscard]] inline double lowShelfMagnitudeSquared (const ShelfSpec& spec, double u) noexcept
+{
+    const double a = spec.coeffLow;
+    const double b = 1.0 - (1.0 - spec.gainLow) * (1.0 - a);
+
+    const double denominator = 1.0 + a * a - 2.0 * a * u;
+
+    if (denominator <= 0.0)
+        return spec.gainLow * spec.gainLow;
+
+    return (b * b + a * a - 2.0 * a * b * u) / denominator;
+}
+
+[[nodiscard]] inline double highShelfMagnitudeSquared (const ShelfSpec& spec, double u) noexcept
+{
+    const double a = spec.coeffHigh;
+    const double g = spec.gainHigh;
+    const double c = g + (1.0 - g) * (1.0 - a);
+
+    const double denominator = 1.0 + a * a - 2.0 * a * u;
+
+    if (denominator <= 0.0)
+        return g * g;
+
+    return (c * c + g * g * a * a - 2.0 * a * c * g * u) / denominator;
+}
+
+/** |H(f)| for the shelf pair - exact, from the closed forms above. */
 [[nodiscard]] inline double magnitudeAt (const ShelfSpec& spec,
                                          double freqHz,
                                          double sampleRate) noexcept
 {
-    if (spec.isTransparent())
+    if (spec.isTransparent() || sampleRate <= 0.0)
         return 1.0;
 
-    if (sampleRate <= 0.0)
-        return 1.0;
+    const double u = std::cos (2.0 * pi
+                               * std::clamp (freqHz, 0.0, 0.5 * sampleRate) / sampleRate);
 
-    const double w = 2.0 * pi * std::clamp (freqHz, 0.0, 0.5 * sampleRate) / sampleRate;
-    const double cw = std::cos (w);
-    const double sw = std::sin (w);
-
-    // LP = (1-a) / (1 - a e^-jw), evaluated as (1-a) * conj(D) / |D|^2.
-    const auto lowpass = [cw, sw] (double a, double& re, double& im) noexcept
-    {
-        const double dr = 1.0 - a * cw;
-        const double di = a * sw;
-        const double mag2 = dr * dr + di * di;
-
-        if (mag2 <= 0.0)
-        {
-            re = 1.0;
-            im = 0.0;
-            return;
-        }
-
-        const double scale = (1.0 - a) / mag2;
-        re =  scale * dr;
-        im = -scale * di;
-    };
-
-    double lpRe = 0.0, lpIm = 0.0;
-
-    // Low shelf: 1 - cLow * LP
-    lowpass (spec.coeffLow, lpRe, lpIm);
-
-    const double cLow = 1.0 - spec.gainLow;
-    const double loRe = 1.0 - cLow * lpRe;
-    const double loIm =     - cLow * lpIm;
-
-    // High shelf: gainHigh + cHigh * LP
-    lowpass (spec.coeffHigh, lpRe, lpIm);
-
-    const double cHigh = 1.0 - spec.gainHigh;
-    const double hiRe = spec.gainHigh + cHigh * lpRe;
-    const double hiIm =                 cHigh * lpIm;
-
-    return std::sqrt ((loRe * loRe + loIm * loIm) * (hiRe * hiRe + hiIm * hiIm));
+    return std::sqrt (std::max (0.0, lowShelfMagnitudeSquared  (spec, u))
+                      * std::max (0.0, highShelfMagnitudeSquared (spec, u)));
 }
 
 // ===========================================================================
-//  Mid-band anchoring
+//  The composite maximum, in closed form
 // ===========================================================================
 /*
-    The mid band is unity BY CONSTRUCTION only in the limit of well-separated
-    corners. In practice each shelf has begun to act a little by the time the
-    other has finished, so the true mid-band gain sits slightly below 1.
+    The normalisation is only as trustworthy as the maximum it divides by, and
+    the maximum has to be exact in one direction specifically: an UNDER-estimate
+    leaves |Hn| above 1 and puts the subtractive invariant back where it was.
 
-    Measured from the closed form at the shipping defaults, the residual is
-    about -0.032 dB per pass. That sounds negligible and is not: at 38 passes
-    per second against a 24 dB/s baseline it makes the mid band decay about
-    5 % short — well outside the +/-2 % this phase promises. It is the same
-    class of error as the 1.7 % allpass overshoot corrected in PHASE 5C.
+    A grid search cannot promise that, and bounding a grid from above is both
+    loose and expensive. It is not needed, because the maximum has a closed
+    form.
 
-    Removing it is nearly free, because the residual is available in closed
-    form: divide the per-line decay gain by |H_i| at a mid reference frequency.
-    The maximum of the combined per-pass response then returns to g_i, so the
-    stability bound is unchanged while the mid band becomes exact.
+    Both factors are rational in u = cos(w), so their log-derivatives are too:
 
-    Two guards on the division, both necessary:
+        d/du log|H_lo|^2 = K1 / (D1 * N1)      K1 = 2 a_l (b - 1)(b - a_l^2)
+        d/du log|H_hi|^2 = K2 / (D2 * N2)      K2 = 2 a_h (c - G)(c - a_h^2 G)
 
-      - a ceiling on the compensation, so the overlap region (where there is no
-        plateau to anchor and |H_mid| can be genuinely small) cannot demand an
-        unbounded gain increase;
-      - the existing min(maxFeedbackGain, ...) clamp applied AFTER the
-        division, which is what keeps g_i * max|H| < 1 unconditionally.
+    with D and N the linear denominators and numerators of the two magnitude
+    formulas above. K1 <= 0 and K2 >= 0, which is the monotonicity result
+    restated. Setting the sum to zero:
 
-    Where the clamp engages, mid-band RT60 drifts. That happens only in the
-    overlap region, which is exactly where the +/-2 % criterion is documented
-    not to apply, and in the extreme-Decay corner where headroom under
-    maxFeedbackGain is thin by design.
+        K1 * D2 * N2  +  K2 * D1 * N1  =  0
+
+    Each product is a quadratic in u, so this is one quadratic equation. Its
+    real roots in [-1, 1], together with the two endpoints u = 1 (DC) and
+    u = -1 (Nyquist), are the only places the composite response can peak.
+
+    Exact, O(1), no grid, no iteration, and nothing whose accuracy depends on
+    the parameter values. It runs when coefficients change, never per sample.
 */
 
-/** Ceiling on the mid-band compensation factor. */
-inline constexpr double maxPlateauCompensation = 2.0;
+/** Relative safety margin on the maximum. Numerical only, never a tuning knob. */
+inline constexpr double maximumSafetyMargin = 1.0e-9;
+
+struct MagnitudeBound
+{
+    double lower = 1.0;      ///< the largest magnitude actually evaluated
+    double upper = 1.0;      ///< what the normalisation divides by
+    double frequencyU = 1.0; ///< cos(w) where the maximum sits
+
+    [[nodiscard]] double bracketWidth() const noexcept { return upper - lower; }
+};
 
 /**
-    Reference frequency the mid band is anchored at: the geometric mean of the
-    two corners, which is the middle of the plateau on a log axis and degrades
-    gracefully into the overlap region. At the shipping defaults (200 Hz,
-    6 kHz) this is 1095 Hz, a hair from the 1 kHz the exit criterion measures.
-*/
-[[nodiscard]] inline double midReferenceHz (double lowCornerHz, double highCornerHz) noexcept
-{
-    const double lo = std::max (lowCornerHz, minCutoffHz);
-    const double hi = std::max (highCornerHz, lo);
+    The exact maximum of |H(w)| over the whole frequency axis.
 
-    return std::clamp (std::sqrt (lo * hi), 125.0, 8000.0);
+    `upper` carries a relative margin of maximumSafetyMargin so that rounding
+    in the root solve can only ever make the damping infinitesimally deeper,
+    never shallower.
+*/
+[[nodiscard]] inline MagnitudeBound compositeMaximum (const ShelfSpec& spec) noexcept
+{
+    if (spec.isTransparent())
+        return {};
+
+    const double al = spec.coeffLow;
+    const double ah = spec.coeffHigh;
+    const double g  = spec.gainHigh;
+
+    const double b = 1.0 - (1.0 - spec.gainLow) * (1.0 - al);
+    const double c = g + (1.0 - g) * (1.0 - ah);
+
+    // D1 * N1 = (p + q u)(r + s u), and likewise for the high shelf.
+    const double p = 1.0 + al * al,  q = -2.0 * al;
+    const double r = b * b + al * al, s = -2.0 * al * b;
+
+    const double p2 = 1.0 + ah * ah,        q2 = -2.0 * ah;
+    const double r2 = c * c + g * g * ah * ah, s2 = -2.0 * ah * c * g;
+
+    const double k1 = 2.0 * al * (b - 1.0) * (b - al * al);
+    const double k2 = 2.0 * ah * (c - g)   * (c - ah * ah * g);
+
+    const double quadratic = k1 * q2 * s2 + k2 * q * s;
+    const double linear    = k1 * (p2 * s2 + q2 * r2) + k2 * (p * s + q * r);
+    const double constant  = k1 * p2 * r2 + k2 * p * r;
+
+    // Candidates always include both endpoints, so a degenerate solve - one
+    // shelf transparent, or both corners identical - is safe rather than
+    // special-cased.
+    double candidates[4] { 1.0, -1.0, 1.0, -1.0 };
+    int count = 2;
+
+    const auto addRoot = [&candidates, &count] (double u) noexcept
+    {
+        if (u > -1.0 && u < 1.0 && count < 4)
+            candidates[count++] = u;
+    };
+
+    if (std::abs (quadratic) > 1.0e-300)
+    {
+        const double discriminant = linear * linear - 4.0 * quadratic * constant;
+
+        if (discriminant >= 0.0)
+        {
+            // The numerically stable pairing, so the small root does not come
+            // out of a subtraction of two nearly equal numbers.
+            const double root = std::sqrt (discriminant);
+            const double sign = (linear >= 0.0) ? 1.0 : -1.0;
+            const double half = -0.5 * (linear + sign * root);
+
+            addRoot (half / quadratic);
+
+            if (std::abs (half) > 1.0e-300)
+                addRoot (constant / half);
+        }
+    }
+    else if (std::abs (linear) > 1.0e-300)
+    {
+        addRoot (-constant / linear);
+    }
+
+    MagnitudeBound result { 0.0, 0.0, 1.0 };
+
+    for (int i = 0; i < count; ++i)
+    {
+        const double u = candidates[i];
+
+        const double magnitude =
+            std::sqrt (std::max (0.0, lowShelfMagnitudeSquared  (spec, u))
+                       * std::max (0.0, highShelfMagnitudeSquared (spec, u)));
+
+        if (magnitude > result.lower)
+        {
+            result.lower = magnitude;
+            result.frequencyU = u;
+        }
+    }
+
+    result.upper = std::clamp (result.lower * (1.0 + maximumSafetyMargin),
+                               minShelfGain, 1.0);
+
+    return result;
 }
 
-/** The mid-band gain to divide out. Exactly 1.0 when damping is transparent. */
-[[nodiscard]] inline double plateauGain (const ShelfSpec& spec,
-                                         double lowCornerHz, double highCornerHz,
-                                         double sampleRate) noexcept
+/**
+    Filter gain that makes the response peak at exactly 1.
+
+    The normalised response is at or below unity everywhere, which is what
+    makes damping purely subtractive: with the decay gain untouched, no
+    frequency can decay longer than the undamped Decay target.
+*/
+[[nodiscard]] inline double normalisationFor (const ShelfSpec& spec) noexcept
 {
     if (spec.isTransparent())
         return 1.0;
 
-    return magnitudeAt (spec, midReferenceHz (lowCornerHz, highCornerHz), sampleRate);
-}
-
-/** Compensation factor for one line, ceiling applied. */
-[[nodiscard]] inline double plateauCompensation (const ShelfSpec& spec,
-                                                 double lowCornerHz, double highCornerHz,
-                                                 double sampleRate) noexcept
-{
-    const double p = plateauGain (spec, lowCornerHz, highCornerHz, sampleRate);
-
-    if (p >= 1.0)
-        return 1.0;
-
-    return std::min (maxPlateauCompensation, 1.0 / std::max (p, 1.0e-9));
+    return 1.0 / compositeMaximum (spec).upper;
 }
 
 // ===========================================================================

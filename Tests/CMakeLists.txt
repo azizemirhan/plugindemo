@@ -75,6 +75,17 @@ set(AV_TEST_SUITE_SOURCES
     ModalAdversarialTests.cpp
     SizeTrack.cpp
     DampingTests.cpp
+    DampingCheckpoint.cpp
+    DampingTopology.cpp
+    DampingRootCause.cpp
+    DampingGate.cpp
+    DampingEnsemble.cpp
+    DampingSynthetic.cpp
+    DampingCoherence.cpp
+    DampingPermutation.cpp
+    DampingEmpirical.cpp
+    DampingModulation.cpp
+    DampingResidue.cpp
     SizeTrackTests.cpp
     SizeRetrack.cpp
     SizeCrossValidation.cpp

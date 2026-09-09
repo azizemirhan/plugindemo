@@ -59,19 +59,25 @@ namespace av::dsp
     band decay time follows in closed form — see DampingTuning.h for the
     equation and for why the shelf gains must be derived per line.
 
-    Two consequences for this class:
+    Each line's response is normalised by its own maximum, so |Hn_i(w)| <= 1
+    with equality at exactly one frequency. Three consequences for this class:
 
-      - Stability is unchanged. |H_i(w)| <= 1 by construction, so
-        ||A*G*H||_2 <= max(g_i) * max|H_i| <= max(g_i) < 1 exactly as before.
-        No new margin, no new clamp.
+      - Decay means the LONGEST frequency-dependent RT60 in the tank. Damping
+        is purely subtractive: no region can ring longer than the undamped
+        target, at any setting.
 
-      - applyGains() now also owns the damping. The shelf gains depend on the
-        loop delays and on RT60, so everything that already re-applied the
-        gains re-derives the shelves too, and the gain carries the mid-band
-        compensation described in DampingTuning.h.
+      - The decay gains are untouched by PHASE 7 — the normalisation lives in
+        the filter, not in g_i. So the feedback clamp is never reached for a
+        damping reason, and stability is the PHASE 4 argument verbatim:
+        ||A*G*Hn||_2 <= max(g_i) * 1 <= max(g_i) < 1.
+
+      - applyGains() still owns the damping, because the shelf gains depend on
+        the loop delays and on RT60. Everything that re-applies the gains
+        re-derives the shelves.
 
     With both damping controls at zero the filter is bypassed on a flag and the
-    compensation is exactly 1.0, so the engine is bit-identical to PHASE 6.
+    gains are computed exactly as before, so the engine is bit-identical to
+    PHASE 6.
 */
 template <int N = fdn::order>
 class FdnCore
@@ -249,16 +255,10 @@ public:
         return dampingSpec[static_cast<size_t> (i)];
     }
 
-    /** Mid-band gain the decay gain is being divided by, on one line. */
-    [[nodiscard]] double getPlateauCompensation (int i) const noexcept
+    /** 1 / max|H| on one line — the gain that makes its response peak at 1. */
+    [[nodiscard]] double getDampingNormalisation (int i) const noexcept
     {
-        if (! dampingActive)
-            return 1.0;
-
-        return damping::plateauCompensation (dampingSpec[static_cast<size_t> (i)],
-                                             lowCornerSm.getCurrentValue(),
-                                             highCornerSm.getCurrentValue(),
-                                             currentSampleRate);
+        return dampingNorm[static_cast<size_t> (i)];
     }
 
     [[nodiscard]] bool isDampingActive() const noexcept { return dampingActive; }
@@ -532,7 +532,12 @@ private:
                              ? damping::shelfGainFor (d, rt60Seconds, dampingHighRatio)
                              : 1.0;
 
-            dampers[idx].setShelves (spec, immediate);
+            // Every line is normalised by its OWN maximum, because every line
+            // has its own shelf depths. Normalising them all by one figure
+            // would put the eight lines back on eight different decay rates.
+            dampingNorm[idx] = damping::normalisationFor (spec);
+
+            dampers[idx].setShelves (spec, dampingNorm[idx], immediate);
         }
     }
 
@@ -549,44 +554,29 @@ private:
         not an energy correction — nothing was gaining energy — it is the same
         formula applied to the right delay.
     */
+    /*
+        The decay gain is exactly what it was before PHASE 7.
+
+        Damping normalises itself — each line's response is scaled so it peaks
+        at unity — so the gain never has to compensate for anything, the
+        feedback clamp is never reached for a damping reason, and g_i keeps
+        meaning "the per-pass gain of the longest-decaying frequency in this
+        line". That is what makes Decay the longest RT60 in the tank rather
+        than the RT60 of one anchor frequency.
+    */
     void applyGains (bool immediate) noexcept
     {
         // The shelves are derived from the same delays and the same RT60 as the
         // gains, so they are re-derived here rather than anywhere else.
         updateDamping (immediate);
 
-        const double fLow  = lowCornerSm .getCurrentValue();
-        const double fHigh = highCornerSm.getCurrentValue();
-
         for (int i = 0; i < N; ++i)
         {
             const auto idx = static_cast<size_t> (i);
-            const double delaySeconds = effectiveDelaySeconds (i);
-
-            /*
-                Mid-band compensation. The shelf pair leaves the mid band a
-                fraction of a decibel below unity, which compounds over
-                circulations into a several-percent decay error — see
-                DampingTuning.h. Dividing it out here restores the maximum of
-                the combined per-pass response to exactly g_i, so the stability
-                bound is unchanged.
-
-                The clamp below is applied AFTER the division on purpose. It is
-                what keeps g_i * max|H| < 1 when the compensation is large,
-                which happens where the two corners overlap and there is no
-                plateau to anchor. Mid-band RT60 drifts where the clamp
-                engages; that region is documented as one where the mid-band
-                tolerance does not apply, because the plateau it measures does
-                not physically exist there.
-            */
-            const double compensation =
-                dampingActive ? damping::plateauCompensation (dampingSpec[idx], fLow, fHigh,
-                                                              currentSampleRate)
-                              : 1.0;
 
             const double gain = std::min (fdn::maxFeedbackGain,
-                                          fdn::feedbackGainForRt60 (delaySeconds, rt60Seconds)
-                                          * compensation);
+                                          fdn::feedbackGainForRt60 (effectiveDelaySeconds (i),
+                                                                    rt60Seconds));
 
             if (immediate) gains[idx].snapTo (gain);
             else           gains[idx].setTarget (gain);
@@ -605,6 +595,8 @@ private:
 
     std::array<LineDamping, static_cast<size_t> (N)>        dampers;
     std::array<damping::ShelfSpec, static_cast<size_t> (N)> dampingSpec {};
+    std::array<double, static_cast<size_t> (N)>             dampingNorm {};
+
 
     LogSmoother<double> lowCornerSm;
     LogSmoother<double> highCornerSm;

@@ -78,6 +78,17 @@ int runAllSuites()
 
     // PHASE 7
     runDampingTests();
+    runDampingCheckpointTests();
+    runDampingTopologyTests();
+    runDampingRootCauseTests();
+    runDampingGateTests();
+    runDampingEnsembleTests();
+    runDampingSyntheticTests();
+    runDampingCoherenceTests();
+    runDampingPermutationTests();
+    runDampingEmpiricalTests();
+    runDampingModulationTests();
+    runDampingResidueTests();
 
     return finish();
 }
