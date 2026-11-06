@@ -89,8 +89,12 @@ void runDampingPermutationTests();
 void runDampingEmpiricalTests();
 void runDampingModulationTests();
 void runDampingResidueTests();
+void runDampingSecondOrderTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
+
+/** Substring filters on suite function names. No filters means every suite. */
+void setSuiteFilters (int count, const char* const* values);
 
 } // namespace avtest

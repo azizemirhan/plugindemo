@@ -86,6 +86,7 @@ set(AV_TEST_SUITE_SOURCES
     DampingEmpirical.cpp
     DampingModulation.cpp
     DampingResidue.cpp
+    DampingSecondOrder.cpp
     SizeTrackTests.cpp
     SizeRetrack.cpp
     SizeCrossValidation.cpp

@@ -520,6 +520,11 @@ struct Mode
 */
 inline constexpr int kTransferDegree = 18657;
 
+/** Mean modal spacing implied by the delay set: 1 / sum(d_i) = 2.574 Hz. */
+inline const double kModalSpacingHz = 1.0 / (0.001 * (fdn::delaysMs[0] + fdn::delaysMs[1]
+    + fdn::delaysMs[2] + fdn::delaysMs[3] + fdn::delaysMs[4] + fdn::delaysMs[5]
+    + fdn::delaysMs[6] + fdn::delaysMs[7]));
+
 /**
     P(z), the cleared characteristic polynomial, evaluated stably.
 
@@ -799,7 +804,283 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
     lets Newton walk into a neighbour. Several starts are tried and the answer
     is accepted only if it lands in the region it was counted in.
 */
-[[nodiscard]] bool refinePole (const StaticTank& t, double f1, double f2, Mode& out)
+/**
+    The same bisection, but on the scaled polynomial P instead of F.
+
+    F = det(I - diag(L) A) carries z^-d per line. On a contour drawn around one
+    root in a narrow sector that factor swings over hundreds of orders of
+    magnitude, and the diagnostics showed the consequence plainly: the contour
+    moment came back at |z| = 2e-6 with a frequency of -14852 Hz, which is not
+    a 15 % error but a dead evaluation.
+
+    P(z) = det[(z-a) z^d_i delta_ij - k_i (p_i z - q_i) A_ij] is the same
+    determinant with the clearing factor moved inside, so it has the same zeros
+    and no poles at all - and the exponential appears as z^+d, which decays
+    instead of exploding. It is the representation the low-radius search already
+    needed for exactly this reason.
+*/
+[[nodiscard]] double polyEdgePhase (const StaticTank& t, Complex from, Complex to,
+                                    CountStats& stats, bool& ok)
+{
+    int samples = 24;
+
+    for (int attempt = 0; attempt < 10; ++attempt)
+    {
+        double total = 0.0, worst = 0.0;
+        Complex previous = characteristicPolynomial (t, from);
+        stats.evaluations += 1;
+
+        for (int k = 1; k <= samples; ++k)
+        {
+            const double u = static_cast<double> (k) / samples;
+            const Complex value = characteristicPolynomial (t, from + (to - from) * u);
+            stats.evaluations += 1;
+
+            if (std::abs (previous) <= 0.0 || std::abs (value) <= 0.0)
+            {
+                previous = value;
+                continue;
+            }
+
+            const double step = std::arg (value / previous);
+
+            worst = std::max (worst, std::abs (step));
+            total += step;
+            previous = value;
+        }
+
+        if (worst < 0.5 * decay::pi)
+        {
+            ok = true;
+            return total;
+        }
+
+        samples *= 2;
+        stats.refinements += 1;
+    }
+
+    ok = false;
+    return 0.0;
+}
+
+/** Zeros of P in an annular sector. P has no poles, so this is a zero count. */
+[[nodiscard]] int countZerosPoly (const StaticTank& t, double f1, double f2,
+                                  double r1, double r2, CountStats& stats, bool& ok)
+{
+    const double w1 = 2.0 * decay::pi * f1 / kSampleRate;
+    const double w2 = 2.0 * decay::pi * f2 / kSampleRate;
+
+    double total = 0.0;
+    bool edgeOk = true;
+
+    const auto arc = [&] (double radius, double from, double to)
+    {
+        const int pieces = std::max (8, static_cast<int> (std::ceil ((to - from) / 0.002)));
+        double sum = 0.0;
+
+        for (int k = 0; k < pieces && edgeOk; ++k)
+        {
+            bool sub = true;
+            sum += polyEdgePhase (t,
+                                  std::polar (radius, from + (to - from) * k / pieces),
+                                  std::polar (radius, from + (to - from) * (k + 1) / pieces),
+                                  stats, sub);
+
+            if (! sub) edgeOk = false;
+        }
+
+        return sum;
+    };
+
+    total += arc (r2, w1, w2);
+
+    bool e2 = true;
+    total += polyEdgePhase (t, std::polar (r2, w2), std::polar (r1, w2), stats, e2);
+    if (! e2) edgeOk = false;
+
+    total += arc (r1, w2, w1);
+
+    bool e4 = true;
+    total += polyEdgePhase (t, std::polar (r1, w1), std::polar (r2, w1), stats, e4);
+    if (! e4) edgeOk = false;
+
+    ok = edgeOk;
+
+    return ok ? static_cast<int> (std::lround (total / (2.0 * decay::pi))) : -1;
+}
+
+/**
+    Locates a single counted zero by bisecting the annular sector itself.
+
+    Newton, the contour moment and deflation all failed on the same ten
+    regions, and the diagnostics said why: they are 0.1 Hz wide against a
+    2.57 Hz modal spacing, so each holds one of a near-degenerate pair. Newton
+    converges tightly onto whichever of the pair is nearer; the moment integral
+    carries 15 % quadrature error at that width; and the acceptance margin,
+    1e-3 of the region, is 0.0001 Hz — finer than any of those estimates.
+
+    So the estimators are dropped in favour of the one thing that has been
+    authoritative throughout: the argument principle. The sector is halved in
+    frequency, then in radius, keeping whichever half still counts the zero,
+    until both dimensions are below tolerance. The answer is then the sector
+    centre and the error is the sector size — no convergence assumption, no
+    tuned threshold, and the count reconciles at every step or the step is
+    refused.
+*/
+[[nodiscard]] bool bisectToRoot (const StaticTank& t, double f1, double f2,
+                                 CountStats& stats, Mode& out,
+                                 double startInner = kInnerRadius,
+                                 double startOuter = kOuterRadius)
+{
+    double r1 = startInner, r2 = startOuter;
+
+    constexpr double frequencyTolerance = 1.0e-7;   // Hz
+    constexpr double radiusTolerance    = 1.0e-11;
+
+    for (int round = 0; round < 200; ++round)
+    {
+        const bool narrowEnough = (f2 - f1) < frequencyTolerance
+                                  && (r2 - r1) < radiusTolerance;
+
+        if (narrowEnough)
+            break;
+
+        bool progressed = false;
+
+        // --- halve in frequency -------------------------------------------
+        if ((f2 - f1) >= frequencyTolerance)
+        {
+            for (double fraction : { 0.5, 0.37, 0.63 })
+            {
+                const double mid = f1 + (f2 - f1) * fraction;
+
+                bool okLow = true, okHigh = true;
+                const int low = countZerosPoly (t, f1, mid, r1, r2, stats, okLow);
+
+                if (! okLow || low < 0)
+                    continue;
+
+                const int high = countZerosPoly (t, mid, f2, r1, r2, stats, okHigh);
+
+                if (! okHigh || high < 0 || low + high != 1)
+                    continue;
+
+                if (low == 1) f2 = mid;
+                else          f1 = mid;
+
+                progressed = true;
+                break;
+            }
+        }
+
+        // --- halve in radius ----------------------------------------------
+        if ((r2 - r1) >= radiusTolerance)
+        {
+            for (double fraction : { 0.5, 0.37, 0.63 })
+            {
+                const double mid = r1 + (r2 - r1) * fraction;
+
+                bool okInner = true, okOuter = true;
+                const int inner = countZerosPoly (t, f1, f2, r1, mid, stats, okInner);
+
+                if (! okInner || inner < 0)
+                    continue;
+
+                const int outer = countZerosPoly (t, f1, f2, mid, r2, stats, okOuter);
+
+                if (! okOuter || outer < 0 || inner + outer != 1)
+                    continue;
+
+                if (inner == 1) r2 = mid;
+                else            r1 = mid;
+
+                progressed = true;
+                break;
+            }
+        }
+
+        if (! progressed)
+            return false;
+    }
+
+    const double frequency = 0.5 * (f1 + f2);
+    const double radius = 0.5 * (r1 + r2);
+
+    if (! (radius > 0.0) || radius > startOuter || radius < startInner)
+        return false;
+
+    out.pole = std::polar (radius, 2.0 * decay::pi * frequency / kSampleRate);
+    out.frequencyHz = frequency;
+    out.rt60 = -3.0 / (std::log10 (radius) * kSampleRate);
+
+    return true;
+}
+
+/** What happened in a region the enumeration could not pin down. */
+/*
+    ANCESTRY OF A REGION'S FREQUENCY EDGES.
+
+    A region does not own its own boundaries: it inherits f1 from one ancestor
+    split and f2 from another, and the only edge a split ever sanitises is the
+    new one it just made. Every split is therefore recorded, and the path from
+    the coarse block down to the region being worked on is kept, so a bad
+    boundary can be traced to the split that created it instead of guessed at.
+*/
+struct SplitEvent
+{
+    double f1 = 0.0, f2 = 0.0;      ///< parent interval
+    int parentCount = 0;
+    double proposedCut = 0.0;       ///< before any displacement
+    double acceptedCut = 0.0;
+    double displacement = 0.0;      ///< acceptedCut - proposedCut
+    int sliverCount = 0;            ///< zeros straddling the proposed cut
+    int left = 0, right = 0;
+    double certifyLeft = -1.0;      ///< |s0 - N| on the left child, -1 = not certified
+    double certifyRight = -1.0;
+    int attempts = 0;               ///< displacement candidates tried
+    int depth = 0;
+};
+
+inline std::vector<SplitEvent> splitEvents;
+
+struct PathStep
+{
+    int event = -1;
+    bool rightChild = false;        ///< the region is the right child of that split
+};
+
+inline std::vector<PathStep> currentPath;
+
+struct FailedRegion
+{
+    std::vector<PathStep> path;     ///< ancestry, coarse block first
+    double f1 = 0.0, f2 = 0.0;
+    int count = 0;
+    int polyCount = -99;        ///< what P says the region holds
+    double minPolyF = 0.0;      ///< where |P| bottoms out across the region
+    double minPolyR = 0.0;
+    double minPolyRatio = 0.0;  ///< |P| there over its median on the grid
+    Complex centroid;
+    double bestStep = 0.0;          ///< smallest |F/F'| Newton reached
+    double centroidFrequency = 0.0;
+    double centroidRadius = 0.0;
+    double centroidResidual = 0.0;  ///< |F(centroid)| / |F(region edge)|
+    double r1 = 0.0, r2 = 0.0;      ///< annulus, when a radial split made it
+    bool edgesProbed = false;
+    bool edgesClean = false;
+    double regionS0Error = -1.0;    ///< |s0 - N| on the region itself
+    int momentPerEdge[6] { 0, 0, 0, 0, 0, 0 };
+    double momentPlain[6] { -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 };
+    double momentShifted[6] { -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 };
+    int edge[4] { -1, -1, -1, -1 };     ///< zeros found on f1, f2, r1, r2
+    bool edgeOk[4] { true, true, true, true };
+    const char* reason = "";
+};
+
+inline std::vector<FailedRegion> failedRegions;
+
+[[nodiscard]] bool refinePole (const StaticTank& t, double f1, double f2, Mode& out,
+                              const std::vector<Mode>& known)
 {
     const double centre = 0.5 * (f1 + f2);
     const double omega = 2.0 * decay::pi * centre / kSampleRate;
@@ -840,6 +1121,8 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
     for (double startRadius : { 0.99993, 0.99986, 0.99979, 0.99970, 0.99950, 0.99920 })
         starts.push_back (std::polar (startRadius, omega));
 
+    double bestStepSeen = 1.0e30;
+
     for (Complex z : starts)
     {
         if (! std::isfinite (z.real()) || ! std::isfinite (z.imag()))
@@ -876,6 +1159,8 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
                 break;
         }
 
+        bestStepSeen = std::min (bestStepSeen, bestStep);
+
         if (bestStep > 1.0e-9)
             continue;
 
@@ -886,7 +1171,16 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
 
         const double frequency = std::arg (best) * kSampleRate / (2.0 * decay::pi);
 
-        if (frequency < f1 - margin || frequency > f2 + margin)
+        /*
+            Strict ownership, restored.
+
+            Every cut this region descends from has been shown root-free by the
+            sliver test, so the root it was counted with lies strictly inside
+            it and the bounds test is meaningful again. It is kept strict for
+            that reason: an acceptance margin would be a tolerance on position,
+            and position is exactly what the contour has already settled.
+        */
+        if (frequency < f1 || frequency > f2)
             continue;
 
         out.pole = best;
@@ -895,19 +1189,125 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
 
         return true;
     }
+    /*
+        Newton converged tightly every time — the best |F/F'| was effectively
+        zero — but onto a NEIGHBOUR's root, which the region check then
+        rejected. These eight regions are 0.1 Hz wide against a 2.57 Hz modal
+        spacing, so they hold one of a near-degenerate pair, and from any start
+        plain Newton slides to whichever of the pair is closer.
+
+        The classical remedy is deflation: divide out the roots already in hand
+        and the remaining zero in the region is the only one left to find.
+
+            G(z) = F(z) / prod (z - z_k)
+            G'/G = F'/F - sum 1/(z - z_k)
+
+        so the Newton step is 1 / (F'/F - sum 1/(z - z_k)), needing nothing but
+        F, a difference for F', and the neighbours already located. No new
+        machinery and no heuristic: the contour still says how many roots are
+        here, deflation only stops the search walking out of the box.
+    */
+    {
+        std::vector<Complex> nearby;
+
+        for (const auto& m : known)
+            if (std::abs (m.frequencyHz - centre) < 25.0)
+                nearby.push_back (m.pole);
+
+        for (Complex z : { centroid, std::polar (0.99977, omega),
+                           std::polar (0.99990, omega) })
+        {
+            if (! std::isfinite (z.real()) || ! std::isfinite (z.imag()))
+                continue;
+
+            double step = 1.0e30;
+
+            for (int iteration = 0; iteration < 80; ++iteration)
+            {
+                const double h = 1.0e-9;
+                const Complex f = characteristic (t, z);
+
+                if (std::abs (f) <= 0.0)
+                    break;
+
+                const Complex fp = (characteristic (t, z + h) - characteristic (t, z - h))
+                                   / (2.0 * h);
+
+                Complex logDerivative = fp / f;
+
+                for (const auto& root : nearby)
+                {
+                    const Complex gap = z - root;
+
+                    if (std::abs (gap) > 1.0e-14)
+                        logDerivative -= Complex (1.0) / gap;
+                }
+
+                if (std::abs (logDerivative) < 1.0e-300)
+                    break;
+
+                const Complex delta = Complex (1.0) / logDerivative;
+
+                z -= delta;
+                step = std::abs (delta);
+
+                if (! std::isfinite (z.real()) || ! std::isfinite (z.imag()))
+                    break;
+
+                if (step < 1.0e-12)
+                    break;
+            }
+
+            if (step > 1.0e-9 || ! std::isfinite (z.real()))
+                continue;
+
+            const double radius = std::abs (z);
+
+            if (radius >= kOuterRadius || radius < kInnerRadius)
+                continue;
+
+            const double frequency = std::arg (z) * kSampleRate / (2.0 * decay::pi);
+
+            if (frequency < f1 - margin || frequency > f2 + margin)
+                continue;
+
+            out.pole = z;
+            out.frequencyHz = frequency;
+            out.rt60 = -3.0 / (std::log10 (radius) * kSampleRate);
+
+            return true;
+        }
+    }
 
     /*
         Newton never landed inside. The contour moment is already an unbiased
-        estimate of the single zero the region holds, so it is used directly
-        rather than losing the mode — but only if it is where the count says it
-        must be.
+        estimate of the single zero the region holds, so it is used instead of
+        losing the mode — but it is VALIDATED first, by checking that the
+        characteristic function really is near zero there. A centroid that
+        merely sits in the right box is not evidence of a root.
     */
     const double centroidRadius = std::abs (centroid);
     const double centroidFrequency = std::arg (centroid) * kSampleRate / (2.0 * decay::pi);
 
+    double residual = 1.0e30;
+
+    if (std::isfinite (centroidRadius) && centroidRadius > 0.0)
+    {
+        // Scale |F| against its value a modal spacing away, which is what a
+        // "typical" magnitude looks like locally.
+        const double reference = std::abs (characteristic (t, std::polar (
+            centroidRadius, 2.0 * decay::pi * (centroidFrequency + 2.0) / kSampleRate)));
+
+        if (reference > 0.0)
+            residual = std::abs (characteristic (t, centroid)) / reference;
+    }
+
+    const double wideMargin = 0.05 * (f2 - f1) + 1.0e-9;
+
     if (std::isfinite (centroidRadius)
         && centroidRadius < kOuterRadius && centroidRadius >= kInnerRadius
-        && centroidFrequency >= f1 - margin && centroidFrequency <= f2 + margin)
+        && centroidFrequency >= f1 - wideMargin && centroidFrequency <= f2 + wideMargin
+        && residual < 1.0e-3)
     {
         out.pole = centroid;
         out.frequencyHz = centroidFrequency;
@@ -916,10 +1316,943 @@ void findRealRoots (const StaticTank& t, double from, double to, int samples,
         return true;
     }
 
+    FailedRegion failure;
+    failure.f1 = f1;
+    failure.f2 = f2;
+    failure.count = 1;
+    failure.centroid = centroid;
+    failure.bestStep = bestStepSeen;
+    failure.centroidFrequency = centroidFrequency;
+    failure.centroidRadius = centroidRadius;
+    failure.centroidResidual = residual;
+    failure.reason = ! std::isfinite (centroidRadius) ? "centroid not finite"
+                     : (centroidRadius >= kOuterRadius) ? "centroid outside the unit circle"
+                     : (centroidRadius < kInnerRadius) ? "centroid below the annulus"
+                     : (centroidFrequency < f1 - wideMargin
+                        || centroidFrequency > f2 + wideMargin) ? "centroid outside the region"
+                     : "characteristic not small at the centroid";
+
+    /*
+        Before giving up, record what the region actually looks like. Four
+        locators have now failed on the same places, so the question is no
+        longer which estimator to try but whether the root is where the count
+        says it is. A grid of |P| over the region answers that directly: if the
+        minimum sits inside, the count is right and the locators are weak; if
+        it does not, the count is what needs revisiting.
+    */
+    {
+        bool okPoly = true;
+        CountStats scratch;
+        failure.polyCount = countZerosPoly (t, f1, f2, kInnerRadius, kOuterRadius,
+                                            scratch, okPoly);
+
+        if (! okPoly)
+            failure.polyCount = -1;
+
+        double best = 1.0e300;
+        std::vector<double> samples;
+
+        for (int i = 0; i <= 120; ++i)
+            for (int j = 0; j <= 24; ++j)
+            {
+                const double f = f1 + (f2 - f1) * i / 120.0;
+                const double r = kInnerRadius
+                                 + (kOuterRadius - kInnerRadius) * j / 24.0;
+
+                const double magnitude = std::abs (characteristicPolynomial (
+                    t, std::polar (r, 2.0 * decay::pi * f / kSampleRate)));
+
+                samples.push_back (magnitude);
+
+                if (magnitude < best)
+                {
+                    best = magnitude;
+                    failure.minPolyF = f;
+                    failure.minPolyR = r;
+                }
+            }
+
+        std::sort (samples.begin(), samples.end());
+        const double median = samples[samples.size() / 2];
+
+        failure.minPolyRatio = (median > 0.0) ? best / median : -1.0;
+    }
+
+    failure.path = currentPath;
+    failedRegions.push_back (failure);
+
     return false;
 }
 
+/*
+    One gate for every locator.
+
+    refinePole, the contour moment and the bisection each produce a root, and
+    the duplicate check has to sit where they all pass through rather than
+    inside one of them: putting it in the Newton path alone let the bisection
+    hand back a root that was already in the list, and the audit caught it as
+    one duplicate out of 9322.
+*/
+[[nodiscard]] bool acceptRoot (const Mode& candidate, std::vector<Mode>& modes)
+{
+    if (! std::isfinite (candidate.pole.real()) || ! std::isfinite (candidate.pole.imag()))
+        return false;
+
+    for (const auto& m : modes)
+        if (std::abs (m.pole - candidate.pole) < 1.0e-9)
+            return false;
+
+    modes.push_back (candidate);
+    return true;
+}
+
 /** Adaptive subdivision until each region holds exactly one zero. */
+// ---------------------------------------------------------------------------
+//  Contour moments
+// ---------------------------------------------------------------------------
+/*
+    s_m = (1 / 2 pi i) * contour integral of z^m P'(z)/P(z) dz
+
+    For a contour enclosing N zeros and no poles, s_0 = N and s_m is the m-th
+    power sum of the enclosed roots. A single enclosed zero is therefore
+    s_1 / s_0 outright, with no initial guess and no iteration to diverge.
+
+    P is used rather than F because P is a polynomial: it has no poles anywhere,
+    so the zeros-minus-poles bookkeeping disappears, and P'/P stays well scaled
+    (it is the sum of 1/(z - z_k) over the roots) where F itself swings over
+    hundreds of orders of magnitude through the z^-d factor.
+
+    The integral is taken edge by edge over the annular sector with the midpoint
+    rule, in the integrand's own variable: i z dtheta along the arcs and
+    e^(i theta) drho along the radial sides. Nothing here unwraps a phase, which
+    is what made the earlier moment attempt return |z| = 2e-6.
+*/
+
+struct Moments
+{
+    Complex s0, s1, s2;
+    bool ok = false;
+};
+
+/*
+    Moments may be taken about a CENTRE.
+
+    With centre = 0 this is bit-for-bit what it always was, and every root
+    already accepted through it is untouched. The centre matters for a close
+    pair: the two roots at 15093.39169 and 15093.40186 Hz are 7.7e-6 apart in
+    z, so the discriminant of their Newton-identity quadratic is 6e-11 while
+    s1^2 is about 4, and forming it from absolute moments destroys it to
+    cancellation long before quadrature error matters. Taken about the
+    region's own centroid the same discriminant is built from numbers of size
+    4e-8, and the pair separates.
+*/
+[[nodiscard]] Moments contourMoments (const StaticTank& t, double f1, double f2,
+                                      double r1, double r2, int perEdge,
+                                      Complex centre = Complex (0.0, 0.0))
+{
+    const double w1 = 2.0 * decay::pi * f1 / kSampleRate;
+    const double w2 = 2.0 * decay::pi * f2 / kSampleRate;
+
+    Complex s0 (0.0, 0.0), s1 (0.0, 0.0), s2 (0.0, 0.0);
+    bool ok = true;
+
+    const auto logDerivative = [&t, &ok] (Complex z) -> Complex
+    {
+        const double h = 1.0e-10 * std::max (1.0, std::abs (z));
+
+        const Complex p = characteristicPolynomial (t, z);
+
+        if (! std::isfinite (p.real()) || ! std::isfinite (p.imag()) || std::abs (p) <= 0.0)
+        {
+            ok = false;
+            return {};
+        }
+
+        const Complex derivative = (characteristicPolynomial (t, z + h)
+                                    - characteristicPolynomial (t, z - h)) / (2.0 * h);
+
+        return derivative / p;
+    };
+
+    const auto accumulate = [&] (Complex z, Complex weight)
+    {
+        const Complex value = logDerivative (z) * weight;
+        const Complex u = z - centre;
+
+        s0 += value;
+        s1 += value * u;
+        s2 += value * u * u;
+    };
+
+    // Outer arc, w1 -> w2 at r2.   dz = i z dtheta
+    {
+        const double step = (w2 - w1) / perEdge;
+
+        for (int k = 0; k < perEdge; ++k)
+        {
+            const Complex z = std::polar (r2, w1 + step * (k + 0.5));
+            accumulate (z, Complex (0.0, 1.0) * z * step);
+        }
+    }
+
+    // Radial, r2 -> r1 at w2.      dz = e^(i w2) drho
+    {
+        const double step = (r1 - r2) / perEdge;
+        const Complex direction = std::polar (1.0, w2);
+
+        for (int k = 0; k < perEdge; ++k)
+            accumulate (std::polar (r2 + step * (k + 0.5), w2), direction * step);
+    }
+
+    // Inner arc, w2 -> w1 at r1.
+    {
+        const double step = (w1 - w2) / perEdge;
+
+        for (int k = 0; k < perEdge; ++k)
+        {
+            const Complex z = std::polar (r1, w2 + step * (k + 0.5));
+            accumulate (z, Complex (0.0, 1.0) * z * step);
+        }
+    }
+
+    // Radial, r1 -> r2 at w1.
+    {
+        const double step = (r2 - r1) / perEdge;
+        const Complex direction = std::polar (1.0, w1);
+
+        for (int k = 0; k < perEdge; ++k)
+            accumulate (std::polar (r1 + step * (k + 0.5), w1), direction * step);
+    }
+
+    const Complex scale = Complex (1.0) / Complex (0.0, 2.0 * decay::pi);
+
+    Moments out;
+    out.s0 = s0 * scale;
+    out.s1 = s1 * scale;
+    out.s2 = s2 * scale;
+    out.ok = ok;
+
+    return out;
+}
+
+/** Scale-free root health: smallest singular value of M over its norm. */
+[[nodiscard]] double conditionAt (const StaticTank& t, Complex z)
+{
+    Complex m[kLines][kLines];
+    double frobenius = 0.0;
+
+    for (int i = 0; i < kLines; ++i)
+    {
+        const Complex loop = t.loopFactor (i, z);
+
+        for (int j = 0; j < kLines; ++j)
+        {
+            m[i][j] = ((i == j) ? Complex (1.0) : Complex (0.0)) - loop * t.matrix[i][j];
+            frobenius += std::norm (m[i][j]);
+        }
+    }
+
+    frobenius = std::sqrt (frobenius);
+
+    // 1 / ||M^-1|| estimated from the largest column of the inverse.
+    double worst = 0.0;
+
+    for (int j = 0; j < kLines; ++j)
+    {
+        Solver s;
+
+        for (int a = 0; a < kLines; ++a)
+            for (int b = 0; b < kLines; ++b)
+                s.m[a][b] = m[a][b];
+
+        Complex rhs[kLines] {};
+        rhs[j] = Complex (1.0);
+
+        (void) s.determinantAndSolve (rhs);
+
+        double norm = 0.0;
+
+        for (int a = 0; a < kLines; ++a)
+            norm += std::norm (rhs[a]);
+
+        worst = std::max (worst, std::sqrt (norm));
+    }
+
+    if (worst <= 0.0 || frobenius <= 0.0)
+        return -1.0;
+
+    return (1.0 / worst) / frobenius;
+}
+
+/** |P/P'|, the scale-free distance estimate to the nearest root. */
+[[nodiscard]] double rootResidual (const StaticTank& t, Complex z)
+{
+    const double h = 1.0e-10 * std::max (1.0, std::abs (z));
+
+    const Complex p = characteristicPolynomial (t, z);
+    const Complex derivative = (characteristicPolynomial (t, z + h)
+                                - characteristicPolynomial (t, z - h)) / (2.0 * h);
+
+    if (std::abs (derivative) <= 0.0)
+        return -1.0;
+
+    return std::abs (p / derivative);
+}
+
+/** One root recovered from moments, with everything needed to judge it. */
+struct MomentRecovery
+{
+    double f1 = 0.0, f2 = 0.0;
+    int count = 0;
+    double s0Error = 0.0;        ///< |s0 - N|
+    double s2Error = 0.0;        ///< |s2 - z0^2| / |z0^2|, N = 1 only
+    double frequency = 0.0, radius = 0.0;
+    double frequencyShift = 0.0; ///< between the last two quadrature resolutions
+    double radiusShift = 0.0;
+    double residual = 0.0;       ///< |P/P'|
+    double condition = 0.0;      ///< sigma_min / ||M||
+    bool newtonUsed = false;
+    bool accepted = false;
+    bool inside = false;
+    bool duplicate = false;
+    bool converged = false;
+};
+
+inline std::vector<MomentRecovery> momentRecoveries;
+
+/**
+    Discovery by contour moment, with convergence rather than a chosen
+    resolution.
+
+    The quadrature is run at 64, 128, 256 and 512 points per edge and the root
+    is accepted only when the last two agree. The shift between them is
+    reported as the error, so the number carries its own uncertainty instead of
+    resting on a resolution picked after the fact.
+
+    Newton is allowed exactly one refinement from the moment root, and if it
+    leaves the verified contour the moment root stands. It is refinement now,
+    not discovery.
+*/
+[[nodiscard]] bool momentRoot (const StaticTank& t, double f1, double f2, int count,
+                               const std::vector<Mode>& known, Mode& out)
+{
+    MomentRecovery record;
+    record.f1 = f1;
+    record.f2 = f2;
+    record.count = count;
+
+    const double r1 = kInnerRadius, r2 = kOuterRadius;
+
+    Complex previousRoot;
+    bool havePrevious = false;
+
+    Complex root;
+    bool haveRoot = false;
+    Moments last;
+
+    for (int perEdge : { 64, 128, 256, 512, 1024, 2048 })
+    {
+        const auto moments = contourMoments (t, f1, f2, r1, r2, perEdge);
+
+        if (! moments.ok || std::abs (moments.s0) <= 0.0)
+            continue;
+
+        const Complex candidate = moments.s1 / moments.s0;
+
+        if (! std::isfinite (candidate.real()) || ! std::isfinite (candidate.imag()))
+            continue;
+
+        if (havePrevious)
+        {
+            const double previousFrequency = std::arg (previousRoot) * kSampleRate
+                                             / (2.0 * decay::pi);
+            const double currentFrequency = std::arg (candidate) * kSampleRate
+                                            / (2.0 * decay::pi);
+
+            record.frequencyShift = std::abs (currentFrequency - previousFrequency);
+            record.radiusShift = std::abs (std::abs (candidate) - std::abs (previousRoot));
+        }
+
+        previousRoot = candidate;
+        havePrevious = true;
+
+        root = candidate;
+        haveRoot = true;
+        last = moments;
+    }
+
+    if (! haveRoot)
+    {
+        momentRecoveries.push_back (record);
+        return false;
+    }
+
+    record.s0Error = std::abs (last.s0 - Complex (static_cast<double> (count)));
+
+    const Complex squared = root * root;
+    record.s2Error = (std::abs (squared) > 0.0)
+                     ? std::abs (last.s2 - squared) / std::abs (squared) : -1.0;
+
+    // One Newton refinement, kept only if it stays inside.
+    {
+        const double h = 1.0e-10;
+        const Complex p = characteristicPolynomial (t, root);
+        const Complex derivative = (characteristicPolynomial (t, root + h)
+                                    - characteristicPolynomial (t, root - h)) / (2.0 * h);
+
+        if (std::abs (derivative) > 0.0)
+        {
+            const Complex refined = root - p / derivative;
+            const double frequency = std::arg (refined) * kSampleRate / (2.0 * decay::pi);
+            const double radius = std::abs (refined);
+
+            if (std::isfinite (radius) && radius < r2 && radius >= r1
+                && frequency >= f1 && frequency <= f2)
+            {
+                root = refined;
+                record.newtonUsed = true;
+            }
+        }
+    }
+
+    record.frequency = std::arg (root) * kSampleRate / (2.0 * decay::pi);
+    record.radius = std::abs (root);
+    record.residual = rootResidual (t, root);
+    record.condition = conditionAt (t, root);
+
+    const bool inside = record.radius < r2 && record.radius >= r1
+                        && record.frequency >= f1 && record.frequency <= f2;
+
+    bool duplicate = false;
+
+    for (const auto& m : known)
+        if (std::abs (m.pole - root) < 1.0e-9)
+            duplicate = true;
+
+    record.inside = inside;
+    record.duplicate = duplicate;
+    /*
+        Convergence is judged against the pole's own geometry, not a frequency
+        I picked. What the reconstruction needs is the pole located well inside
+        its distance from the unit circle: 1 - rho is about 2.5e-4 here, which
+        in frequency is roughly 1.9 Hz, so demanding 1e-5 Hz was a thousand
+        times stricter than anything downstream can use - and it rejected 746
+        regions whose roots Newton then found anyway. The requirement is that
+        the last two quadrature resolutions agree to a thousandth of that
+        distance, measured in z.
+    */
+    const double distanceFromCircle = std::max (1.0 - record.radius, 1.0e-12);
+    const double shiftInZ = std::hypot (record.radiusShift,
+                                        record.radius * 2.0 * decay::pi
+                                        * record.frequencyShift / kSampleRate);
+
+    record.converged = shiftInZ < 1.0e-3 * distanceFromCircle;
+
+    record.inside = inside;
+    record.duplicate = duplicate;
+    record.accepted = inside && ! duplicate
+                      && record.s0Error < 0.05
+                      && record.converged;
+
+    momentRecoveries.push_back (record);
+
+    if (! record.accepted)
+        return false;
+
+    out.pole = root;
+    out.frequencyHz = record.frequency;
+    out.rt60 = -3.0 / (std::log10 (record.radius) * kSampleRate);
+
+    return true;
+}
+
+/**
+    A cluster the subdivision cannot separate, solved from its moments.
+
+    For N enclosed zeros the power sums s_1 .. s_N determine the local monic
+    polynomial through Newton's identities, and its roots ARE the enclosed
+    zeros. No individual root is guessed and no root is picked by proximity:
+    the contour fixes how many there are and the symmetric functions fix which
+    ones.
+
+    Only N = 2 is implemented, because that is what the enumeration actually
+    leaves: one region with two zeros that neither a frequency nor a radius cut
+    would separate. For N = 2,
+
+        e1 = s1,    e2 = (s1^2 - s2) / 2
+
+    and the roots are those of z^2 - e1 z + e2, taken with the numerically
+    stable pairing so the smaller root does not come out of a subtraction of
+    two nearly equal numbers.
+
+    This is far safer than building the global degree-18657 polynomial, which
+    is the only other way to get at a cluster this tight.
+*/
+[[nodiscard]] int clusterRoots (const StaticTank& t, double f1, double f2, int count,
+                                const std::vector<Mode>& known, std::vector<Mode>& out,
+                                double r1 = kInnerRadius, double r2 = kOuterRadius)
+{
+    if (count != 2)
+        return 0;
+
+    /*
+        The moments are taken about the region's own centroid. For a close
+        pair that is not a refinement, it is the difference between solving
+        the quadratic and not: u1 - u2 is around 8e-6, so the discriminant is
+        6e-11, and about the origin it would have to be recovered from s1^2
+        near 4 - gone to cancellation at the fifteenth digit before the
+        quadrature even enters. About the centroid s1^2 is around 4e-8 and the
+        same discriminant survives with four digits intact.
+    */
+    const double wMid = decay::pi * (f1 + f2) / kSampleRate;
+    const Complex centre = std::polar (0.5 * (r1 + r2), wMid);
+
+    Moments best;
+    bool have = false;
+
+    for (int perEdge : { 256, 512, 1024, 2048 })
+    {
+        const auto moments = contourMoments (t, f1, f2, r1, r2, perEdge, centre);
+
+        if (! moments.ok)
+            continue;
+
+        if (std::abs (moments.s0 - Complex (2.0)) < 0.05)
+        {
+            best = moments;
+            have = true;
+        }
+    }
+
+    if (! have)
+        return 0;
+
+    const Complex e1 = best.s1;
+    const Complex e2 = (best.s1 * best.s1 - best.s2) * 0.5;
+
+    /*
+        e1^2 - 4 e2 is identically 2 s2 - s1^2, and that form is used because
+        it never builds the difference twice: the first expression forms e2 by
+        subtracting s2 from s1^2 and then subtracts it again, losing the same
+        digits a second time.
+    */
+    const Complex discriminant = std::sqrt (2.0 * best.s2 - best.s1 * best.s1);
+
+    const Complex u1 = 0.5 * (e1 + discriminant);
+    const Complex u2 = 0.5 * (e1 - discriminant);
+
+    // Both identities are checked against the moments they came from.
+    if (std::abs (u1 + u2 - e1) > 1.0e-9 * std::max (1.0, std::abs (e1))
+        || std::abs (u1 * u2 - e2) > 1.0e-9 * std::max (1.0e-12, std::abs (e2)))
+        return 0;
+
+    int accepted = 0;
+
+    for (Complex root : { centre + u1, centre + u2 })
+    {
+        if (! std::isfinite (root.real()) || ! std::isfinite (root.imag()))
+            continue;
+
+        const double radius = std::abs (root);
+        const double frequency = std::arg (root) * kSampleRate / (2.0 * decay::pi);
+
+        if (radius >= r2 || radius < r1
+            || frequency < f1 || frequency > f2)
+            continue;
+
+        bool duplicate = false;
+
+        for (const auto& m : known)
+            if (std::abs (m.pole - root) < 1.0e-9)
+                duplicate = true;
+
+        for (const auto& m : out)
+            if (std::abs (m.pole - root) < 1.0e-9)
+                duplicate = true;
+
+        if (duplicate)
+            continue;
+
+        Mode mode;
+        mode.pole = root;
+        mode.frequencyHz = frequency;
+        mode.rt60 = -3.0 / (std::log10 (radius) * kSampleRate);
+
+        out.push_back (mode);
+        ++accepted;
+    }
+
+    return accepted;
+}
+
+/*
+    MOMENT CERTIFICATION OF A SHARED BOUNDARY.
+
+    A thin-sliver winding count cannot establish that a DISPLACED cut is
+    root-free. The sliver's contour is about 0.02 Hz wide and 0.001 tall - an
+    aspect ratio near 1:400 - so its winding number is the small difference of
+    two long, nearly cancelling radial phase walks. It returned 0 for a sliver
+    with a root at its centre four times in the previous run, and those four
+    false negatives are exactly the four roots that were lost.
+
+    The moment integral is the sensitive instrument here, and it is the one
+    that exposed the fault: on the two children of the 13569 Hz parent the
+    winding counts were 1 and 1 while s0 came back 0 and 2. A zero sitting on
+    the shared boundary puts the integrand's singularity ON the path, so s0
+    stops being an integer. Requiring s0 to reproduce the winding count on
+    BOTH children, at two quadrature resolutions, therefore certifies the one
+    shared boundary for both siblings at once - no overlap, no gap, and no
+    tolerance on where the root is allowed to sit.
+*/
+[[nodiscard]] bool certifyCut (const StaticTank& t, double f1, double cut, double f2,
+                               int left, int right, double& errLeft, double& errRight)
+{
+    errLeft = errRight = -1.0;
+
+    /*
+        The resolution is not chosen, it is climbed until the integral settles
+        on the integer it is supposed to produce. A clean cut reaches 1e-5 or
+        better; a cut with a zero on it is out by a whole root and no
+        resolution rescues it, so the ladder terminates on the answer rather
+        than on a tolerance someone picked. The first rung scales with how
+        many roots the children have to hold, since a wide region integrating
+        to 10 needs more points than a narrow one integrating to 1.
+    */
+    const int count = left + right;
+    const int first = std::min (256, std::max (32, 16 * count));
+
+    for (int perEdge = first; perEdge <= 1024; perEdge *= 2)
+    {
+        const auto l = contourMoments (t, f1, cut, kInnerRadius, kOuterRadius, perEdge);
+        const auto r = contourMoments (t, cut, f2, kInnerRadius, kOuterRadius, perEdge);
+
+        if (! l.ok || ! r.ok)
+            return false;
+
+        errLeft  = std::abs (l.s0 - Complex (static_cast<double> (left)));
+        errRight = std::abs (r.s0 - Complex (static_cast<double> (right)));
+
+        if (errLeft < 0.05 && errRight < 0.05)
+            return true;
+    }
+
+    return false;
+}
+
+/**
+    One region, certified against its own winding count.
+
+    The same instrument as certifyCut, for a region that is not the child of
+    a cut: a boundary of the scan itself. s0 has to reproduce the count, or a
+    zero is on the contour and the region as drawn is not usable.
+*/
+[[nodiscard]] bool certifyRegion (const StaticTank& t, double f1, double f2,
+                                  double r1, double r2, int count, double& error)
+{
+    error = -1.0;
+
+    const int first = std::min (256, std::max (32, 16 * std::max (1, count)));
+
+    for (int perEdge = first; perEdge <= 4096; perEdge *= 2)
+    {
+        const auto m = contourMoments (t, f1, f2, r1, r2, perEdge);
+
+        if (! m.ok)
+            return false;
+
+        error = std::abs (m.s0 - Complex (static_cast<double> (count)));
+
+        if (error < 0.05)
+            return true;
+    }
+
+    return false;
+}
+
+/**
+    All four contour edges of a region, probed for a zero sitting on them.
+
+    The two frequency edges are probed by a thin sliver straddling them, the
+    two radius edges by a thin annulus. Zero on every probe means no zero lies
+    on the contour. edge[k] is -1 where the probe itself was unreliable.
+*/
+[[nodiscard]] bool edgesRootFree (const StaticTank& t, double f1, double f2,
+                                  double r1, double r2, CountStats& stats,
+                                  int edge[4], bool reliable[4])
+{
+    const double df = std::min (0.25 * (f2 - f1), 0.02 * kModalSpacingHz);
+    const double dr = std::min (0.25 * (r2 - r1), 2.0e-6);
+
+    bool all = true;
+
+    for (int k = 0; k < 4; ++k)
+    {
+        reliable[k] = true;
+        edge[k] = -1;
+    }
+
+    /*
+        The f1 probe is clamped away from zero. At the bottom of the scan f1
+        is 0.02 Hz and the probe half-width 0.05, so the window ran to
+        negative frequency, wrapped past z = 1 and reported four zeros that
+        are not on the edge at all.
+    */
+    edge[0] = countZerosPoly (t, std::max (0.005, f1 - df), f1 + df, r1, r2, stats, reliable[0]);
+    edge[1] = countZerosPoly (t, f2 - df, f2 + df, r1, r2, stats, reliable[1]);
+    edge[2] = countZerosPoly (t, f1, f2, std::max (0.9980, r1 - dr), r1 + dr, stats, reliable[2]);
+    edge[3] = countZerosPoly (t, f1, f2, r2 - dr, std::min (1.0, r2 + dr), stats, reliable[3]);
+
+    for (int k = 0; k < 4; ++k)
+        if (! reliable[k] || edge[k] != 0)
+            all = false;
+
+    return all;
+}
+
+/**
+    What a region actually looks like, for a region no locator could resolve.
+
+    A grid of |P| over the annulus, the moments at rising resolution both
+    about the origin and about the centroid, and the winding count from P.
+    Enough to say whether the count is right and the locators are weak, or
+    the count itself needs revisiting.
+*/
+void describeRegion (const StaticTank& t, double f1, double f2, double r1, double r2,
+                     int count, FailedRegion& failure)
+{
+    bool okPoly = true;
+    CountStats scratch;
+
+    failure.polyCount = countZerosPoly (t, f1, f2, r1, r2, scratch, okPoly);
+
+    if (! okPoly)
+        failure.polyCount = -1;
+
+    double best = 1.0e300;
+    std::vector<double> samples;
+
+    for (int i = 0; i <= 240; ++i)
+        for (int j = 0; j <= 32; ++j)
+        {
+            const double f = f1 + (f2 - f1) * i / 240.0;
+            const double r = r1 + (r2 - r1) * j / 32.0;
+
+            const double magnitude = std::abs (characteristicPolynomial (
+                t, std::polar (r, 2.0 * decay::pi * f / kSampleRate)));
+
+            samples.push_back (magnitude);
+
+            if (magnitude < best)
+            {
+                best = magnitude;
+                failure.minPolyF = f;
+                failure.minPolyR = r;
+            }
+        }
+
+    std::sort (samples.begin(), samples.end());
+    const double median = samples[samples.size() / 2];
+
+    failure.minPolyRatio = (median > 0.0) ? best / median : -1.0;
+
+    const double wMid = decay::pi * (f1 + f2) / kSampleRate;
+    const Complex centre = std::polar (0.5 * (r1 + r2), wMid);
+
+    for (int k = 0; k < 6; ++k)
+    {
+        const int perEdge = 128 << k;
+
+        const auto plain = contourMoments (t, f1, f2, r1, r2, perEdge);
+        const auto shifted = contourMoments (t, f1, f2, r1, r2, perEdge, centre);
+
+        failure.momentPerEdge[k] = perEdge;
+        failure.momentPlain[k] = plain.ok
+            ? std::abs (plain.s0 - Complex (static_cast<double> (count))) : -1.0;
+        failure.momentShifted[k] = shifted.ok
+            ? std::abs (shifted.s0 - Complex (static_cast<double> (count))) : -1.0;
+    }
+
+    if (failure.momentShifted[5] >= 0.0)
+        failure.regionS0Error = failure.momentShifted[5];
+}
+
+/** A cut that had to be moved off a root, kept for the record. */
+struct ShiftedCut
+{
+    double parentF1 = 0.0, parentF2 = 0.0;
+    double originalCut = 0.0, shiftedCut = 0.0;
+    double displacement = 0.0;
+    int parentCount = 0;
+    int leftOriginal = 0, rightOriginal = 0;
+    int leftShifted = 0, rightShifted = 0;
+    int leftOpposite = 0, rightOpposite = 0;
+    int sliverCount = 0;
+    int attempts = 0;
+    double certifyLeft = -1.0;
+    double certifyRight = -1.0;
+    bool invariant = false;
+};
+
+inline std::vector<ShiftedCut> shiftedCuts;
+
+/*
+    A cut must be ROOT-FREE before its counts mean anything.
+
+    A zero sitting on the contour makes the winding integral formally
+    undefined, and the earlier run showed this is not hypothetical: eight
+    regions reported a clean integer count while |P| bottomed out exactly on
+    their boundary, to five decimal places. Those counts were undefined and
+    removing the ownership test would have accepted roots on that basis.
+
+    So every cut is checked. A thin sliver straddling the cut is counted first;
+    if it is empty the cut is root-free and the ordinary split proceeds. If it
+    is not, the cut is displaced so the root falls strictly inside one child,
+    both children are recounted, and the parent total is required to be
+    invariant under displacement to EITHER side. The displacement comes from
+    the region's own width and the sliver's extent, not from a frequency
+    tolerance.
+*/
+/*
+    NEAR DC, THE REGION IS SPLIT ALONG ITS LONG AXIS.
+
+    The two roots below 1 Hz sit in 0.02595 .. 0.02994 Hz, and that block is
+    5.2e-7 rad wide against an annulus 1e-3 thick - an aspect ratio of 1 to
+    1900. On such a needle the winding number of P says 2 and the moment
+    integral of the same P says 0, stably, from 128 points per edge to 4096.
+    Both are contour integrals of P'/P, so one of them is wrong, and it is
+    the moment: its two long radial edges nearly cancel and the enclosed
+    count is the small residue of that cancellation. It is the same
+    degeneracy that made the thin-sliver probe give false negatives.
+
+    Frequency subdivision cannot escape this near DC. For an annulus 1e-3
+    thick a sector only stops being a needle at about 1e-4 rad, which is 0.76
+    Hz - the whole strip as one block. Separating two roots 0.004 Hz apart
+    needs a finer cut than that by definition, so every such cut is
+    degenerate. The radial direction is the only one with room, so the
+    annulus is halved instead, each half certified by its own P count against
+    the parent, until the region is no longer a needle. Only then is it
+    solved - by centred moments, which is what a non-degenerate contour
+    supports.
+
+    enumerate is untouched. The 9322 roots it already finds keep their exact
+    code path; this runs only on the near-DC strip.
+*/
+[[nodiscard]] int solveNearDc (const StaticTank& t, double f1, double f2,
+                               double r1, double r2, int count,
+                               std::vector<Mode>& modes, CountStats& stats, int depth)
+{
+    if (count <= 0)
+        return 0;
+
+    const double angular = 0.5 * (r1 + r2) * 2.0 * decay::pi * (f2 - f1) / kSampleRate;
+    const double radial = r2 - r1;
+
+    /*
+        The annulus is halved while the region is still radius-dominant. The
+        cuts are counted on the WIDE sector deliberately: the first attempt
+        at this ran the bisection inside a 0.004 Hz block, where the sector
+        is 5.2e-7 rad across and the roots sit inside it, so every radial
+        edge passed within 2.6e-7 of a root, the phase step hit pi and the
+        counts went unreliable after two levels. On the full strip the edges
+        are 6.5e-5 away in angle and the same counts are clean.
+    */
+    if (radial > angular && depth < 80)
+    {
+        for (double fraction : { 0.5, 0.37, 0.63, 0.23, 0.77 })
+        {
+            const double rc = r1 + (r2 - r1) * fraction;
+
+            bool okInner = true, okOuter = true;
+
+            const int inner = countZerosPoly (t, f1, f2, r1, rc, stats, okInner);
+
+            if (! okInner || inner < 0 || inner > count)
+                continue;
+
+            const int outer = countZerosPoly (t, f1, f2, rc, r2, stats, okOuter);
+
+            if (! okOuter || outer < 0 || inner + outer != count)
+                continue;
+
+            return solveNearDc (t, f1, f2, r1, rc, inner, modes, stats, depth + 1)
+                   + solveNearDc (t, f1, f2, rc, r2, outer, modes, stats, depth + 1);
+        }
+    }
+
+    const double wMid = decay::pi * (f1 + f2) / kSampleRate;
+    const Complex centre = std::polar (0.5 * (r1 + r2), wMid);
+
+    if (count == 2)
+    {
+        std::vector<Mode> recovered;
+
+        if (clusterRoots (t, f1, f2, count, modes, recovered, r1, r2) == count)
+        {
+            int taken = 0;
+
+            for (const auto& m : recovered)
+                if (acceptRoot (m, modes))
+                    ++taken;
+
+            if (taken == count)
+                return taken;
+        }
+    }
+
+    if (count == 1)
+    {
+        // Centred moments first, since the contour is no longer a needle.
+        Complex previous;
+        bool have = false;
+
+        for (int perEdge : { 128, 256, 512, 1024, 2048 })
+        {
+            const auto m = contourMoments (t, f1, f2, r1, r2, perEdge, centre);
+
+            if (! m.ok || std::abs (m.s0 - Complex (1.0)) >= 0.05
+                || std::abs (m.s0) <= 0.0)
+                continue;
+
+            const Complex candidate = centre + m.s1 / m.s0;
+
+            if (have && std::abs (candidate - previous) < 1.0e-13)
+            {
+                Mode mode;
+                mode.pole = candidate;
+                mode.frequencyHz = std::arg (candidate) * kSampleRate / (2.0 * decay::pi);
+                mode.rt60 = -3.0 / (std::log10 (std::abs (candidate)) * kSampleRate);
+
+                if (std::abs (candidate) > kInnerRadius && std::abs (candidate) < 1.0
+                    && acceptRoot (mode, modes))
+                    return 1;
+            }
+
+            previous = candidate;
+            have = true;
+        }
+
+        Mode mode;
+
+        if (bisectToRoot (t, f1, f2, stats, mode, r1, r2) && acceptRoot (mode, modes))
+            return 1;
+    }
+
+    FailedRegion failure;
+    failure.f1 = f1;
+    failure.f2 = f2;
+    failure.r1 = r1;
+    failure.r2 = r2;
+    failure.count = count;
+    failure.centroid = centre;
+    describeRegion (t, f1, f2, r1, r2, count, failure);
+    failure.reason = "near-DC region: not a needle any more and still unsolved";
+    failedRegions.push_back (failure);
+
+    stats.depthExceeded += count;
+
+    return 0;
+}
+
 void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
                 std::vector<Mode>& modes, CountStats& stats)
 {
@@ -930,10 +2263,71 @@ void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
     {
         Mode mode;
 
-        if (refinePole (t, f1, f2, mode))
-            modes.push_back (mode);
-        else
-            stats.newtonFailed += 1;
+        if ((momentRoot (t, f1, f2, 1, modes, mode)
+             || refinePole (t, f1, f2, mode, modes)
+             || bisectToRoot (t, f1, f2, stats, mode))
+            && acceptRoot (mode, modes))
+            return;
+
+        stats.newtonFailed += 1;
+
+        /*
+            UNRESOLVED LINEAGE ONLY. The split protocol sanitises the cut it
+            has just made and nothing else, so a region that cannot be
+            resolved has its other three edges probed here - the inherited
+            frequency edge first, since that is where the fault was. This runs
+            on failures alone, not on all 9324 regions.
+        */
+        int edge[4] { -1, -1, -1, -1 };
+        bool edgeOk[4] { true, true, true, true };
+
+        const bool clean = edgesRootFree (t, f1, f2, kInnerRadius, kOuterRadius,
+                                          stats, edge, edgeOk);
+
+        FailedRegion* target = nullptr;
+
+        for (auto it = failedRegions.rbegin(); it != failedRegions.rend(); ++it)
+            if (it->f1 == f1 && it->f2 == f2)
+            {
+                target = &*it;
+                break;
+            }
+
+        if (target == nullptr)
+        {
+            FailedRegion fresh;
+            fresh.f1 = f1;
+            fresh.f2 = f2;
+            fresh.count = count;
+            fresh.path = currentPath;
+            fresh.reason = "single root, every locator declined it";
+            failedRegions.push_back (fresh);
+            target = &failedRegions.back();
+        }
+
+        target->r1 = kInnerRadius;
+        target->r2 = kOuterRadius;
+        target->edgesProbed = true;
+        target->edgesClean = clean;
+
+        /*
+            The honest edge test, next to the sliver probe that cannot be
+            trusted: s0 over the region itself. If it is not the integer the
+            winding count claims, a zero is on the contour whatever the
+            sliver says.
+        */
+        {
+            const auto m = contourMoments (t, f1, f2, kInnerRadius, kOuterRadius, 512);
+
+            if (m.ok)
+                target->regionS0Error = std::abs (m.s0 - Complex (static_cast<double> (count)));
+        }
+
+        for (int k = 0; k < 4; ++k)
+        {
+            target->edge[k] = edge[k];
+            target->edgeOk[k] = edgeOk[k];
+        }
 
         return;
     }
@@ -945,14 +2339,22 @@ void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
     }
 
     /*
-        The split point is jittered on failure.
+        EVERY cut is certified, not only the displaced ones.
 
-        A contour that runs almost exactly through a root has a phase that
-        turns arbitrarily fast, and no amount of resampling fixes it — the
-        first attempt at this study lost 1292 of 9322 zeros that way. Roots are
-        isolated points, so moving the cut a little takes the boundary off them.
-        Every candidate is still required to account for the parent exactly, so
-        jitter changes where the boundary is drawn and never what is accepted.
+        Gating certification on a non-empty sliver was wrong. The thin-sliver
+        winding count gives false negatives - the provenance trace showed all
+        three remaining failures were sliver 0, candidates tried 0, their cut
+        accepted with no further check, while s0 on the two children was out
+        by a full root. The same sliver probe reported zero zeros on all four
+        edges of those regions. It is a 0.02 Hz by 0.001 contour and its
+        winding number is the small difference of two long, nearly cancelling
+        radial phase walks; it is kept as a diagnostic and decides nothing.
+
+        What decides is s0 on both children. A zero on the shared boundary
+        puts the singularity of the integrand on the path and s0 stops being
+        the integer the winding count claims, which is how the fault was
+        found. The cut position is still swept, because a cut a fifth of the
+        way into the parent frequently needs no displacement at all.
     */
     static constexpr double fractions[] { 0.5, 0.41, 0.59, 0.33, 0.67, 0.27, 0.73, 0.19, 0.81 };
 
@@ -960,20 +2362,184 @@ void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
     {
         const double mid = f1 + (f2 - f1) * fraction;
 
+        /*
+            The displacement comes from local geometry: the width of the
+            region, the modal spacing of the delay set, and the mean spacing
+            of the roots this region actually holds. Not from a tolerance.
+        */
+        const double displacement = std::min (std::min (0.10 * (f2 - f1),
+                                                        0.02 * kModalSpacingHz),
+                                              0.25 * (f2 - f1) / count);
+
+        bool okSliver = true;
+        const int sliver = countZerosPoly (t, mid - displacement, mid + displacement,
+                                           kInnerRadius, kOuterRadius, stats, okSliver);
+
         bool ok1 = true, ok2 = true;
-        const int left = countZeros (t, f1, mid, stats, ok1);
 
-        if (! ok1 || left < 0 || left > count)
+        const int left0 = countZeros (t, f1, mid, stats, ok1);
+
+        if (! ok1 || left0 < 0 || left0 > count)
             continue;
 
-        const int right = countZeros (t, mid, f2, stats, ok2);
+        const int right0 = countZeros (t, mid, f2, stats, ok2);
 
-        if (! ok2 || right < 0 || left + right != count)
+        if (! ok2 || right0 < 0 || left0 + right0 != count)
             continue;
 
-        enumerate (t, f1, mid, left, depth + 1, modes, stats);
-        enumerate (t, mid, f2, right, depth + 1, modes, stats);
+        double cut = mid;
+        int left = left0, right = right0;
+        double eL = -1.0, eR = -1.0;
+        int attempts = 1;
+
+        ShiftedCut record;
+        bool needsRecord = false;
+
+        if (! certifyCut (t, f1, mid, f2, left0, right0, eL, eR))
+        {
+            /*
+                A zero lies on this cut. The ONE shared boundary is moved for
+                both children together - no overlap, no gap - and a candidate
+                is taken only when it certifies AND the parent total survives
+                displacement to either side of it. The strip count is then
+                read off the two reliable counts as L(+) - L(-) instead of
+                being measured on a degenerate contour.
+            */
+            record.parentF1 = f1;
+            record.parentF2 = f2;
+            record.parentCount = count;
+            record.originalCut = mid;
+            record.sliverCount = sliver;
+            record.leftOriginal = left0;
+            record.rightOriginal = right0;
+
+            bool settled = false;
+
+            for (double k : { 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 0.25, -0.25,
+                              3.0, -3.0, 0.125, -0.125, 4.0, -4.0, 6.0, -6.0 })
+            {
+                const double candidate = mid + k * displacement;
+
+                if (! (candidate > f1 && candidate < f2))
+                    continue;
+
+                attempts += 1;
+
+                bool c1 = true, c2 = true;
+
+                const int l = countZeros (t, f1, candidate, stats, c1);
+
+                if (! c1 || l < 0 || l > count)
+                    continue;
+
+                const int r = countZeros (t, candidate, f2, stats, c2);
+
+                if (! c2 || r < 0 || l + r != count)
+                    continue;
+
+                double a1 = -1.0, a2 = -1.0;
+
+                if (! certifyCut (t, f1, candidate, f2, l, r, a1, a2))
+                {
+                    eL = a1;
+                    eR = a2;
+                    continue;
+                }
+
+                const double step = 0.5 * displacement;
+
+                bool p1 = true, p2 = true, m1 = true, m2 = true;
+
+                const int lp = countZeros (t, f1, candidate + step, stats, p1);
+                const int rp = countZeros (t, candidate + step, f2, stats, p2);
+                const int lm = countZeros (t, f1, candidate - step, stats, m1);
+                const int rm = countZeros (t, candidate - step, f2, stats, m2);
+
+                if (! (p1 && p2 && m1 && m2)
+                    || lp < 0 || rp < 0 || lm < 0 || rm < 0
+                    || lp + rp != count || lm + rm != count)
+                    continue;
+
+                cut = candidate;
+                left = l;
+                right = r;
+                eL = a1;
+                eR = a2;
+
+                record.shiftedCut = candidate;
+                record.displacement = candidate - mid;
+                record.leftShifted = lp;
+                record.rightShifted = rp;
+                record.leftOpposite = lm;
+                record.rightOpposite = rm;
+                record.sliverCount = lp - lm;
+                record.certifyLeft = a1;
+                record.certifyRight = a2;
+                record.attempts = attempts;
+                record.invariant = true;
+
+                settled = true;
+                needsRecord = true;
+                break;
+            }
+
+            if (! settled)
+                continue;
+        }
+
+        if (needsRecord)
+            shiftedCuts.push_back (record);
+
+        SplitEvent event;
+        event.f1 = f1;
+        event.f2 = f2;
+        event.parentCount = count;
+        event.proposedCut = mid;
+        event.acceptedCut = cut;
+        event.displacement = cut - mid;
+        event.sliverCount = sliver;
+        event.left = left;
+        event.right = right;
+        event.certifyLeft = eL;
+        event.certifyRight = eR;
+        event.attempts = attempts;
+        event.depth = depth;
+
+        const int eventIndex = static_cast<int> (splitEvents.size());
+        splitEvents.push_back (event);
+
+        currentPath.push_back ({ eventIndex, false });
+        enumerate (t, f1, cut, left, depth + 1, modes, stats);
+        currentPath.pop_back();
+
+        currentPath.push_back ({ eventIndex, true });
+        enumerate (t, cut, f2, right, depth + 1, modes, stats);
+        currentPath.pop_back();
+
         return;
+    }
+
+    /*
+        NO CERTIFIABLE FREQUENCY CUT EXISTS.
+
+        For a close pair that is not a failure of the search, it is a fact
+        about the geometry. The two roots at 15093.39169 and 15093.40186 Hz
+        are 0.0102 Hz apart, which is 1.3e-6 in z, while the radial edges of
+        the contour span 1e-3. Any cut between them passes within 7e-7 of
+        both, so no resolution certifies it and none should. The pair is
+        solved from its moments where it stands instead.
+    */
+    if (count == 2)
+    {
+        std::vector<Mode> recovered;
+
+        if (clusterRoots (t, f1, f2, count, modes, recovered) == count)
+        {
+            for (const auto& m : recovered)
+                (void) acceptRoot (m, modes);
+
+            return;
+        }
     }
 
     /*
@@ -1000,6 +2566,8 @@ void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
         for (int side = 0; side < 2; ++side)
         {
             const int n = (side == 0) ? inner : outer;
+            const double rLo = (side == 0) ? kInnerRadius : cut;
+            const double rHi = (side == 0) ? cut : kOuterRadius;
 
             if (n == 0)
                 continue;
@@ -1008,19 +2576,88 @@ void enumerate (const StaticTank& t, double f1, double f2, int count, int depth,
             {
                 Mode mode;
 
-                if (refinePole (t, f1, f2, mode))
-                    modes.push_back (mode);
+                if ((refinePole (t, f1, f2, mode, modes) || bisectToRoot (t, f1, f2, stats, mode))
+                    && acceptRoot (mode, modes))
+                    {}
                 else
                     stats.newtonFailed += 1;
             }
             else
             {
+                /*
+                    A radial sub-annulus the frequency path cannot re-enter.
+                    It was previously abandoned with no diagnostics at all,
+                    which is how an N = 2 cluster went into the ledger as
+                    "never separated" with nothing to say about it. Its four
+                    edges are probed first - item 6's rule, the contour before
+                    the moments - and only then are the moments asked for the
+                    two roots.
+                */
+                FailedRegion failure;
+                failure.f1 = f1;
+                failure.f2 = f2;
+                failure.r1 = rLo;
+                failure.r2 = rHi;
+                failure.count = n;
+                failure.path = currentPath;
+                failure.centroid = contourCentroid (t, f1, f2);
+                failure.edgesProbed = true;
+                failure.edgesClean = edgesRootFree (t, f1, f2, rLo, rHi, stats,
+                                                    failure.edge, failure.edgeOk);
+
+                std::vector<Mode> recovered;
+
+                if (n == 2 && clusterRoots (t, f1, f2, n, modes, recovered, rLo, rHi) == n)
+                {
+                    for (const auto& m : recovered)
+                        (void) acceptRoot (m, modes);
+
+                    continue;
+                }
+
+                describeRegion (t, f1, f2, rLo, rHi, n, failure);
+
+                failure.reason = "radial sub-annulus: moments did not resolve it";
+                failedRegions.push_back (failure);
+
                 stats.depthExceeded += n;
             }
         }
 
         return;
     }
+
+    /*
+        Neither cut separated the cluster, so it is solved from its moments by
+        Newton's identities rather than guessed at one root a time.
+    */
+    {
+        std::vector<Mode> recovered;
+
+        if (clusterRoots (t, f1, f2, count, modes, recovered) == count)
+        {
+            for (const auto& m : recovered)
+                (void) acceptRoot (m, modes);
+
+            return;
+        }
+    }
+
+    FailedRegion failure;
+    failure.f1 = f1;
+    failure.f2 = f2;
+    failure.count = count;
+    failure.centroid = contourCentroid (t, f1, f2);
+    failure.path = currentPath;
+    failure.r1 = kInnerRadius;
+    failure.r2 = kOuterRadius;
+    failure.edgesProbed = true;
+    failure.edgesClean = edgesRootFree (t, f1, f2, kInnerRadius, kOuterRadius, stats,
+                                        failure.edge, failure.edgeOk);
+    describeRegion (t, f1, f2, kInnerRadius, kOuterRadius, count, failure);
+
+    failure.reason = "cluster never separated in frequency, radius or moments";
+    failedRegions.push_back (failure);
 
     stats.depthExceeded += count;
 }
@@ -1585,13 +3222,93 @@ void runDampingResidueTests()
         // Coarse blocks first, each then subdivided by count.
         const int blocks = 480;
 
+        /*
+            THE ONE BOUNDARY THE PROTOCOL NEVER TOUCHED.
+
+            Every internal cut is certified now, but 1.0 Hz is not an internal
+            cut: it is where the low sliver scan meets the main window, and
+            the provenance trace named it exactly - both edges of the only
+            unresolved region "came from the coarse block grid, never a
+            split", so neither was ever tested. Its two zeros sum correctly
+            with the window's 9322, which is what a zero sitting on a shared
+            edge and being counted once looks like.
+
+            So that boundary is chosen rather than assumed. The candidate is
+            moved for BOTH neighbours together, their counts are required to
+            add up to the count over the union, and s0 on each is required to
+            reproduce its own count. Only the first block's lower edge moves;
+            the remaining 479 boundaries are left exactly where they were,
+            because moving them all once cost 40 roots.
+        */
+        const double blockWidth = (highest - lowest) / blocks;
+        const double sliverBottom = 0.02;
+
+        double sliverTop = lowest;
+        double boundaryErrorLow = -1.0, boundaryErrorHigh = -1.0;
+        int boundaryAttempts = 0;
+        bool boundaryCertified = false;
+
+        {
+            const double unionTop = lowest + blockWidth;
+
+            bool okUnion = true;
+            const int nUnion = countZeros (tank, sliverBottom, unionTop, stats, okUnion);
+
+            for (double candidate : { 1.0, 1.0515, 0.9485, 1.1030, 0.8970,
+                                      1.2000, 0.8000, 1.3500, 0.6500 })
+            {
+                if (! okUnion || nUnion < 0)
+                    break;
+
+                boundaryAttempts += 1;
+
+                bool okLeft = true, okRight = true;
+
+                const int nLeft = countZeros (tank, sliverBottom, candidate, stats, okLeft);
+                const int nRight = countZeros (tank, candidate, unionTop, stats, okRight);
+
+                if (! okLeft || ! okRight || nLeft < 0 || nRight < 0
+                    || nLeft + nRight != nUnion)
+                    continue;
+
+                double eL = -1.0, eR = -1.0;
+
+                if (! certifyCut (tank, sliverBottom, candidate, unionTop, nLeft, nRight, eL, eR))
+                {
+                    boundaryErrorLow = eL;
+                    boundaryErrorHigh = eR;
+                    continue;
+                }
+
+                sliverTop = candidate;
+                boundaryErrorLow = eL;
+                boundaryErrorHigh = eR;
+                boundaryCertified = true;
+                break;
+            }
+
+            info ("  shared boundary, low sliver against the first block");
+            info ("    zeros over the union 0.02 .. " + number (unionTop, 4) + " Hz   "
+                  + (okUnion && nUnion >= 0 ? std::to_string (nUnion)
+                                            : std::string ("contour unreliable")));
+            info ("    candidates tried                      "
+                  + std::to_string (boundaryAttempts));
+            info ("    boundary taken                        " + number (sliverTop, 4) + " Hz"
+                  + (boundaryCertified ? std::string() : std::string ("   NOT CERTIFIED")));
+            info ("    |s0 - N| low side                     "
+                  + (boundaryErrorLow < 0.0 ? std::string ("not measured")
+                                            : number (boundaryErrorLow, 9)));
+            info ("    |s0 - N| high side                    "
+                  + (boundaryErrorHigh < 0.0 ? std::string ("not measured")
+                                             : number (boundaryErrorHigh, 9)));
+        }
+
         long long counted = 0, unreliable = 0;
 
         for (int blockIndex = 0; blockIndex < blocks; ++blockIndex)
         {
-            const double f1 = lowest + (highest - lowest) * blockIndex / blocks;
-            const double f2 = lowest + (highest - lowest) * (blockIndex + 1) / blocks;
-
+            const double f1 = (blockIndex == 0) ? sliverTop : lowest + blockWidth * blockIndex;
+            const double f2 = lowest + blockWidth * (blockIndex + 1);
             bool ok = true;
             int n = countZeros (tank, f1, f2, stats, ok);
 
@@ -1631,8 +3348,190 @@ void runDampingResidueTests()
             separately so that the window which already counted 9322 cleanly is
             left exactly as it was.
         */
-        for (auto sliver : { std::pair<double, double> { 0.02, 1.0 },
-                             std::pair<double, double> { 0.5 * kSampleRate - 1.0,
+        /*
+            THE BOTTOM OF THE SCAN.
+
+            The symmetric boxes settle the count: nothing within 0.02 Hz of
+            DC, four zeros within 0.1 Hz, and no more out to 0.5 Hz. Four is
+            even, so these are two conjugate pairs and not real roots - which
+            the real-axis scan already said, stepping 2.5e-8 through [0.99, 1)
+            and finding its one sign change on the Nyquist side. Two
+            upper-half roots therefore sit between 0.02 and 0.1 Hz, and the
+            accounting needs exactly those two.
+
+            On the SECTOR, however, the winding count and s0 disagree and
+            lowering the bottom edge does not fix it. So the report stops
+            printing |s0 - N|, which cannot tell s0 = 0 from s0 = 4, and
+            prints s0 itself. Where the two roots are is then found by direct
+            search over a region whose count is already certified, and each
+            root is validated afterwards by a box drawn around it.
+        */
+        info ("");
+        info ("  BOTTOM OF THE SCAN");
+
+        /*
+            Both instruments, side by side. F is meromorphic and its winding
+            number is zeros minus poles; P is a polynomial of degree 18657
+            with no poles at all, so its winding number is a plain zero
+            count. Where the two disagree, P is the one that can be trusted,
+            and printing them together says which is failing instead of
+            leaving it to be inferred.
+        */
+        info ("    box          F winding   P winding");
+
+        for (double halfWidth : { 0.02, 0.03, 0.05, 0.07, 0.1, 0.5, 1.0 })
+        {
+            bool okF = true, okP = true;
+            const int nF = countZeros (tank, -halfWidth, halfWidth, stats, okF);
+            const int nP = countZerosPoly (tank, -halfWidth, halfWidth,
+                                           kInnerRadius, kOuterRadius, stats, okP);
+
+            info ("    |f| <= " + pad (number (halfWidth, 3), 13)
+                  + pad (okF && nF >= 0 ? std::to_string (nF) : std::string ("unreliable"), 12)
+                  + (okP && nP >= 0 ? std::to_string (nP) : std::string ("unreliable")));
+        }
+
+        // And the strip at the top of the band that the scan never covered.
+        info ("");
+        info ("    strip near Nyquist      F winding   P winding");
+
+        for (double low : { 23999.0, 23999.9, 23999.99 })
+        {
+            bool okF = true, okP = true;
+            const int nF = countZeros (tank, low, 24000.0, stats, okF);
+            const int nP = countZerosPoly (tank, low, 24000.0,
+                                           kInnerRadius, kOuterRadius, stats, okP);
+
+            info ("    " + pad (number (low, 2) + " .. 24000", 24)
+                  + pad (okF && nF >= 0 ? std::to_string (nF) : std::string ("unreliable"), 12)
+                  + (okP && nP >= 0 ? std::to_string (nP) : std::string ("unreliable")));
+        }
+
+        info ("");
+        info ("    sector                      winding   s0 at 1024                s0 at 8192");
+
+        struct Sector { double f1, f2; };
+
+        for (Sector s : { Sector { 0.02, 1.0 }, Sector { 0.00003, 1.0 },
+                          Sector { 0.02, 0.1 }, Sector { 0.015, 0.12 },
+                          Sector { 0.005, 0.15 } })
+        {
+            bool ok = true;
+            const int n = countZeros (tank, s.f1, s.f2, stats, ok);
+
+            const auto a = contourMoments (tank, s.f1, s.f2, kInnerRadius, kOuterRadius, 1024);
+            const auto b = contourMoments (tank, s.f1, s.f2, kInnerRadius, kOuterRadius, 8192);
+
+            info ("    " + pad (number (s.f1, 5) + " .. " + number (s.f2, 4) + " Hz", 28)
+                  + pad (ok && n >= 0 ? std::to_string (n) : std::string ("unreliable"), 10)
+                  + pad (a.ok ? number (a.s0.real(), 6) + ", " + number (a.s0.imag(), 6)
+                              : std::string ("unreliable"), 26)
+                  + (b.ok ? number (b.s0.real(), 6) + ", " + number (b.s0.imag(), 6)
+                          : std::string ("unreliable")));
+        }
+
+        /*
+            THE NEAR-DC STRIP, BLOCKED LIKE THE REST OF THE BAND.
+
+            This was the structural fault. The main window is cut into 480
+            blocks and each one is subdivided by its own count; the strip
+            below it was handled as a single 1 Hz sliver and handed to the
+            same recursion. Near DC the geometry is far tighter - a 1 Hz
+            sector spans 1.3e-4 rad against a radial extent of 1e-3, and the
+            four zeros sit between 0.020 and 0.030 Hz, inside 2.6e-6 rad of
+            the sliver's own lower edge. One sliver was never going to
+            separate them; the strip needs finer blocks, not fewer.
+
+            The counts here come from P. F and P agree exactly on every box
+            tried - 0 zeros within 0.020 Hz of DC, 4 within 0.030, and no
+            more out to 1.0 Hz - but P is a polynomial of degree 18657 with
+            no poles, so its winding number is a plain zero count and needs
+            no correction for pole order.
+
+            The local-minimum grid search that used to sit here has been
+            removed. It reported no minimum over this whole strip, and that
+            is not evidence: it is the same detector that found only 30 % of
+            the modes at 12 kHz earlier in this study, which is why the
+            argument principle replaced it. A shallow dip under a strong
+            radial trend does not produce a strict local minimum.
+        */
+        info ("");
+        info ("  NEAR-DC STRIP");
+
+        {
+            const int dcBlocks = 250;
+            const double dcLow = 0.002;
+
+            long long dcCounted = 0;
+            int dcUnreliable = 0;
+
+            info ("    " + number (dcLow, 4) + " .. " + number (sliverTop, 4) + " Hz in "
+                  + std::to_string (dcBlocks) + " blocks of "
+                  + number ((sliverTop - dcLow) / dcBlocks, 5) + " Hz");
+            info ("    block (Hz)                   zeros");
+
+            for (int b = 0; b < dcBlocks; ++b)
+            {
+                const double a1 = dcLow + (sliverTop - dcLow) * b / dcBlocks;
+                const double a2 = dcLow + (sliverTop - dcLow) * (b + 1) / dcBlocks;
+
+                bool ok = true;
+                const int n = countZerosPoly (tank, a1, a2, kInnerRadius, kOuterRadius,
+                                              stats, ok);
+
+                if (! ok || n < 0)
+                {
+                    ++dcUnreliable;
+                    info ("    " + pad (number (a1, 5) + " .. " + number (a2, 5), 29)
+                          + "contour unreliable");
+                    continue;
+                }
+
+                if (n == 0)
+                    continue;
+
+                info ("    " + pad (number (a1, 5) + " .. " + number (a2, 5), 29)
+                      + std::to_string (n));
+
+                dcCounted += n;
+            }
+
+            unreliable += dcUnreliable;
+
+            info ("    zeros counted in the blocks    " + std::to_string (dcCounted));
+            info ("    blocks with an unreliable count " + std::to_string (dcUnreliable));
+
+            /*
+                The blocks above are a map, not the working subdivision. The
+                solve runs on the WHOLE strip, because that is the only
+                sector down here that is not a needle: 0.002 to 1.0 Hz is
+                1.3e-4 rad across an annulus 1e-3 thick, an aspect ratio of
+                about 1 to 8, while any 0.004 Hz block is 1 to 1900. The
+                annulus is then halved on this wide sector until the region
+                is square enough for its moments to mean something.
+            */
+            bool okStrip = true;
+            const int stripCount = countZerosPoly (tank, dcLow, sliverTop,
+                                                   kInnerRadius, kOuterRadius,
+                                                   stats, okStrip);
+
+            info ("    zeros over the whole strip     "
+                  + (okStrip && stripCount >= 0 ? std::to_string (stripCount)
+                                                : std::string ("contour unreliable")));
+
+            /*
+                Not solved and not counted. The two zeros this winding number
+                reports are the real roots at 0.9999424, which lie at f = 0,
+                on the boundary of every sector with f1 > 0 and inside none
+                of them. s0 said zero here at every resolution from 512
+                upward and s0 was right; the real-axis scan below owns them.
+            */
+            info ("    the strip itself holds         0 zeros strictly inside"
+                  "   (s0 = 0; the winding count reads the f = 0 roots on its edge)");
+        }
+
+        // The sliver at the top of the band, left exactly as it was.
+        for (auto sliver : { std::pair<double, double> { 0.5 * kSampleRate - 1.0,
                                                          0.5 * kSampleRate - 0.02 } })
         {
             bool ok = true;
@@ -1682,6 +3581,187 @@ void runDampingResidueTests()
                               && (stats.newtonFailed == 0)
                               && (static_cast<long long> (modes.size()) == counted);
 
+
+        if (! failedRegions.empty())
+        {
+            info ("");
+            info ("  REGIONS THE ENUMERATION COULD NOT PIN DOWN");
+            info ("    f1 .. f2 (Hz)                N  Pcnt  min|P| at f / |z|           |P|/median  reason");
+
+            for (const auto& r : failedRegions)
+                info ("    " + pad (number (r.f1, 4) + " .. " + number (r.f2, 4), 29)
+                      + pad (std::to_string (r.count), 3)
+                      + pad (std::to_string (r.polyCount), 6)
+                      + pad (number (r.minPolyF, 5) + " / " + number (r.minPolyR, 9), 28)
+                      + pad (number (r.minPolyRatio, 8), 12)
+                      + r.reason);
+
+            /*
+                BOUNDARY PROVENANCE. For each unresolved region, where every
+                one of its four contour edges came from and whether a zero
+                sits on it. The frequency edges are traced to the split that
+                created them, through the kept path, so an inherited boundary
+                can be named rather than inferred.
+            */
+            info ("");
+            info ("  BOUNDARY PROVENANCE OF THE UNRESOLVED REGIONS");
+
+            for (const auto& r : failedRegions)
+            {
+                info ("");
+                info ("    region " + number (r.f1, 4) + " .. " + number (r.f2, 4)
+                      + " Hz   N = " + std::to_string (r.count)
+                      + (r.r2 > r.r1 ? "   |z| " + number (r.r1, 6) + " .. " + number (r.r2, 6)
+                                     : std::string()));
+
+                if (r.regionS0Error >= 0.0)
+                    info ("      |s0 - N| over the region itself   "
+                          + number (r.regionS0Error, 8)
+                          + (r.regionS0Error < 0.05 ? "   contour clean"
+                                                    : "   A ZERO IS ON THE CONTOUR"));
+
+                if (r.momentPerEdge[0] > 0)
+                {
+                    info ("      |s0 - N| against quadrature resolution");
+                    info ("        perEdge   about the origin   about the centroid");
+
+                    for (int k = 0; k < 6; ++k)
+                        info ("        " + pad (std::to_string (r.momentPerEdge[k]), 10)
+                              + pad (r.momentPlain[k] < 0.0 ? std::string ("unreliable")
+                                                            : number (r.momentPlain[k], 8), 20)
+                              + (r.momentShifted[k] < 0.0 ? std::string ("unreliable")
+                                                          : number (r.momentShifted[k], 8)));
+                }
+
+                if (r.edgesProbed)
+                {
+                    const char* names[4] { "f1", "f2", "inner |z|", "outer |z|" };
+                    info ("      sliver probe (unreliable, kept for comparison):");
+
+                    for (int k = 0; k < 4; ++k)
+                        info (std::string ("      zeros on edge ") + pad (names[k], 11)
+                              + (r.edgeOk[k] ? std::to_string (r.edge[k])
+                                             : std::string ("probe unreliable")));
+                }
+
+                int lowFrom = -1, highFrom = -1;
+
+                for (const auto& step : r.path)
+                {
+                    if (step.rightChild)
+                        lowFrom = step.event;        // its f1 is that split's cut
+                    else
+                        highFrom = step.event;       // its f2 is that split's cut
+                }
+
+                for (int which = 0; which < 2; ++which)
+                {
+                    const int index = (which == 0) ? lowFrom : highFrom;
+                    const char* label = (which == 0) ? "f1" : "f2";
+
+                    if (index < 0 || index >= static_cast<int> (splitEvents.size()))
+                    {
+                        info (std::string ("      ") + label
+                              + " came from the coarse block grid, never a split");
+                        continue;
+                    }
+
+                    const auto& e = splitEvents[static_cast<size_t> (index)];
+
+                    info (std::string ("      ") + label + " = " + number (e.acceptedCut, 5)
+                          + " was made by the split of "
+                          + number (e.f1, 4) + " .. " + number (e.f2, 4)
+                          + " (N = " + std::to_string (e.parentCount)
+                          + ", depth " + std::to_string (e.depth) + ")");
+                    info (std::string ("         proposed cut  ") + number (e.proposedCut, 5)
+                          + "   displacement " + number (e.displacement, 6)
+                          + "   sliver " + std::to_string (e.sliverCount)
+                          + "   candidates tried " + std::to_string (e.attempts));
+                    info (std::string ("         children      ")
+                          + std::to_string (e.left) + " / " + std::to_string (e.right)
+                          + "   |s0-N| left " + (e.certifyLeft < 0.0 ? std::string ("not certified")
+                                                                     : number (e.certifyLeft, 8))
+                          + "   right " + (e.certifyRight < 0.0 ? std::string ("not certified")
+                                                                : number (e.certifyRight, 8)));
+                }
+
+                info ("      ancestry depth " + std::to_string (r.path.size())
+                      + " splits below the coarse block");
+            }
+        }
+
+
+        {
+            int failures = 0;
+
+            for (const auto& r : momentRecoveries)
+                if (! r.accepted)
+                    ++failures;
+
+            info ("");
+            info ("  CONTOUR-MOMENT RECOVERY");
+            info ("    regions attempted                 " + std::to_string (momentRecoveries.size()));
+            info ("    accepted                          "
+                  + std::to_string (momentRecoveries.size() - failures));
+            info ("    rejected                          " + std::to_string (failures));
+            int outsideCount = 0, duplicateCount = 0, s0Count = 0, shiftCount = 0;
+
+            for (const auto& r : momentRecoveries)
+                if (! r.accepted)
+                {
+                    if (! r.inside)                     ++outsideCount;
+                    else if (r.duplicate)               ++duplicateCount;
+                    else if (! (r.s0Error < 0.05))      ++s0Count;
+                    else if (! r.converged) ++shiftCount;
+                }
+
+            info ("    rejected: outside contour         " + std::to_string (outsideCount));
+            info ("    rejected: duplicate               " + std::to_string (duplicateCount));
+            info ("    rejected: |s0-N| >= 0.05          " + std::to_string (s0Count));
+            info ("    rejected: quadrature not settled  " + std::to_string (shiftCount));
+
+            if (failures > 0 && failures <= 40)
+            {
+                info ("");
+                info ("    f1 .. f2 (Hz)                N  |s0-N|     |s2-z0^2|  f / |z|                   df       dr        |P/P'|     sigma/||M||  Nwt");
+
+                for (const auto& r : momentRecoveries)
+                    if (! r.accepted)
+                        info ("    " + pad (number (r.f1, 4) + " .. " + number (r.f2, 4), 29)
+                              + pad (std::to_string (r.count), 3)
+                              + pad (number (r.s0Error, 6), 11)
+                              + pad (number (r.s2Error, 6), 11)
+                              + pad (number (r.frequency, 5) + " / " + number (r.radius, 9), 27)
+                              + pad (number (r.frequencyShift, 2), 9)
+                              + pad (number (r.radiusShift, 2), 10)
+                              + pad (number (r.residual, 3), 11)
+                              + pad (number (r.condition, 3), 13)
+                              + (r.newtonUsed ? "y" : "n"));
+            }
+        }
+        if (! shiftedCuts.empty())
+        {
+            info ("");
+            info ("  CUTS DISPLACED OFF A ROOT");
+            info ("    parent (Hz)                  Np  original cut   shifted cut    delta      L/R orig  L/R +d    L/R -d    invariant");
+
+            for (const auto& c : shiftedCuts)
+                info ("    " + pad (number (c.parentF1, 4) + " .. " + number (c.parentF2, 4), 29)
+                      + pad (std::to_string (c.parentCount), 4)
+                      + pad (number (c.originalCut, 5), 15)
+                      + pad (number (c.shiftedCut, 5), 15)
+                      + pad (number (c.displacement, 5), 11)
+                      + pad (std::to_string (c.leftOriginal) + "/" + std::to_string (c.rightOriginal), 10)
+                      + pad (std::to_string (c.leftShifted) + "/" + std::to_string (c.rightShifted), 10)
+                      + pad (std::to_string (c.leftOpposite) + "/" + std::to_string (c.rightOpposite), 10)
+                      + (c.invariant ? "yes" : "NO"));
+
+            info ("");
+            info ("  Each row: a sliver straddling the cut counted at least one zero, so");
+            info ("  the cut was moved by a tenth of the parent's width. The parent total");
+            info ("  is required to survive displacement to either side, and the root to");
+            info ("  change hands between them - that is what makes ownership strict.");
+        }
         check (unreliable == 0, "every coarse block returned a reliable integer count");
         check (stats.depthExceeded == 0, "every counted zero was isolated to a single region");
         checkEqual (static_cast<long long> (modes.size()), counted,
@@ -1785,13 +3865,254 @@ void runDampingResidueTests()
                   + "; where the closed-loop roots actually land is measured, not assumed.");
             info ("");
         }
+        /*
+            THE DC CLUSTER, COUNTED ON A SQUARE CONTOUR.
 
-        // Real roots near the unit circle, which the angular scan cannot reach.
+            Two real roots sit at 0.999942449866 and 0.999942451318, 1.45e-9
+            apart. That is why nothing found them: the F scan steps 2.5e-8,
+            so it crosses both sign changes inside one step and sees none at
+            all, and the P scan only resolves them because its step is
+            8.3e-10. Both are DC modes with RT60 2.50 s.
+
+            They also settle which instrument was right. s0 reported no zeros
+            inside every sector with f1 > 0, and that is simply true of a
+            root at f = 0; the sector winding count was the corrupted one,
+            reading a root on its own boundary. So the near-DC sector solve
+            is gone - there was never anything inside it - and the real-axis
+            scan owns these roots.
+
+            The annulus holds 18649 zeros. 9322 upper-half complex with their
+            conjugates, the Nyquist root and these two make 18647, so two are
+            still missing, and the cluster is where to look. It is counted
+            here on a contour that is actually square: the frequency
+            half-width is chosen so that r*dw matches the radius window,
+            which the full-annulus boxes never did - |f| <= 0.02 across the
+            whole annulus is 5.2e-6 by 1e-3, an aspect ratio of 1 to 190.
+        */
+        info ("  THE DC CLUSTER");
+        info ("    radius window              |f| <=      aspect     P count");
+
+        for (double half : { 2.0e-6, 5.0e-6, 2.0e-5, 1.0e-4 })
+        {
+            const double rLo = std::max (kInnerRadius, 0.999942450592 - half);
+            const double rHi = std::min (1.0, 0.999942450592 + half);
+
+            // The frequency half-width that makes r*dw equal the radius window.
+            const double halfF = half * kSampleRate / (2.0 * decay::pi);
+
+            bool ok = true;
+            const int n = countZerosPoly (tank, -halfF, halfF, rLo, rHi, stats, ok);
+
+            info ("    " + pad (number (rLo, 12) + " .. " + number (rHi, 12), 27)
+                  + pad (number (halfF, 6), 12)
+                  + pad ("1 : 1", 11)
+                  + (ok && n >= 0 ? std::to_string (n) : std::string ("unreliable")));
+        }
+
+        info ("");
+        info ("    sign changes of P in the cluster, at rising resolution");
+        info ("      window                               samples     found");
+
+        for (int samples : { 200000, 800000, 3200000 })
+        {
+            std::vector<double> tight;
+            findPolynomialRealRoots (tank, 0.9999410, 0.9999440, samples, tight);
+
+            info ("      0.9999410 .. 0.9999440              "
+                  + pad (std::to_string (samples), 12)
+                  + std::to_string (tight.size()));
+
+            if (samples == 3200000)
+                for (double x : tight)
+                    info ("        x = " + number (x, 12)
+                          + "   RT60 " + number (-3.0 / (std::log10 (x) * kSampleRate), 6)
+                          + " s   |P/P'| " + number (rootResidual (tank, Complex (x, 0.0)), 6));
+        }
+
+        info ("");
+        /*
+            THE REAL AXIS INSIDE THE ANNULUS, COUNTED THEN LOCATED.
+
+            A single-resolution sign scan cannot do this. The four DC roots
+            span 3.2e-9 in z, so resolving them over [0.999, 1) needs a step
+            near 1e-12 and therefore a billion samples; at the 8.3e-10 step
+            that 1.2 million samples buys, two of the four crossings fall
+            inside one step and vanish. F is worse still - its 2.5e-8 step
+            crosses all four and reports none, which is why this cluster was
+            invisible for the whole study.
+
+            So the count and the position come from different instruments,
+            and the count comes first. A box symmetric about the real axis,
+            with its frequency half-width set so that r*dw equals the radius
+            window, is a square contour and its winding number is a plain
+            zero count - 4 at the DC axis and 1 at Nyquist, the same at every
+            scale tried. Each root the coarse scan does find is then used as
+            a seed for a fine scan of its own neighbourhood, which recovers
+            the rest of its micro-cluster, and the total is required to equal
+            the certified count. Nothing is accepted on the strength of the
+            locator alone.
+        */
         std::vector<double> realRoots;
 
-        findRealRoots (tank, 0.9900, 0.99999999, 400000, realRoots);
-        findRealRoots (tank, -0.99999999, -0.9900, 400000, realRoots);
+        {
+            /*
+                The box has to be narrow in RADIUS, not just square, or it
+                counts the wrong thing. A box 1e-3 deep needs a 7.64 Hz
+                half-width to be square, and at 2.57 Hz between modes that
+                sweeps in whole conjugate pairs: it returns 6 at DC, which is
+                the four real roots plus one pair, and 7 at Nyquist. Those
+                numbers are correct and they are not a count of real roots,
+                so comparing them against what the axis scan locates
+                compares two different quantities.
 
+                What certifies the real roots is a box whose radius window
+                brackets the cluster alone. Its half-width is then small
+                enough to exclude the pairs, and it returned 4 at DC at four
+                different scales, matching the sign scan at three
+                resolutions. That bracket is measured here rather than
+                assumed: the radius window is contracted around the located
+                roots until the count stops changing.
+            */
+            bool okWide = true;
+            const double wideHalf = (kOuterRadius - kInnerRadius)
+                                    * kSampleRate / (2.0 * decay::pi);
+            const int wideDc = countZerosPoly (tank, -wideHalf, wideHalf,
+                                               kInnerRadius, kOuterRadius, stats, okWide);
+
+            info ("  REAL AXIS INSIDE THE ANNULUS");
+            info ("    all zeros in the square box around DC, real and complex   "
+                  + (okWide && wideDc >= 0 ? std::to_string (wideDc)
+                                           : std::string ("unreliable"))
+                  + "   (half-width " + number (wideHalf, 4) + " Hz)");
+
+            /*
+                The certifying count: a box bracketing the located cluster,
+                contracted until the count settles. Its frequency half-width
+                tracks its radius window so the contour stays square, and
+                the window is small enough to hold no conjugate pair.
+            */
+            const auto bracketCount = [&] (double centre, double span, int& out) -> bool
+            {
+                /*
+                    The radius window is built from |centre|; the sign of
+                    centre only picks which axis, 0 Hz or Nyquist. Building
+                    it from centre itself gave a negative outer radius on the
+                    Nyquist side and the count came back unreliable, which
+                    read as a disagreement when it was a mistake in the
+                    diagnostic rather than anything about the roots.
+                */
+                const double m = std::abs (centre);
+
+                const double rLo = std::max (kInnerRadius, m - span);
+                const double rHi = std::min (1.0, m + span);
+                const double hf = span * kSampleRate / (2.0 * decay::pi);
+                const double axis = (centre > 0.0) ? 0.0 : 0.5 * kSampleRate;
+
+                bool ok = true;
+                out = countZerosPoly (tank, axis - hf, axis + hf, rLo, rHi, stats, ok);
+
+                return ok && out >= 0;
+            };
+
+            info ("    bracketing box around each axis");
+            info ("      axis       span        half-width (Hz)   zeros");
+
+            int certifiedDc = -1, certifiedNy = -1;
+
+            for (double span : { 1.0e-4, 2.0e-5, 5.0e-6, 2.0e-6 })
+            {
+                int n = -1;
+                const bool ok = bracketCount (0.999942450592, span, n);
+
+                info ("      DC         " + pad (number (span, 8), 12)
+                      + pad (number (span * kSampleRate / (2.0 * decay::pi), 6), 18)
+                      + (ok ? std::to_string (n) : std::string ("unreliable")));
+
+                if (ok)
+                    certifiedDc = n;
+            }
+
+            for (double span : { 1.0e-4, 2.0e-5, 5.0e-6, 2.0e-6 })
+            {
+                int n = -1;
+                const bool ok = bracketCount (-0.999744702600, span, n);
+
+                info ("      Nyquist    " + pad (number (span, 8), 12)
+                      + pad (number (span * kSampleRate / (2.0 * decay::pi), 6), 18)
+                      + (ok ? std::to_string (n) : std::string ("unreliable")));
+
+                if (ok)
+                    certifiedNy = n;
+            }
+
+            // Coarse seeds.
+            std::vector<double> seeds, fromF;
+
+            findPolynomialRealRoots (tank, kInnerRadius, 0.99999999, 1200000, seeds);
+            findPolynomialRealRoots (tank, -0.99999999, -kInnerRadius, 1200000, seeds);
+
+            findRealRoots (tank, 0.9900, 0.99999999, 400000, fromF);
+            findRealRoots (tank, -0.99999999, -0.9900, 400000, fromF);
+
+            info ("    seeds from P               " + std::to_string (seeds.size()));
+            info ("    seeds from F               " + std::to_string (fromF.size()));
+
+            // Each seed opens a fine scan of its own neighbourhood.
+            const auto add = [&realRoots] (double x)
+            {
+                for (double y : realRoots)
+                    if (std::abs (x - y) < 1.0e-13)
+                        return;
+
+                realRoots.push_back (x);
+            };
+
+            for (double seed : seeds)
+            {
+                const double span = 4.0e-8;
+                const double lo = seed - span, hi = seed + span;
+
+                std::vector<double> fine;
+                findPolynomialRealRoots (tank, lo, hi, 400000, fine);
+
+                for (double x : fine)
+                    add (x);
+
+                if (fine.empty())
+                    add (seed);
+            }
+
+            std::sort (realRoots.begin(), realRoots.end());
+
+            int atDc = 0, atNyquist = 0;
+
+            info ("    x                       |P/P'|        RT60 (s)      side");
+
+            for (double x : realRoots)
+            {
+                info ("    " + pad (number (x, 12), 24)
+                      + pad (number (rootResidual (tank, Complex (x, 0.0)), 6), 14)
+                      + pad (number (-3.0 / (std::log10 (std::abs (x)) * kSampleRate), 6), 14)
+                      + (x > 0.0 ? "DC" : "Nyquist"));
+
+                if (x > 0.0)
+                    ++atDc;
+                else
+                    ++atNyquist;
+            }
+
+            info ("    located at DC              " + std::to_string (atDc)
+                  + "   bracketing box says " + (certifiedDc >= 0
+                      ? std::to_string (certifiedDc) : std::string ("unreliable"))
+                  + (certifiedDc == atDc ? "   agree" : "   DISAGREE"));
+            info ("    located at Nyquist         " + std::to_string (atNyquist)
+                  + "   bracketing box says " + (certifiedNy >= 0
+                      ? std::to_string (certifiedNy) : std::string ("unreliable"))
+                  + (certifiedNy == atNyquist ? "   agree" : "   DISAGREE"));
+            info ("");
+        }
+
+        info ("  real roots found on |x| in [0.99, 1)   " + std::to_string (realRoots.size()));
         info ("  real roots found on |x| in [0.99, 1)   " + std::to_string (realRoots.size()));
 
         for (double r : realRoots)
@@ -1811,7 +4132,8 @@ void runDampingResidueTests()
         info ("");
         info ("  ACCOUNTING");
         info ("    2 * upper-half complex in band      " + std::to_string (2 * modes.size()));
-        info ("    unresolved regions in band          " + std::to_string (stats.newtonFailed));
+        info ("    isolated but unrefined regions      " + std::to_string (stats.newtonFailed));
+        info ("    regions that never separated        " + std::to_string (stats.depthExceeded));
         info ("    real roots near the unit circle     " + std::to_string (realRoots.size()));
         info ("    low-radius roots located            " + std::to_string (lowRadiusModes.size()) + "   (winding says " + std::to_string (zerosInsideInner) + ")");
         info ("    ---------------------------------------------");
@@ -1819,6 +4141,7 @@ void runDampingResidueTests()
 
         const long long accounted = 2 * static_cast<long long> (modes.size())
                                     + 2 * stats.newtonFailed
+                                    + 2 * stats.depthExceeded
                                     + static_cast<long long> (realModes.size())
                                     + static_cast<long long> (lowRadiusModes.size());
 
