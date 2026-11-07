@@ -155,6 +155,7 @@ int runAllSuites()
     AV_RUN (runDampingResidueTests);
     AV_RUN (runDampingSecondOrderTests);
     AV_RUN (runDampingCornerSweepTests);
+    AV_RUN (runDampingLowCornerSweepTests);
 
 
     if (suitesRun == 0)
