@@ -93,6 +93,7 @@ void runDampingSecondOrderTests();
 void runDampingCornerSweepTests();
 void runDampingLowCornerSweepTests();
 void runDampingLowAmountSweepTests();
+void runDampingHighAmountSweepTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
