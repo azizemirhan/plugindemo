@@ -89,6 +89,7 @@ set(AV_TEST_SUITE_SOURCES
     DampingSecondOrder.cpp
     DampingCornerSweep.cpp
     DampingLowCornerSweep.cpp
+    DampingLowAmountSweep.cpp
     SizeTrackTests.cpp
     SizeRetrack.cpp
     SizeCrossValidation.cpp
