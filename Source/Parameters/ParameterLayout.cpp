@@ -129,11 +129,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 
     // --- Frequency-dependent decay ---------------------------------------
 
-    layout.add (percentParam (id::lowDamp,  "Low Damp",  20.0f));
-    layout.add (percentParam (id::highDamp, "High Damp", 50.0f));
+    /*
+        PHASE 7 DEFAULT CHANGE - defaults only.
 
-    layout.add (freqParam (id::lowDampFreq,  "Low Damp Freq",   20.0f,  1000.0f,  200.0f,  200.0f));
-    layout.add (freqParam (id::highDampFreq, "High Damp Freq", 500.0f, 20000.0f, 4000.0f, 6000.0f));
+        High Damp 50 -> 45 % and High Damp Freq 6 -> 10 kHz. Parameter ids,
+        ranges, the skew centres and every mapping are untouched; these are
+        two default VALUES and nothing else.
+
+        Why, from the default-space study: at the old 6 kHz / 50 % the worst
+        500 Hz - 2 kHz deviation from the requested Decay was 7.90 %, almost
+        all of it at 2 kHz. Every default axis was then swept to an interior
+        optimum - Low Damp Freq and Low Damp amount both landed on what we
+        already shipped, the high corner wanted 10 kHz, and the high amount
+        wanted 45 % - and the combination gives 2.32 %.
+
+        The approximate 2 % target is NOT strictly met. It is not reachable
+        by any default: the 500 Hz and 2 kHz ends of the window cross over at
+        about 2.3 % because Option A normalises each line by a single scalar,
+        so the two shelves are coupled and neither end moves without the
+        other. A second-order shelf was worse overall, and the overlap
+        architecture had no measurable effect, so no further complexity is
+        justified for the last 0.3 pp.
+
+        The cost is 9.4 % of the high-frequency damping function: 45 % retains
+        90.6 % of what 50 % delivered, still a 30.7 % RT60 reduction at
+        16 kHz. See Docs/Phase7-HighAmountSweep.md.
+    */
+    layout.add (percentParam (id::lowDamp,  "Low Damp",  20.0f));
+    layout.add (percentParam (id::highDamp, "High Damp", 45.0f));
+
+    layout.add (freqParam (id::lowDampFreq,  "Low Damp Freq",   20.0f,  1000.0f,  200.0f,   200.0f));
+    layout.add (freqParam (id::highDampFreq, "High Damp Freq", 500.0f, 20000.0f, 4000.0f, 10000.0f));
 
     // --- Output stage -----------------------------------------------------
 

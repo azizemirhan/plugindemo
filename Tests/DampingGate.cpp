@@ -298,7 +298,19 @@ void runDampingGateTests()
         const Case cases[]
         {
             { 0.00, 0.00,  200.0, 6000.0, "A  damping OFF" },
-            { 0.20, 0.50,  200.0, 6000.0, "B  shipping default" },
+            /*
+                This row TRACKS THE SHIPPING DEFAULT and has to be updated
+                whenever that default moves, or it quietly stops testing the
+                product. It was { 0.20, 0.50, 200.0, 6000.0 } and is now
+                { 0.20, 0.45, 200.0, 10000.0 } because Phase 7 changed High
+                Damp 50 -> 45 % and High Damp Freq 6 -> 10 kHz.
+
+                The THRESHOLDS below are untouched - |T20-T30| <= 5 % and
+                R^2 >= 0.995 are still the pre-registered numbers. Only the
+                operating point this row describes has changed, to match the
+                product it is supposed to describe.
+            */
+            { 0.20, 0.45,  200.0, 10000.0, "B  shipping default" },
             { 0.00, 0.60,  200.0, 6000.0, "C  moderate high damping" },
             { 0.00, 1.00,  200.0, 6000.0, "D  High Damp 100 %" },
             { 1.00, 0.00,  200.0, 6000.0, "E  Low Damp 100 %" },
