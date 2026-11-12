@@ -94,6 +94,7 @@ void runDampingCornerSweepTests();
 void runDampingLowCornerSweepTests();
 void runDampingLowAmountSweepTests();
 void runDampingHighAmountSweepTests();
+void runDampingOverlapTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
