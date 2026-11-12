@@ -175,6 +175,46 @@ struct Tank
 
         return out;
     }
+
+    /*
+        The same render, both channels. Modulation's reason for existing is
+        partly stereo, so the benefit metrics need L and R from one pass -
+        the tank is stateful, so rendering them separately would not give
+        the same realisation.
+    */
+    void renderStereo (const std::vector<double>& drive, int numSamples,
+                       std::vector<double>& left, std::vector<double>& right)
+    {
+        core.reset();
+
+        left.assign (static_cast<size_t> (numSamples), 0.0);
+        right.assign (static_cast<size_t> (numSamples), 0.0);
+
+        double injection[kLines] {};
+        double state[kLines] {};
+
+        for (int n = 0; n < numSamples; ++n)
+        {
+            const double x = (n < static_cast<int> (drive.size()))
+                             ? drive[static_cast<size_t> (n)] : 0.0;
+
+            for (int i = 0; i < kLines; ++i)
+                injection[i] = x * fdn::injectionLeft[i] * fdn::signVectorNorm;
+
+            core.processSample (injection, state);
+
+            double l = 0.0, r = 0.0;
+
+            for (int i = 0; i < kLines; ++i)
+            {
+                l += state[i] * fdn::readoutLeft[i] * fdn::signVectorNorm;
+                r += state[i] * fdn::readoutRight[i] * fdn::signVectorNorm;
+            }
+
+            left[static_cast<size_t> (n)] = l;
+            right[static_cast<size_t> (n)] = r;
+        }
+    }
 };
 
 /*

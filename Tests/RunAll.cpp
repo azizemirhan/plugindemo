@@ -159,6 +159,7 @@ int runAllSuites()
     AV_RUN (runDampingLowAmountSweepTests);
     AV_RUN (runDampingHighAmountSweepTests);
     AV_RUN (runDampingOverlapTests);
+    AV_RUN (runDampingModulationCornerTests);
 
 
     if (suitesRun == 0)
