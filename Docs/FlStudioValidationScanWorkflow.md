@@ -1,13 +1,26 @@
 # Loading a validation build in FL Studio without installing it
 
-**Diagnosis: the artefact is fine and FL Studio never saw it. Both custom
-search paths that had been added point at the wrong thing — one at a path that
-does not exist, one at the bundle instead of the folder containing it — so
-every scan looked in the right build tree at the wrong level and correctly
-found nothing.** There was no error to report, which is why none appeared.
+**Diagnosis: the artefact is fine and FL Studio never saw it. A VST3 is not
+discoverable through a custom search path at all — FL Studio's "Plugin search
+paths" are for VST1/VST2, and a VST3 has to be found in the standard Windows
+VST3 location.** The artefact passes every check: hash, architecture,
+`LoadLibrary`, `GetPluginFactory`, dependencies, identity.
 
-Fixed by `Scripts\prepare-fl-validation.ps1`. No install, nothing written to
-`C:\Program Files\Common Files\VST3`, no elevated shell.
+`Scripts\prepare-fl-validation.ps1` puts a **directory junction** in the system
+VST3 folder pointing at the build tree. The plugin is not copied, so the host
+loads the validation artefact itself.
+
+### Three attempts, and why the first two could not work
+
+| | what it was | why it failed |
+|---|---|---|
+| 1 | custom search paths into the build tree | custom paths are VST2-only. Both were also at the wrong level — one a path that did not exist, one the bundle instead of its parent — but the level was never the deciding problem |
+| 2 | junction in `%LOCALAPPDATA%\Programs\Common\VST3` | a standard VST3 location by the specification, and some hosts scan it; this FL Studio did not find the plugin there |
+| 3 | **junction in `%CommonProgramFiles%\VST3`** | the system location. This is the one |
+
+Attempt 1's diagnosis is kept below because it is still the explanation for the
+*first* symptom, and because the malformed entries had to be cleaned up either
+way.
 
 ---
 
@@ -178,77 +191,106 @@ should know it is not here.
 ## 4. The fix
 
 ```powershell
-# Close FL Studio first - see below for why.
+# FL Studio must be closed.
 .\Scripts\prepare-fl-validation.ps1
 ```
 
-It will:
+An ordinary (non-elevated) PowerShell is fine. The script elevates **one
+command** — the `mkdir` + `mklink` pair — and Windows raises a single UAC
+prompt for it. Everything else, including every hash and every check, runs as
+the ordinary user. Starting the shell as Administrator is also fine and then
+no prompt appears.
 
-1. Refuse to run while FL Studio is open.
-2. Verify the bundle, binary and **SHA-256**, and stop on a mismatch.
-3. Export `HKCU\Software\Image-Line\Shared\Plugin search paths` to
-   `%LOCALAPPDATA%\AuroraVerb-fl-backups\plugin-search-paths-<timestamp>.reg`.
-4. Remove every entry whose path is inside an `AuroraVerb_artefacts` tree, and
-   **leave every other search path exactly as it is**.
-5. Add one entry: the bundle's parent folder, `custom=1`, `selected=1`.
-6. Renumber the subkeys `0..N-1` and set `Count` to match.
-7. Print the list before and after, and confirm the production folder is
-   untouched.
+| | |
+|---|---|
+| junction | `C:\Program Files\Common Files\VST3\AuroraVerb.vst3` |
+| target | `C:\JuceBuilds\av-phase7\AuroraVerb_artefacts\RelWithDebInfo\VST3\AuroraVerb.vst3` |
+| expected SHA-256 | `2C52D78F701A3024167A5651A6A90D5F5ADB971B147B30871631365715BA6151` |
 
-Then in FL Studio: **Options → Manage plugins**, confirm the path is listed and
-ticked, and press **Find more plugins** with **Verify plugins** left on, so a
-plugin that fails to load is reported instead of skipped.
+What it does, in order:
 
-Undo with `-Remove`.
+1. **Refuses while FL Studio is running.** A plugin folder must not change
+   under a running host, and FL also rewrites its search-path registry key
+   from memory on exit, so an edit made while it is open is silently
+   discarded — which looks exactly like the edit not working.
+2. **Verifies the source** bundle, its Windows binary and its SHA-256, and
+   stops on a mismatch.
+3. **Inspects the destination.** If `AuroraVerb.vst3` is already there as a
+   *real directory*, it prints that directory's hash and stops: a real
+   directory is an installed plugin, and this script is not an installer. If
+   it is a junction pointing outside an `AuroraVerb_artefacts` tree, it also
+   stops. It only replaces a junction it can see is one of its own.
+4. **Asks whether elevation is actually needed**, by probing the folder for
+   writability rather than assuming, so no UAC prompt is raised when none is
+   required.
+5. **Creates the junction**, making the parent `VST3` folder first if it does
+   not exist. On this machine it did not.
+6. **Verifies through the junction**: resolves the link target, hashes the
+   binary *through the link*, and fails unless it equals the source hash. The
+   bytes the host will load are therefore the bytes that were verified.
+7. **Removes the superseded per-user junction**, so there is only one
+   validation path to be confused by later. `-KeepUserJunction` keeps it.
+8. **Removes the AuroraVerb custom search-path entries**, which provably
+   cannot find a VST3. An entry that cannot work is worse than no entry: it
+   looks like provision. Unrelated paths are carried across untouched and the
+   key is exported to `%LOCALAPPDATA%\AuroraVerb-fl-backups\` first.
+   `-KeepScanPaths` leaves the registry alone.
 
-### Why it refuses while FL is running
+### Then, in FL Studio
 
-FL Studio writes this whole key back from memory when it exits. An edit made
-while it is open is silently discarded — which looks identical to the edit not
-working. The script checks and says so rather than appearing to succeed. FL was
-running (`FL64`, pid 14040) when this was diagnosed, which is why the real key
-was left alone; the rewrite logic was instead exercised against a byte-for-byte
-scratch copy of the key, verified, and the copy deleted.
+1. **Options → Manage plugins**
+2. Leave **Verify plugins** ON, so a plugin that fails to load is reported
+   instead of skipped silently.
+3. Press **Find more plugins**.
+4. AuroraVerb appears under **Effects**, maker **IndieDSP**.
 
-### If the folder still is not picked up
+A full or forced rescan is not needed, and **Rescan previously failed plugins**
+is not needed either: FL has no cached AuroraVerb entry of any kind — its
+plugin database holds 281 files and not one mentions `Aurora` or `JuceBuilds`.
+There is nothing cached to invalidate. Do not wipe the plugin database.
+
+### Undo
 
 ```powershell
-.\Scripts\prepare-fl-validation.ps1 -Junction
+.\Scripts\prepare-fl-validation.ps1 -Remove
 ```
 
-This additionally creates a **directory junction**:
+Removes the junction with `rmdir`, which deletes the link and not its target.
+It **never removes the parent `VST3` folder** — if the folder was created by
+this script and is now empty, it is left for you to delete by hand.
 
-```
-%LOCALAPPDATA%\Programs\Common\VST3\AuroraVerb.vst3
-    -> C:\JuceBuilds\av-phase7\AuroraVerb_artefacts\RelWithDebInfo\VST3\AuroraVerb.vst3
-```
+### How it was tested
 
-That is the per-user VST3 folder the README documents — the previous working
-method's destination, reached without copying anything. Three properties make
-it better than a staging copy:
+The privileged step cannot be rehearsed against Program Files without actually
+writing there, so the whole script was run end to end against a scratch
+directory and a byte-for-byte copy of FL's registry key. All three paths were
+exercised and the copies deleted afterwards:
 
-- **The host loads the validation artefact itself.** The script hashes the
-  binary *through the junction* and fails if it does not match, so the thing
-  under test cannot drift from the thing that was verified.
-- **No elevation.** A junction is not a symlink; `mklink /J` needs no admin.
-- **`-Remove` leaves nothing behind.** It removes the link with `rmdir`, which
-  deletes the link and not the target, and it refuses to delete a real folder
-  it did not create.
+| path | result |
+|---|---|
+| create | junction made, resolved, hashed through the link — `2C52D78F…5BA6151`, matches |
+| `-Remove` | link deleted, **source bundle intact**, parent folder left in place |
+| refusal | a planted real directory was **not** overwritten, its hash was printed, the script stopped |
 
-It never writes to `C:\Program Files\Common Files\VST3`, and the script asserts
-that before creating the link.
+The `mklink` / `rmdir` command forms were validated separately before being
+wired in.
 
 ---
 
 ## 5. What was deliberately not done
 
-- **No global install.** The scan-path method was not proven unworkable — it
-  was proven misconfigured, with the exact misconfiguration identified.
+- **No copy.** The junction means the host loads the validation artefact
+  itself, so the bytes under test cannot drift from the bytes that were
+  verified.
 - **No plugin-database wipe.** FL has no AuroraVerb record to clear.
 - **No rebuild.** The artefact verified byte-for-byte against the expected
   hash.
-- **No change to unrelated search paths.** The four stock entries are carried
-  across untouched, and the script's filter is `*AuroraVerb_artefacts*`.
+- **No change to unrelated search paths.** The stock entries are carried
+  across untouched; the script's filter is `*AuroraVerb_artefacts*`.
 - **No `AV_COPY_PLUGIN_AFTER_BUILD=ON`.** Re-enabling it would restore the
   defect the hardening pass closed: every build installing itself as a side
-  effect, whatever profile it is.
+  effect, whatever profile it is. It stays OFF.
+- **No change to `Source/`, the DSP, the defaults, the CMake configuration or
+  any Phase 7 result.** This is host plumbing and nothing else.
+- **Nothing written to Program Files except the one junction** (and the `VST3`
+  folder itself, which did not exist). No binary is installed there.

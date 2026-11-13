@@ -125,15 +125,20 @@ Close FL Studio, then:
 .\Scripts\prepare-fl-validation.ps1
 ```
 
-It verifies the hash, points FL's custom search path at the bundle's **parent
-folder**, and leaves every unrelated path alone. Nothing is installed and
-`C:\Program Files\Common Files\VST3` is not written to. If the folder still is
-not picked up, re-run with `-Junction`, which links the artefact into the
-per-user VST3 folder without copying it. `-Remove` undoes either.
+It verifies the hash and creates a **directory junction** at
+`C:\Program Files\Common Files\VST3\AuroraVerb.vst3` pointing at the build
+bundle, then hashes the binary *through the junction* and fails unless it
+matches. The plugin is not copied, so FL loads the validation artefact itself.
+`-Remove` undoes it.
 
-**Adding the path by hand is what failed the first time.** Both paths that had
-been entered pointed at the bundle rather than at the folder containing it, so
-every scan correctly found nothing and reported no error.
+An ordinary PowerShell is enough: the script elevates one command and nothing
+else. In FL: **Options → Manage plugins → Find more plugins**, with **Verify
+plugins** left on.
+
+**Custom search paths are not the way, and that is why the first attempts
+failed.** FL Studio's plugin search paths are for VST1/VST2; a VST3 must be in
+the standard system VST3 folder. A junction in the per-user VST3 folder was
+tried too and FL did not find it there either.
 `Docs/FlStudioValidationScanWorkflow.md` has the full diagnosis — the artefact
 itself verified clean on every check, including `LoadLibrary` and
 `GetPluginFactory`.
