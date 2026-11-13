@@ -7,9 +7,10 @@ says the new default operating point is measurably healthier — the worst
 anywhere in 2350 checks. It says nothing at all about whether the result is a
 better product.
 
-**Verdict: not yet taken.** This document is the procedure and the material.
-The six answers and the verdict are to be written into it by the listener; I
-have no ears and will not fill them in.
+**Verdict: CONDITIONAL PASS / ACCEPTABLE.** Taken on the blind offline set.
+The FL Studio host A/B was subsequently **waived** — see below and
+`Docs/Phase7-Closure.md`. The verdict and the per-source answers below were
+written by the listener; nothing in them is inferred.
 
 ---
 
@@ -200,14 +201,33 @@ down before opening the key.**
 
 ### Answers
 
-| source | 1 brighter | 2 body | 3 tail | 4 HF damping | 5 transients | 6 modulation |
-|---|---|---|---|---|---|---|
-| mixed | | | | | | |
-| snare | | | | | | |
-| hats | | | | | | |
-| pad | | | | | | |
-| piano | | | | | | |
-| vocal | | | | | | |
+Taken on the three pairs the difference table identified as able to carry a
+difference. The other nine pairs were near-identical by measurement and are
+not reported as perceptual results.
+
+| source | preferred | reason given |
+|---|---|---|
+| `mixed-wet` | **A**, the old default | decay felt more natural / pleasant |
+| `snare-wet` | **B**, the new default | felt more natural |
+| `hats-wet` | **A**, the old default | B sounded *different* — explicitly **not** metallic, harsh or broken |
+
+Against the six questions, across those three sources:
+
+| | finding |
+|---|---|
+| 1 brighter | yes, B is audibly brighter in fully-wet HF-sensitive material |
+| 2 body | no loss of low-mid / mid body reported |
+| 3 tail | silky, lush and continuous on both sides; **no metallic decay** |
+| 4 HF damping | still perceptually useful; not reported as too open or exposed |
+| 5 transients | no transient smearing; separation not reported as worse |
+| 6 modulation | organic on both sides; no chorus character |
+
+An initial "metallic" impression was **clarified by the listener as not
+actually metallic, harsh or defective**. It is recorded here because the first
+wording would otherwise survive in the trail as a defect that was never found.
+
+**Preferences were source-dependent, and no consistent perceptual defect was
+identified.**
 
 ---
 
@@ -219,10 +239,38 @@ down before opening the key.**
 | **CONDITIONAL PASS** | B is clearly technically preferable and only a very small voicing difference exists, not enough to justify another DSP iteration |
 | **FAIL** | an obvious undesirable product-level character change: harsh or brittle HF tail, noticeably weaker damping function, loss of lushness, metallic decay, transient smearing, or an obvious modulation / chorus character |
 
-**Verdict:** _not yet taken_
+**Verdict: CONDITIONAL PASS / ACCEPTABLE**
 
-On FAIL: do not tune anything. Record which source and which perceptual
-dimension failed, and stop there.
+The new defaults create an audible voicing difference, clearest in fully-wet
+HF-sensitive material. Blind listening did not reveal a consistent metallic
+tail, harsh or brittle HF character, loss of lushness, transient smearing,
+chorus character, modulation defect, or generally degraded reverb quality.
+Preferences varied by source. The voicing difference is therefore acceptable
+and **does not justify another Phase 7 DSP iteration**.
+
+Recorded honestly: this is CONDITIONAL PASS and not PASS. Two of the three
+sensitive sources were preferred at the **old** default. What the blind set
+establishes is the absence of a defect, not a preference for the new voicing —
+and the case for the new default rests on the measurement, where the worst
+deviation from the requested Decay falls from 7.90 % to 2.3 %.
+
+---
+
+## FL Studio A/B: WAIVED
+
+**Waived after acceptable blind offline listening validation. Host listening
+was not performed, and is not claimed as performed.**
+
+The blind offline set used the exact validation build, was level-matched, hid
+which side was which, and ran at 100 % wet — higher sensitivity than the
+Mix = 30 % operating point, where the difference was already measured to be
+below 0.25 dB on every pair. The purpose of host listening was perceptual
+validation rather than another DSP measurement, and blind evaluation found no
+consistent product defect. `Docs/Phase7-Closure.md` carries the full grounds.
+
+The validation artefact remains reachable from a host — see
+`Docs/FlStudioValidationScanWorkflow.md` — so the route exists whenever it is
+wanted. It is simply not a Phase 7 gate.
 
 ---
 

@@ -13,7 +13,7 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 
 ---
 
-## Current status — PHASE 6 complete, shipping build hardened
+## Current status — PHASE 7 complete, shipping build hardened
 
 | Area | State |
 |---|---|
@@ -53,8 +53,19 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 | Diagnostic layer — lock-free telemetry, session reports, audio capture | done |
 | `DiagnosticAnalyzer` — offline analysis reusing the PHASE 3–5C measurements | done |
 | FL Studio test tooling — watcher, launcher, session analyser, checklist | done |
-| Offline DSP test harness — 1077 checks | done |
+| Frequency-dependent decay (PHASE 7) — per-line low/high shelves, Option A composite normalisation | done |
+| Damping default operating point — swept to interior optima and adopted | done, with accepted limitations |
+| Certified modal analysis — 18657 / 18657 poles, 0 duplicates, 0 unresolved | done, frozen |
+| Offline DSP test harness — 2350 checks | done |
 | **Algorithm bank** | **not yet — the wet path is an identity placeholder** |
+
+**PHASE 7 closed with four documented accepted limitations** — see
+[`Docs/Phase7-Closure.md`](Docs/Phase7-Closure.md). In short: the ~2 % Problem A
+research target was slightly missed at ~2.3 % (from 7.90 %), High Damp 100 %
+keeps a known extreme tail-curvature diagnostic, six of 2350 checks
+intentionally stay red as historical or rejected-topology records, and blind
+listening found source-dependent voicing preferences but no consistent
+perceptual defect. Phase 8 has not started.
 
 The plugin loads in a DAW, shows all parameters, automates them without zipper
 noise, saves/restores state, and passes audio through. The DSP core, the
