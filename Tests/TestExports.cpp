@@ -11,6 +11,7 @@
     stdout.
 */
 
+#include "DampingListening.h"
 #include "DiagnosticAnalyzer.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
@@ -305,6 +306,24 @@ __declspec (dllexport) int ExportAuroraVerbDecisionGate (const char* directory,
 
     return avtest::exportDecisionGateSet (directory,
                                           sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/**
+    Renders the Phase 7 damping default A/B set.
+
+    Two damping operating points - the default the plugin shipped with before
+    Phase 7 and the one it ships with now - across five sources, at the
+    shipping Mix and at 100% wet, unmatched and loudness-matched. Blind
+    letters, with the mapping and every per-file measurement in a key file.
+*/
+__declspec (dllexport) int ExportAuroraVerbDampingListening (const char* directory,
+                                                             double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportDampingListeningSet (directory,
+                                              sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"

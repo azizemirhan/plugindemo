@@ -98,6 +98,7 @@ set(AV_TEST_SUITE_SOURCES
     SizeCrossValidation.cpp
     Phase6Regenerate.cpp
     PerceptualBridge.cpp
+    DampingListening.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
