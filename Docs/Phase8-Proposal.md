@@ -176,6 +176,26 @@ This is the critical risk the brief names, and it has a clean test.
 | **High Damp** | per-line shelf **inside the feedback loop** → frequency-dependent **decay rate** | `RT60(f)` changes |
 | **High Cut** | one-pole on the **excitation**, outside the loop → frequency-dependent **injected amplitude** | `RT60(f)` **unchanged**; band energy changes |
 
+> **WITHDRAWN IN STAGE 2.5 — see `Phase8-Stage2.5-Signoff.md`.** The
+> pre-registered test below was built on two things that did not survive
+> measurement. The `≤ 1 %` RT60 target is not achievable through this harness
+> for reasons that have nothing to do with the tank: a one-octave analysis
+> band has finite rejection, so a broadband excitation leaks fast-decaying
+> high-frequency energy into every band, and removing the highs removes the
+> leak. A post-tank control — the same filter applied where it is
+> mathematically incapable of changing a decay — produced the same measured
+> change, which settles whose it is. And the harness fails its own sensitivity
+> control against Phase 7's analytic table, so its silence would prove nothing
+> anyway. **No quantitative RT60 gate was created from it.**
+>
+> What replaced it is a *routing* guarantee, proved on the complete production
+> tank at the shipped Mod Depth: every readable tank control value is
+> identical across a full cut sweep, and the signal reaching `processBlock`
+> replays bit-identically into a tank that was never told a cut parameter.
+> The claim is that a cut cannot change the **decay law**, not that it cannot
+> change a **measured** RT60 — the latter is too strong for a finite,
+> modulated, modal system.
+
 **Pre-registered separation test.** Measure `RT60(f)` with the certified
 fixed-Q ensemble analyser at a fixed damping setting, sweeping High Cut across
 its range. The decay time in every band must be invariant while the band's
@@ -412,8 +432,9 @@ certified ensemble analyser.
 **System**
 - **Phase-7 zero-setting regression: bit-identical** output at Pre-Delay 0 /
   Low Cut 20 / High Cut 20 k, against the Phase-7 path — the strict reference case
-- **the damping separation test of §4** — RT60(f) invariant under both cut
-  controls while band energy follows the filter
+- ~~**the damping separation test of §4** — RT60(f) invariant under both cut
+  controls while band energy follows the filter~~ — **withdrawn in Stage 2.5**;
+  replaced by the structural routing verification, see §4's banner
 - interaction matrix: each cut control against Low Damp, Low Damp Freq, High
   Damp, High Damp Freq, Decay, Size, Mod Depth
 - Decay still hits its target with the cuts engaged

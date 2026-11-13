@@ -101,6 +101,7 @@ set(AV_TEST_SUITE_SOURCES
     DampingListening.cpp
     Phase8Filters.cpp
     Phase8System.cpp
+    Phase8Signoff.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp

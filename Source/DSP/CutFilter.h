@@ -14,17 +14,34 @@ namespace av::dsp
     WHAT THESE ARE, AND WHAT THEY ARE NOT
     -------------------------------------
     These filters sit OUTSIDE the feedback loop, on the signal that excites
-    the tank. They change how much energy enters a band. They do not change
-    how long a band takes to decay - that is PHASE 7 damping, which lives
-    inside the loop. The two are not redundant and the difference is
-    measurable rather than rhetorical:
+    the tank. They change how much energy enters a band. PHASE 7 damping
+    lives inside the loop and changes how long a band takes to decay. The two
+    are not redundant, and the difference is structural:
 
-        High Damp   RT60(f) changes            progressively darker tail
-        High Cut    RT60(f) unchanged          uniformly darker tail
+        High Damp   enters the recurrence      progressively darker tail
+        High Cut    does not                   uniformly darker tail
 
-    A test asserts exactly that: sweeping either cut must leave RT60(f) within
-    1 % while band energy follows the filter's magnitude. If a cut moves
-    RT60(f), it has leaked into the loop.
+    STATED PRECISELY, because STAGE 2 stated it too strongly and STAGE 2.5
+    had to correct it.
+
+    The cuts are EXCITATION filters. Their parameters do not enter any tank
+    control value - not RT60, not the damping ratios or shelf coefficients,
+    not the feedback gains, not the delay lengths, not the modulation depth or
+    rate - and therefore appear nowhere in the tank's recurrence equations.
+    They cannot change the decay law. Two tests prove it on the complete
+    production tank at the shipped Mod Depth: every readable tank control
+    value is identical across a full cut sweep, and the signal reaching
+    processBlock replays bit-identically into a tank that was never told a cut
+    parameter.
+
+    They CAN change modal excitation weighting, the energy observed in a band,
+    what a finite-band RT60 estimator reports, and - the tank being modulated,
+    hence time-varying - the time-varying weighting of what reaches the
+    output. The STAGE 2 harness measured the third of those at up to 9 %.
+
+    So the claim is NOT "a cut can never change a measured RT60". That is too
+    strong for a finite, modulated, modal system, and it is not what the
+    architecture needs to be true.
 
     FILTER FORM
     -----------
@@ -80,6 +97,37 @@ namespace av::dsp
 
     There is a step at each endpoint, because the endpoint means OFF. It is
     measured and reported rather than morphed away.
+
+    PRIMING ON RE-ENTRY
+    -------------------
+    A bypassed filter's state is neither advanced nor cleared - process()
+    returns before touching it. On its own that means a filter parked on OFF
+    for two seconds comes back carrying the sample history of two seconds ago,
+    and computes its first output from it. STAGE 2.5 measured that, by running
+    the same signal and the same automation twice with different histories
+    before the bypass: with the state left alone the two outputs differed by
+    6.9 % of peak at re-entry, and every one of the 9600 samples after it
+    differed. Nothing about a signal from before a bypass should be audible
+    after it, so the first sample of each active period PRIMES the state:
+
+        high cut   s = x            (a s + (1-a) x = x exactly)
+        low cut    s = x (a - 1/k) / a
+
+    Both solve "make this sample pass through unchanged", which is what the
+    filter would have done with it had it been running all along, and which
+    depends only on the sample in hand. The audio after a bypass is then
+    bit-identical whatever happened before it - a test asserts exactly that -
+    and the first sample is continuous with the bypassed signal rather than
+    stepping away from it, so the OFF boundary cannot click.
+
+    What priming does NOT do, and is not meant to: remove the SETTLING that
+    follows. A low cut entering on a bass-heavy signal still takes its time
+    constant to remove the lows. That is the filter doing its job, it is
+    smooth by construction, and it is what a tonal change across OFF sounds
+    like.
+
+    This costs one branch per block, not per sample, and it cannot touch the
+    neutral path: a bypassed stage never reaches the loop at all.
 */
 
 /** The neutral endpoints. These MUST match ParameterLayout's minima/maxima. */
@@ -101,19 +149,43 @@ public:
         highState = 0.0;
     }
 
-    /** Low cut, high cut, in that order. Coefficients come from the owner. */
+    /**
+        Low cut, high cut, in that order. Coefficients come from the owner.
+
+        `primeLow` and `primeHigh` are set for the first sample after a filter
+        comes back from bypass. See PRIMING ON RE-ENTRY in the class comment:
+        each sets the state so that this sample passes through unchanged, which
+        is what a filter that had been running all along would have done with
+        it, and which carries nothing over from before the bypass.
+    */
     [[nodiscard]] double process (double x,
                                   bool lowActive,  double aLow,  double kLow,
-                                  bool highActive, double aHigh) noexcept
+                                  bool highActive, double aHigh,
+                                  bool primeLow = false,
+                                  bool primeHigh = false) noexcept
     {
         if (lowActive)
         {
+            // Solve y = x for the state that the update below will produce:
+            //   s' = a s + (1-a) x,  y = (x - s') k  =>  s' = x (1 - 1/k)
+            //   =>  s = x (a - 1/k) / a
+            if (primeLow)
+                lowState = (aLow > 1.0e-12 && kLow > 0.0)
+                           ? x * (aLow - 1.0 / kLow) / aLow
+                           : 0.0;
+
             lowState += (1.0 - aLow) * (x - lowState);
             x = (x - lowState) * kLow;
         }
 
         if (highActive)
         {
+            // s' = a s + (1-a) x = x exactly when s = x. The high cut's input
+            // is the low cut's OUTPUT, which is why priming happens here and
+            // not from the caller's buffer.
+            if (primeHigh)
+                highState = x;
+
             highState += (1.0 - aHigh) * (x - highState);
             x = highState;
         }
@@ -149,6 +221,9 @@ public:
     {
         left .reset();
         right.reset();
+
+        primeLowPending  = false;
+        primeHighPending = false;
     }
 
     /**
@@ -158,10 +233,15 @@ public:
     */
     void setLowCut (double hz, bool settledAtEndpoint) noexcept
     {
+        const bool wasActive = lowActive;
+
         lowActive = ! (settledAtEndpoint && hz <= lowCutOffHz);
 
         if (! lowActive)
             return;
+
+        if (! wasActive)
+            primeLowPending = true;
 
         aLow = damping::onePoleCoefficient (hz, currentSampleRate);
 
@@ -173,10 +253,17 @@ public:
 
     void setHighCut (double hz, bool settledAtEndpoint) noexcept
     {
+        const bool wasActive = highActive;
+
         highActive = ! (settledAtEndpoint && hz >= highCutOffHz);
 
-        if (highActive)
-            aHigh = damping::onePoleCoefficient (hz, currentSampleRate);
+        if (! highActive)
+            return;
+
+        if (! wasActive)
+            primeHighPending = true;
+
+        aHigh = damping::onePoleCoefficient (hz, currentSampleRate);
     }
 
     /** True when both filters are bypassed and the stage is an identity. */
@@ -193,7 +280,24 @@ public:
         if (isBypassed())
             return;
 
-        for (int i = 0; i < numSamples; ++i)
+        int i = 0;
+
+        // The priming sample, taken out of the loop so that the loop itself
+        // passes compile-time false and is exactly what it was before.
+        if ((primeLowPending || primeHighPending) && numSamples > 0)
+        {
+            l[0] = left .process (l[0], lowActive, aLow, kLow, highActive, aHigh,
+                                  primeLowPending, primeHighPending);
+            r[0] = right.process (r[0], lowActive, aLow, kLow, highActive, aHigh,
+                                  primeLowPending, primeHighPending);
+
+            primeLowPending  = false;
+            primeHighPending = false;
+
+            i = 1;
+        }
+
+        for (; i < numSamples; ++i)
         {
             l[i] = left .process (l[i], lowActive, aLow, kLow, highActive, aHigh);
             r[i] = right.process (r[i], lowActive, aLow, kLow, highActive, aHigh);
@@ -210,6 +314,10 @@ private:
 
     bool lowActive  = false;
     bool highActive = false;
+
+    // Set on a bypass -> active edge, consumed by the next sample processed.
+    bool primeLowPending  = false;
+    bool primeHighPending = false;
 };
 
 } // namespace av::dsp

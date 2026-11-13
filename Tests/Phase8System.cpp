@@ -28,10 +28,19 @@
     The second is the central architectural claim of the phase. High Damp
     lives inside the feedback loop and changes how long a band takes to
     decay. The cuts live outside it and change how much energy enters a band.
-    If a cut moved RT60(f), it would have leaked into the loop and the two
-    controls would be redundant in a way users would feel and could not
-    name. So it is measured, with the same certified fixed-Q ensemble
-    analyser PHASE 7 used, rather than argued.
+    If a cut had leaked into the loop the two controls would be redundant in
+    a way users would feel and could not name. So it is measured rather than
+    argued.
+
+    SCOPE, corrected by STAGE 2.5. The commutation suite below runs at Mod
+    Depth 0, where the tank is time invariant and commutation is the right
+    test. The shipped product runs at 30 %, where it is not. The claim that
+    survives with modulation is a ROUTING claim - the cut parameters are
+    consumed before processBlock and enter no tank control value - and it is
+    proved on the complete production tank in runPhase8SignoffTests. Neither
+    suite claims that a cut can never change a MEASURED RT60: the suite below
+    shows the opposite, and shows why it is the estimator rather than the
+    tank.
 */
 
 using namespace av::dsp;
@@ -182,10 +191,17 @@ void runPhase8SystemTests()
     }
 
     // -----------------------------------------------------------------------
-    beginSuite ("PHASE 8 system - the cut is outside the loop, by commutation");
+    beginSuite ("PHASE 8 system - the cut is outside the loop, STATIC control");
     // -----------------------------------------------------------------------
     {
-        info ("  The decisive structural test, and it needs no statistics.");
+        info ("  A STATIC / LTI CONTROL TEST. Mod Depth is 0 here, which makes");
+        info ("  the tank time invariant - verified by shift invariance in the");
+        info ("  STAGE 2.5 signoff suite, where the same tank at the shipped");
+        info ("  30 % fails that test by twelve orders of magnitude. So this");
+        info ("  result is evidence about the STATIC case and does not extend");
+        info ("  to the default product. The routing claim that does hold with");
+        info ("  modulation is proved separately, on the complete production");
+        info ("  tank, in runPhase8SignoffTests.");
         info ("");
         info ("  If the cut really is outside the feedback loop then the cut");
         info ("  and the tank are two LTI blocks in series, and they COMMUTE:");
