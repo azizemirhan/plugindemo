@@ -119,17 +119,36 @@ C:\JuceBuilds\av-phase7\AuroraVerb_artefacts\RelWithDebInfo\VST3\AuroraVerb.vst3
 SHA256  2C52D78F701A3024167A5651A6A90D5F5ADB971B147B30871631365715BA6151
 ```
 
-Add **that folder** as an extra plugin search path in FL Studio
-(*Options → Manage plugins → Plugin search paths*) and rescan. Do not install
-globally: the production target `C:\Program Files\Common Files\VST3` must not
-be written to, and a search path reaches the artifact without touching it.
+Close FL Studio, then:
+
+```powershell
+.\Scripts\prepare-fl-validation.ps1
+```
+
+It verifies the hash, points FL's custom search path at the bundle's **parent
+folder**, and leaves every unrelated path alone. Nothing is installed and
+`C:\Program Files\Common Files\VST3` is not written to. If the folder still is
+not picked up, re-run with `-Junction`, which links the artefact into the
+per-user VST3 folder without copying it. `-Remove` undoes either.
+
+**Adding the path by hand is what failed the first time.** Both paths that had
+been entered pointed at the bundle rather than at the folder containing it, so
+every scan correctly found nothing and reported no error.
+`Docs/FlStudioValidationScanWorkflow.md` has the full diagnosis — the artefact
+itself verified clean on every check, including `LoadLibrary` and
+`GetPluginFactory`.
+
+Note that this is the `validation` profile, so `AV_DEV_DIAGNOSTICS` is ON and
+every instantiation writes a session folder under
+`%USERPROFILE%\AuroraVerbDiagnostics`. Expect a lot of them after a listening
+session.
 
 A sweep of this machine confirms there is no installed `AuroraVerb.vst3`
-anywhere — not at the production target, not at the dev-preview location
-`%LOCALAPPDATA%\Programs\Common\VST3` that
-`Docs/FlStudioTestChecklist.md` names, nowhere outside the two build trees. So
-the installed-artifact hash invariant `2B45…0BD8` is preserved by there being
-nothing to overwrite, not by a check that passed.
+anywhere — not at the production target, not at the per-user location
+`%LOCALAPPDATA%\Programs\Common\VST3` that `Docs/FlStudioTestChecklist.md`
+names, nowhere outside the two build trees. The rollback archive is not here
+either. So the installed-artifact hash invariant `2B45…0BD8` is preserved by
+there being nothing to overwrite, not by a check that passed.
 
 ### Getting side A
 
