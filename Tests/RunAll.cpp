@@ -161,6 +161,10 @@ int runAllSuites()
     AV_RUN (runDampingOverlapTests);
     AV_RUN (runDampingModulationCornerTests);
 
+    // PHASE 8
+    AV_RUN (runPhase8Tests);
+    AV_RUN (runPhase8SystemTests);
+
 
     if (suitesRun == 0)
     {

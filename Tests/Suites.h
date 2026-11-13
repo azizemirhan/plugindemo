@@ -96,6 +96,8 @@ void runDampingLowAmountSweepTests();
 void runDampingHighAmountSweepTests();
 void runDampingOverlapTests();
 void runDampingModulationCornerTests();
+void runPhase8Tests();
+void runPhase8SystemTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

@@ -18,8 +18,10 @@
 // did not, so only building all three caught it.
 #include "DSP/ParameterMapping.h"
 
+#include "DSP/CutFilter.h"
 #include "DSP/ModulationArchitecture.h"
 #include "DSP/MorphingStereoFdn.h"
+#include "DSP/PreDelay.h"
 
 #if AV_DEV_DIAGNOSTICS
  #include "Diagnostics/DiagnosticSession.h"
@@ -35,6 +37,17 @@ namespace av
       Level  linear ramp, audio rate    — normalised 0..1 amounts and gains
       Glide  one-pole, audio rate       — times in milliseconds
       Ratio  log-domain, control rate   — frequencies and durations
+
+    PHASE 8 removed the `Glide preDelayMs` member rather than leaving it
+    unused. A one-pole on a delay TIME produces Doppler — the derivative of a
+    delay time is the pitch shift applied to the signal passing through it —
+    so dsp::PreDelay owns its own transition, a crossfade between two fixed
+    taps, and takes the raw target in milliseconds once per chunk. Leaving the
+    smoother in place would have left a loaded gun: the obvious thing to do
+    with a `preDelayMs` smoother is to read it per sample, which is exactly
+    the thing that must not happen. No `Glide` is currently used; the class
+    stays in SmoothedParameter.h because it is the right tool for a modulation
+    depth or a feedback coefficient, neither of which is smoothed here yet.
 
     Percentage parameters are normalised to 0..1 here (Width reaches 2.0) so the
     render loop never carries a stray 0.01.
@@ -61,8 +74,6 @@ struct SmoothedParameters
     Level size, earlyDiffusion, lateDiffusion, density, attack;
     Level modDepth, lowDamp, highDamp;
     Level width, mix;
-
-    Glide preDelayMs;
 
     Ratio decaySeconds, modRate, lowDampFreq, highDampFreq, lowCut, highCut;
 };
@@ -157,6 +168,21 @@ private:
         full-scale input from clipping. See dsp::mapping::previewWetTrim, whose
         name predates this change and whose numeric behaviour is unchanged. */
     dsp::MorphingStereoFdn<> tank;
+
+    /** PHASE 8, wet path only, upstream of the tank.
+
+        input -> Low Cut -> High Cut -> Pre-Delay -> tank
+
+        Both live on the wet buffer between the capture step and the engine,
+        so the dry signal is untouched structurally rather than by care, and
+        "no change to dry timing" is a property of where they sit rather than
+        a thing to remember.
+
+        At the neutral settings — Pre-Delay 0 ms, Low Cut 20 Hz, High Cut
+        20 kHz — both stages are skipped on a flag and the PHASE 7 path is
+        reproduced bit for bit. */
+    dsp::StereoCutFilters cutFilters;
+    dsp::PreDelay<Real>   preDelay;
 
    #if AV_DEV_DIAGNOSTICS
     /** Telemetry. Compiled out entirely unless -DAV_DEV_DIAGNOSTICS=ON: in the

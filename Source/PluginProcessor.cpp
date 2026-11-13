@@ -30,14 +30,11 @@ void SmoothedParameters::prepare (double sampleRate)
     // Long enough to be inaudible on fast automation, short enough that the
     // control still feels immediate.
     constexpr double levelRampSeconds     = 0.02;
-    constexpr double glideTimeConstant    = 0.01;
     constexpr double ratioTimeConstant    = 0.03;
 
     for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density, &attack,
                      &modDepth, &lowDamp, &highDamp, &width, &mix })
         s->prepare (sampleRate, levelRampSeconds);
-
-    preDelayMs.prepare (sampleRate, glideTimeConstant);
 
     // Floors match each parameter's minimum, so the log domain is always valid.
     decaySeconds .prepare (sampleRate, ratioTimeConstant, Real (0.05));
@@ -61,8 +58,6 @@ void SmoothedParameters::updateTargets (const params::RawHandles& raw)
     width         .setTarget (loadPercent (raw.width));
     mix           .setTarget (loadPercent (raw.mix));
 
-    preDelayMs    .setTarget (load (raw.preDelay));
-
     decaySeconds  .setTarget (load (raw.decay));
     modRate       .setTarget (load (raw.modRate));
     lowDampFreq   .setTarget (load (raw.lowDampFreq));
@@ -77,8 +72,6 @@ void SmoothedParameters::snapToTargets()
                      &modDepth, &lowDamp, &highDamp, &width, &mix })
         s->snapToTarget();
 
-    preDelayMs.snapToTarget();
-
     for (auto* s : { &decaySeconds, &modRate, &lowDampFreq, &highDampFreq,
                      &lowCut, &highCut })
         s->snapToTarget();
@@ -90,8 +83,23 @@ void SmoothedParameters::advanceUnconsumed (int numSamples)
                      &modDepth, &lowDamp, &highDamp })
         s->skip (numSamples);
 
-    preDelayMs.skip (numSamples);
+    /*
+        PHASE 8 note, because this is the easiest place in the project to
+        introduce a bug that looks like a feature.
 
+        lowCut and highCut are now CONSUMED by the audio path - but through
+        getCurrentValue(), which reads without advancing, exactly as
+        lowDampFreq and highDampFreq have always been read. This function is
+        how every control-rate Ratio smoother advances, so the two cuts stay
+        in this list and are advanced here once per chunk.
+
+        Calling advance(count) in the filter stage AND leaving them here would
+        run every one of them at twice the rate: automation would simply feel
+        quicker, nothing would fail, and no test that only looked at the audio
+        would notice. A test asserts the once-per-sample property directly.
+
+        preDelayMs is gone entirely - dsp::PreDelay owns its own transition.
+    */
     for (auto* s : { &decaySeconds, &modRate, &lowDampFreq, &highDampFreq,
                      &lowCut, &highCut })
         s->skip (numSamples);
@@ -127,6 +135,13 @@ void AuroraVerbProcessor::prepareToPlay (double sampleRate, int maximumExpectedS
 
     smoothed.prepare (sampleRate);
     needsSmootherReset = true;
+
+    // PHASE 8. Wet path only, upstream of the tank. prepareToPlay is the
+    // only allocation point, and the pre-delay's ring buffer is sized here
+    // for its full 500 ms at this rate - at 192 kHz that is 96000 samples,
+    // rounded up to a power of two by DelayLine, about 2 MB across the pair.
+    cutFilters.prepare (sampleRate);
+    preDelay  .prepare (sampleRate);
 
     tank.prepare (sampleRate);
     tank.setRt60Seconds (2.0, true);
@@ -249,6 +264,11 @@ void AuroraVerbProcessor::reset()
     wetBuffer.clear();
     needsSmootherReset = true;
 
+    // PHASE 8. Without this the pre-delay buffer would replay audio from
+    // before the stop, which is the classic stale-buffer bug.
+    cutFilters.reset();
+    preDelay  .reset();
+
     tank.reset();
 
    #if AV_DEV_DIAGNOSTICS
@@ -274,10 +294,13 @@ bool AuroraVerbProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 
 double AuroraVerbProcessor::getTailLengthSeconds() const
 {
-    const auto decay    = static_cast<double> (raw.decay    ->load (std::memory_order_relaxed));
-    const auto preDelay = static_cast<double> (raw.preDelay ->load (std::memory_order_relaxed));
+    // Named preDelayMs rather than preDelay: since PHASE 8 there is a member
+    // called preDelay, and a local that shadows it is a warning today and a
+    // misreading later.
+    const auto decay      = static_cast<double> (raw.decay    ->load (std::memory_order_relaxed));
+    const auto preDelayMs = static_cast<double> (raw.preDelay ->load (std::memory_order_relaxed));
 
-    return decay + preDelay * 0.001;
+    return decay + preDelayMs * 0.001;
 }
 
 // --- Rendering -------------------------------------------------------------
@@ -395,6 +418,62 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
            #if AV_DEV_DIAGNOSTICS
             diagnostics.getCollector().observeInput (wetL, wetR, count);
            #endif
+        }
+
+        // --- 1b. PHASE 8: Low Cut, High Cut, Pre-Delay --------------------
+        //
+        //   input -> Low Cut -> High Cut -> Pre-Delay -> tank
+        //
+        // On the wet buffer only, so the dry signal and its timing are
+        // untouched by where this sits rather than by care taken here.
+        //
+        // These filters are OUTSIDE the feedback loop. They change how much
+        // energy enters a band; PHASE 7 damping, inside the loop, changes how
+        // long a band takes to decay. Neither is a substitute for the other
+        // and a test measures the difference rather than asserting it.
+        //
+        // A future Early/Late split belongs after the filters and before the
+        // pre-delay: the filters condition both paths, and a pre-delay is a
+        // late-path control because early reflections should start early.
+
+        {
+            auto* wetL = wetBuffer.getWritePointer (0);
+            auto* wetR = wetBuffer.getWritePointer (1);
+
+            // Control rate, once per chunk. The corner frequency is read
+            // without advancing - advanceUnconsumed() at the end of the chunk
+            // is what advances it, exactly as for the damping corners. See the
+            // comment there before changing either.
+            //
+            // Whether a cut is OFF is decided from the SETTLED TARGET and not
+            // from the smoothed value: LogSmoother recovers its linear value
+            // through exp(log(x)), which need not return x bit-exactly, so an
+            // equality test on the smoothed value could miss the endpoint for
+            // ever and leave a nominally-neutral filter running.
+            cutFilters.setLowCut (smoothed.lowCut.getCurrentValue(),
+                                  ! smoothed.lowCut.isSmoothing()
+                                    && smoothed.lowCut.getTargetValue() <= dsp::lowCutOffHz);
+
+            cutFilters.setHighCut (smoothed.highCut.getCurrentValue(),
+                                   ! smoothed.highCut.isSmoothing()
+                                     && smoothed.highCut.getTargetValue() >= dsp::highCutOffHz);
+
+            cutFilters.process (wetL, wetR, count);
+
+            // The pre-delay takes the raw target in milliseconds, not a
+            // smoothed one. It crossfades between two fixed integer taps
+            // instead of sliding a read position, because the derivative of a
+            // delay time is the pitch shift applied to whatever is passing
+            // through it.
+            const auto preDelayTargetMs =
+                static_cast<double> (raw.preDelay->load (std::memory_order_relaxed));
+
+            if (firstBlockAfterPrepare && offset == 0)
+                preDelay.snapTo (preDelayTargetMs);
+            else
+                preDelay.setDelayMilliseconds (preDelayTargetMs);
+
+            preDelay.process (wetL, wetR, count);
         }
 
         // --- 2. Reverb engine ---------------------------------------------
