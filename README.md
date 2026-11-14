@@ -13,7 +13,7 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 
 ---
 
-## Current status — PHASE 8 complete, shipping build hardened
+## Current status — PHASE 9 complete, shipping build hardened
 
 | Area | State |
 |---|---|
@@ -57,6 +57,7 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 | Damping default operating point — swept to interior optima and adopted | done, with accepted limitations |
 | Certified modal analysis — 18657 / 18657 poles, 0 duplicates, 0 unresolved | done, frozen |
 | Pre-Delay (PHASE 8) — integer taps, dual read, 20 ms linear crossfade, explicit zero | done |
+| Attack (PHASE 9) — 32-tap staggered feedforward injection, L2-normalised, outside the recurrence | done |
 | Low Cut / High Cut (PHASE 8) — first-order one-pole excitation filters outside the loop | done |
 | Offline DSP test harness — 2350 checks | done |
 | **Algorithm bank** | **not yet — the wet path is an identity placeholder** |
@@ -80,7 +81,27 @@ one defect found during validation — filter state surviving a bypass, 6.9 % of
 peak — was fixed by priming and is now bit-zero. Added cost is ~3.9 % of the
 tank engaged, ~1.2 % neutral. The cuts are excitation filters outside the
 feedback network: their parameters enter no tank control value, verified on
-the complete production tank at the shipping Mod Depth. Phase 9 has not
+the complete production tank at the shipping Mod Depth.
+
+**PHASE 9 closed shipping one control, Attack** — see
+[`Docs/Phase9-Closure.md`](Docs/Phase9-Closure.md). It is a 32-tap staggered
+feedforward injection on the wet path before the tank: one immediate tap
+carrying 25 % of the power plus 31 irregularly placed taps over up to 250 ms,
+L2-normalised, **outside the feedback recurrence**. Attack 0 is
+**bit-identical to the Phase 8 path** across six signal classes, and every
+transient receives the same Attack — proved by exact superposition, with no
+onset detector and no transport awareness. Onset belongs to Pre-Delay and
+buildup to Attack, orthogonally; Attack's 143 ms range survives every Early
+Diffusion and Mod Depth setting. Wet energy varies by 0.096 dB across the
+sweep. Added cost is ~0.7 % of the tank neutral, ~14.7 % active.
+
+**Density, Bloom and Late Diffusion were rejected on measurement**, before any
+production code was written for them — evidence-based scope reductions, not
+failed implementations. Late echo density was already saturated at 0.93–0.99;
+Bloom could not be separated from Attack; and Late Diffusion's only working
+mechanism *increased* periodicity at Mod Depth 0, depending on modulation to
+blur its own recurrence structure. `lateDiffusion` and `density` stay as
+dormant serialised parameters for session compatibility. Phase 10 has not
 started.
 
 > One live hazard: the Phase 7 junction at
@@ -1096,6 +1117,13 @@ These hold for every module added from PHASE 2 onwards:
 Parameters are intentionally allowed to mean different things per algorithm —
 `Attack` becomes gate/reverse length in the Nonlinear family, `Density` is a
 primary control on Plate and a secondary one on Room, and so on.
+
+Two of them are **dormant** as of Phase 9: `Late Diffusion` and `Density` are
+registered and serialised but consumed by no DSP, because Phase 9 rejected
+both as controls on measurement — see
+[`Docs/Phase9-Closure.md`](Docs/Phase9-Closure.md). Their IDs are kept so that
+sessions saved before the decision still restore. Their existing is not a
+reason to expose the rejected behaviour.
 
 ---
 
