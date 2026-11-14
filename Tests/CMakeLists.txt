@@ -103,6 +103,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase8Filters.cpp
     Phase8System.cpp
     Phase8Signoff.cpp
+    Phase9Research.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
