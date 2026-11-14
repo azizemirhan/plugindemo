@@ -13,7 +13,7 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 
 ---
 
-## Current status — PHASE 7 complete, shipping build hardened
+## Current status — PHASE 8 complete, shipping build hardened
 
 | Area | State |
 |---|---|
@@ -56,6 +56,8 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 | Frequency-dependent decay (PHASE 7) — per-line low/high shelves, Option A composite normalisation | done |
 | Damping default operating point — swept to interior optima and adopted | done, with accepted limitations |
 | Certified modal analysis — 18657 / 18657 poles, 0 duplicates, 0 unresolved | done, frozen |
+| Pre-Delay (PHASE 8) — integer taps, dual read, 20 ms linear crossfade, explicit zero | done |
+| Low Cut / High Cut (PHASE 8) — first-order one-pole excitation filters outside the loop | done |
 | Offline DSP test harness — 2350 checks | done |
 | **Algorithm bank** | **not yet — the wet path is an identity placeholder** |
 
@@ -65,7 +67,26 @@ research target was slightly missed at ~2.3 % (from 7.90 %), High Damp 100 %
 keeps a known extreme tail-curvature diagnostic, six of 2350 checks
 intentionally stay red as historical or rejected-topology records, and blind
 listening found source-dependent voicing preferences but no consistent
-perceptual defect. Phase 8 has not started.
+perceptual defect.
+
+**PHASE 8 closed with Pre-Delay, Low Cut and High Cut shipping** — see
+[`Docs/Phase8-Closure.md`](Docs/Phase8-Closure.md). The chain is
+`input → Low Cut → High Cut → Pre-Delay → tank`, on the wet path only, with
+the dry path structurally untouched. At the neutral endpoints
+(Pre-Delay 0 ms, Low Cut 20 Hz, High Cut 20 kHz) the output is **bit-identical
+to the Phase 7 path** — 0 of 48 000 samples differ. Pre-delay timing is exact
+at 44.1 / 48 / 96 kHz, 30 endpoint transitions add no avoidable step, and the
+one defect found during validation — filter state surviving a bypass, 6.9 % of
+peak — was fixed by priming and is now bit-zero. Added cost is ~3.9 % of the
+tank engaged, ~1.2 % neutral. The cuts are excitation filters outside the
+feedback network: their parameters enter no tank control value, verified on
+the complete production tank at the shipping Mod Depth. Phase 9 has not
+started.
+
+> One live hazard: the Phase 7 junction at
+> `C:\Program Files\Common Files\VST3\AuroraVerb.vst3` still points at an
+> older build tree, so FL Studio does **not** load the Phase 8 artifact until
+> it is repointed. See the closure document.
 
 The plugin loads in a DAW, shows all parameters, automates them without zipper
 noise, saves/restores state, and passes audio through. The DSP core, the
@@ -1064,9 +1085,9 @@ These hold for every module added from PHASE 2 onwards:
 | Mod Rate | 0.01 – 10 Hz | 0.5 Hz |
 | Mod Depth | 0 – 100 % | 30 % |
 | Low Damp | 0 – 100 % | 20 % |
-| High Damp | 0 – 100 % | 50 % |
+| High Damp | 0 – 100 % | 45 % |
 | Low Damp Freq | 20 – 1000 Hz | 200 Hz |
-| High Damp Freq | 500 Hz – 20 kHz | 6 kHz |
+| High Damp Freq | 500 Hz – 20 kHz | 10 kHz |
 | Width | 0 – 200 % | 100 % |
 | Low Cut | 20 – 1000 Hz | 20 Hz |
 | High Cut | 500 Hz – 20 kHz | 20 kHz |
