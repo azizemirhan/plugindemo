@@ -168,6 +168,7 @@ int runAllSuites()
     AV_RUN (runPhase9ResearchTests);
     AV_RUN (runPhase9Stage2Tests);
     AV_RUN (runPhase9Stage3Tests);
+    AV_RUN (runPhase10ResearchTests);
 
 
     if (suitesRun == 0)

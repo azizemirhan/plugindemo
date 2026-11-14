@@ -107,6 +107,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase9Research.cpp
     Phase9Stage2.cpp
     Phase9Stage3.cpp
+    Phase10Research.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
