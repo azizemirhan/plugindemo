@@ -13,6 +13,7 @@
 
 #include "DampingListening.h"
 #include "DiagnosticAnalyzer.h"
+#include "Phase8Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -324,6 +325,25 @@ __declspec (dllexport) int ExportAuroraVerbDampingListening (const char* directo
 
     return avtest::exportDampingListeningSet (directory,
                                               sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/**
+    Renders the PHASE 8 Stage 3 listening set.
+
+    Pre-Delay, Low Cut and High Cut, four cases over four sources, at the
+    shipping Mix and wet-only where the tail is what is judged. Only case 4 -
+    High Cut against High Damp - is blind, and its mapping is in a key file.
+    The production cut filters and pre-delay are the ones rendered; nothing
+    here is a reimplementation.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase8Listening (const char* directory,
+                                                            double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase8ListeningSet (directory,
+                                             sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"

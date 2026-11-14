@@ -99,6 +99,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase6Regenerate.cpp
     PerceptualBridge.cpp
     DampingListening.cpp
+    Phase8Listening.cpp
     Phase8Filters.cpp
     Phase8System.cpp
     Phase8Signoff.cpp

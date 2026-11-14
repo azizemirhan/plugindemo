@@ -268,72 +268,73 @@ namespace
         return (name[0] == 'A') ? kSettingA : kSettingB;
     }
 
-    /**
-        A bright percussion source, and why this set needs one.
-
-        The established FU-2 source set is a 220 Hz tone, a piano chord, a
-        snare stand-in, a full-band mix and a vocal. The first render of this
-        A/B showed that eight of its ten pairs come out near-identical, and the
-        reason is the material: moving the high damping corner from 6 to 10 kHz
-        can only be heard on energy above 6 kHz, and four of those five sources
-        carry almost none. A listening gate that cannot reveal the change it is
-        gating is not a gate, so this source is here to give it something to
-        act on.
-
-        It is a hi-hat / shaker stand-in: short noise transients with the low
-        end differenced away, at a steady interval. Noise rather than a
-        resonant model on purpose - a metallic resonator would put metallic
-        character into the source, and question 3 asks whether the TANK sounds
-        metallic. The source must not answer that question for it.
-
-        This is an addition, not part of the established Phase 6 material, and
-        it is named as one in the manifest so a reader is never misled about
-        where it came from.
-    */
-    [[nodiscard]] std::vector<StereoFrame> makeBrightPercussion (double sampleRate, double seconds)
-    {
-        std::vector<StereoFrame> out (static_cast<size_t> (sampleRate * seconds));
-
-        // Deterministic, like every other source in the listening material.
-        unsigned int seed = 1973u;
-
-        const auto next = [&seed]
-        {
-            seed = seed * 1664525u + 1013904223u;
-            return static_cast<double> (seed) / 2147483648.0 - 1.0;
-        };
-
-        double previousL = 0.0, previousR = 0.0;
-
-        for (size_t n = 0; n < out.size(); ++n)
-        {
-            const double t = static_cast<double> (n) / sampleRate;
-
-            // Eighth notes at 120 bpm, alternating accent, so the tail of one
-            // hit is still audible when the next arrives - which is where a
-            // damping difference lives.
-            const double since = std::fmod (t, 0.25);
-            const bool accent = std::fmod (t, 0.5) < 0.25;
-
-            const double envelope = std::exp (-since / 0.030) * (accent ? 0.5 : 0.3);
-
-            const double rawL = next() * envelope;
-            const double rawR = next() * envelope;
-
-            // A one-sample difference is a 6 dB/octave highpass. Crude, and
-            // deliberately so: it tilts energy upward without imposing a
-            // corner frequency of its own anywhere near the 6 and 10 kHz the
-            // two settings differ at.
-            out[n] = { rawL - previousL, rawR - previousR };
-
-            previousL = rawL;
-            previousR = rawR;
-        }
-
-        return out;
-    }
 
 } // namespace
+
+/**
+    A bright percussion source, and why this set needs one.
+
+    The established FU-2 source set is a 220 Hz tone, a piano chord, a
+    snare stand-in, a full-band mix and a vocal. The first render of this
+    A/B showed that eight of its ten pairs come out near-identical, and the
+    reason is the material: moving the high damping corner from 6 to 10 kHz
+    can only be heard on energy above 6 kHz, and four of those five sources
+    carry almost none. A listening gate that cannot reveal the change it is
+    gating is not a gate, so this source is here to give it something to
+    act on.
+
+    It is a hi-hat / shaker stand-in: short noise transients with the low
+    end differenced away, at a steady interval. Noise rather than a
+    resonant model on purpose - a metallic resonator would put metallic
+    character into the source, and question 3 asks whether the TANK sounds
+    metallic. The source must not answer that question for it.
+
+    This is an addition, not part of the established Phase 6 material, and
+    it is named as one in the manifest so a reader is never misled about
+    where it came from.
+*/
+[[nodiscard]] std::vector<StereoFrame> makeBrightPercussion (double sampleRate, double seconds)
+{
+    std::vector<StereoFrame> out (static_cast<size_t> (sampleRate * seconds));
+
+    // Deterministic, like every other source in the listening material.
+    unsigned int seed = 1973u;
+
+    const auto next = [&seed]
+    {
+        seed = seed * 1664525u + 1013904223u;
+        return static_cast<double> (seed) / 2147483648.0 - 1.0;
+    };
+
+    double previousL = 0.0, previousR = 0.0;
+
+    for (size_t n = 0; n < out.size(); ++n)
+    {
+        const double t = static_cast<double> (n) / sampleRate;
+
+        // Eighth notes at 120 bpm, alternating accent, so the tail of one
+        // hit is still audible when the next arrives - which is where a
+        // damping difference lives.
+        const double since = std::fmod (t, 0.25);
+        const bool accent = std::fmod (t, 0.5) < 0.25;
+
+        const double envelope = std::exp (-since / 0.030) * (accent ? 0.5 : 0.3);
+
+        const double rawL = next() * envelope;
+        const double rawR = next() * envelope;
+
+        // A one-sample difference is a 6 dB/octave highpass. Crude, and
+        // deliberately so: it tilts energy upward without imposing a
+        // corner frequency of its own anywhere near the 6 and 10 kHz the
+        // two settings differ at.
+        out[n] = { rawL - previousL, rawR - previousR };
+
+        previousL = rawL;
+        previousR = rawR;
+    }
+
+    return out;
+}
 
 int exportDampingListeningSet (const std::string& directory, double sampleRate)
 {

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "GainStaging.h"
+
 #include <string>
+#include <vector>
 
 /**
     Phase 7: the damping default A/B listening set.
@@ -58,5 +61,20 @@ namespace avtest
     Returns the number of files written, or a negative value on failure.
 */
 int exportDampingListeningSet (const std::string& directory, double sampleRate = 48000.0);
+
+/**
+    The bright-percussion source this set added, exposed for reuse.
+
+    A hi-hat / shaker stand-in: short noise transients with the low end
+    differenced away, at a steady interval, with no resonator in it. It was
+    added here because none of the established sources carries enough energy
+    above 6 kHz for a change to the high damping corner to act on.
+
+    Visible rather than file-local so that a later set needing a bright source
+    uses this one instead of growing a second copy that would drift from it.
+    The arithmetic is unchanged, so every render made from it before remains
+    reproducible.
+*/
+[[nodiscard]] std::vector<StereoFrame> makeBrightPercussion (double sampleRate, double seconds);
 
 } // namespace avtest
