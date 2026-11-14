@@ -256,14 +256,14 @@ namespace
                                     * std::exp (-since / 0.45);
 
             const double bass = envelope
-                              * (0.55 * std::sin (2.0 * pi * f0 * t)
-                                 + 0.22 * std::sin (2.0 * pi * 2.0 * f0 * t)
-                                 + 0.09 * std::sin (2.0 * pi * 3.0 * f0 * t)
-                                 + 0.04 * std::sin (2.0 * pi * 5.0 * f0 * t));
+                              * (0.55 * std::sin (2.0 * damping::pi * f0 * t)
+                                 + 0.22 * std::sin (2.0 * damping::pi * 2.0 * f0 * t)
+                                 + 0.09 * std::sin (2.0 * damping::pi * 3.0 * f0 * t)
+                                 + 0.04 * std::sin (2.0 * damping::pi * 5.0 * f0 * t));
 
             // A kick-like thump on every beat: a short low sine burst.
             const double thump = std::exp (-since / 0.055)
-                                 * 0.35 * std::sin (2.0 * pi * 48.0 * since);
+                                 * 0.35 * std::sin (2.0 * damping::pi * 48.0 * since);
 
             // Mid content, so the file is a bass part in a track and not a
             // test tone. Quiet, and well above the cut frequencies, so it
@@ -271,7 +271,7 @@ namespace
             // something unchanged to judge the low end against.
             const double midSince = std::fmod (t, beat * 0.5);
             const double mid = std::exp (-midSince / 0.040) * 0.10
-                               * (std::sin (2.0 * pi * 880.0 * t)
+                               * (std::sin (2.0 * damping::pi * 880.0 * t)
                                   + 0.6 * next());
 
             const double x = 0.42 * (bass + thump + mid);
@@ -282,7 +282,7 @@ namespace
             out[n].l = x;
             out[n].r = 0.42 * (bass + thump + mid * 0.7
                                + 0.04 * std::exp (-midSince / 0.040)
-                                 * std::sin (2.0 * pi * 880.0 * t + 0.8));
+                                 * std::sin (2.0 * damping::pi * 880.0 * t + 0.8));
         }
 
         return out;
@@ -292,82 +292,93 @@ namespace
     //  Measurement, for the manifest and for the case-4 match
     // -----------------------------------------------------------------------
     /**
-        Energy above the split over energy below it, in dB.
+        Energy in one band over one time window, as a level in dB.
 
-        The same measure PHASE 7's listening set used, at the same 6 kHz
-        split, so a number here and a number there describe the same thing.
-        Not a loudness model and not a verdict: only differences between
-        renders measured identically are used.
+        This is case 4's measure, and the first version of this file got it
+        wrong in a way worth recording. That version used the centre of
+        gravity in time of the high-band energy, and it separated the two
+        controls by 46 ms out of 3 s - 1.5 %, which is not a discriminator.
+        The reason is that the source runs for six seconds and the tail for
+        three and a half, so a centroid over the whole render is dominated by
+        the source's own span and barely sees the decay at all.
+
+        What distinguishes the two controls is not when the high band arrives
+        but how it leaves, and that is only visible in the FREE TAIL, after
+        the source has stopped. So the band level is measured over an explicit
+        window:
+
+            early tail   how dark the tail STARTS
+            late  tail   how dark it has BECOME
+
+        A high cut lowers the first and leaves the fall between them alone. A
+        high damp leaves the first much closer to the default and steepens the
+        fall. Those two numbers are the distinction, stated before anyone
+        listens.
     */
-    [[nodiscard]] double highToLowDb (const std::vector<StereoFrame>& frames,
-                                      double sampleRate, double splitHz = 6000.0)
+    [[nodiscard]] double bandLevelDb (const std::vector<StereoFrame>& frames,
+                                      double sampleRate,
+                                      double fromSeconds, double toSeconds,
+                                      double splitHz = 6000.0,
+                                      bool above = true)
     {
-        const double a = std::exp (-2.0 * pi * splitHz / sampleRate);
+        const double a = std::exp (-2.0 * damping::pi * splitHz / sampleRate);
 
-        double lowEnergy = 0.0, highEnergy = 0.0;
-        double stateL = 0.0, stateR = 0.0;
-
-        for (const auto& f : frames)
-        {
-            stateL = a * stateL + (1.0 - a) * f.l;
-            stateR = a * stateR + (1.0 - a) * f.r;
-
-            const double hiL = f.l - stateL;
-            const double hiR = f.r - stateR;
-
-            lowEnergy  += stateL * stateL + stateR * stateR;
-            highEnergy += hiL * hiL + hiR * hiR;
-        }
-
-        if (lowEnergy <= 0.0 || highEnergy <= 0.0)
-            return 0.0;
-
-        return 10.0 * std::log10 (highEnergy / lowEnergy);
-    }
-
-    /**
-        How fast the high band decays relative to the whole, as a time.
-
-        This exists for case 4 and it is the measure that separates the two
-        controls. A high cut removes high-frequency energy at the input, so
-        the high band is quieter throughout and its decay TIME is unchanged.
-        High Damp shortens the high band's decay, so the high band's energy
-        falls away faster than the rest of the tail.
-
-        Measured as the centre of gravity in time of the energy above the
-        split, in seconds from the start. Crude on purpose: it is a single
-        number that moves for one control and not the other, and it is in the
-        manifest so a listener knows what the two files are expected to differ
-        in rather than hunting for a difference blind.
-    */
-    [[nodiscard]] double highBandCentroidSeconds (const std::vector<StereoFrame>& frames,
-                                                  double sampleRate,
-                                                  double splitHz = 6000.0)
-    {
-        const double a = std::exp (-2.0 * pi * splitHz / sampleRate);
+        const auto from = static_cast<size_t> (fromSeconds * sampleRate);
+        const auto to   = std::min (frames.size(),
+                                    static_cast<size_t> (toSeconds * sampleRate));
 
         double stateL = 0.0, stateR = 0.0;
-        double weighted = 0.0, total = 0.0;
+        double energy = 0.0;
+        size_t counted = 0;
 
-        for (size_t n = 0; n < frames.size(); ++n)
+        // The filter runs from the start so that its state is settled by the
+        // time the window opens; only the window contributes to the total.
+        for (size_t n = 0; n < to; ++n)
         {
             stateL = a * stateL + (1.0 - a) * frames[n].l;
             stateR = a * stateR + (1.0 - a) * frames[n].r;
 
-            const double hiL = frames[n].l - stateL;
-            const double hiR = frames[n].r - stateR;
+            if (n < from)
+                continue;
 
-            const double energy = hiL * hiL + hiR * hiR;
+            const double bandL = above ? frames[n].l - stateL : stateL;
+            const double bandR = above ? frames[n].r - stateR : stateR;
 
-            weighted += energy * static_cast<double> (n);
-            total    += energy;
+            energy += bandL * bandL + bandR * bandR;
+            ++counted;
         }
 
-        if (total <= 0.0)
-            return 0.0;
+        if (counted == 0 || energy <= 0.0)
+            return -200.0;
 
-        return weighted / total / sampleRate;
+        return 10.0 * std::log10 (energy / static_cast<double> (counted));
     }
+
+    /** Worst sample difference between two renders of the same source. */
+    [[nodiscard]] double worstSampleDifference (const std::vector<StereoFrame>& a,
+                                                const std::vector<StereoFrame>& b)
+    {
+        double worst = 0.0;
+
+        for (size_t n = 0; n < std::min (a.size(), b.size()); ++n)
+        {
+            worst = std::max (worst, std::abs (a[n].l - b[n].l));
+            worst = std::max (worst, std::abs (a[n].r - b[n].r));
+        }
+
+        return worst;
+    }
+
+    /*
+        The line between "this pair can carry an audible difference" and "it
+        cannot", carried over from PHASE 7's listening set unchanged.
+
+        0.25 dB is roughly the smallest broadband level or tilt difference that
+        survives an A/B on program material. It is a judgement about hearing,
+        not a measurement, and it is written here so it can be argued with
+        rather than discovered in the code.
+    */
+    constexpr double kAudibleDb = 0.25;
 
     [[nodiscard]] std::string fixed (double v, int decimals)
     {
@@ -597,19 +608,36 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
         { "400", Point { 0.0, 400.0,       highCutOffHz } },
     };
 
+    /*
+        `vocal` is heard WET here rather than at Mix 30 %.
+
+        The first render of this set put it at Mix 30 % and the pair came out
+        0.04 dB apart - a null trial. At 30 % wet the output is 70 % dry
+        signal, and the dry path never passes through the cut, so a change
+        confined to the reverb's low end arrives at the output scaled by 0.3
+        and buried under something unchanged. `bass` is kept at Mix 30 %
+        because that question - does anything get worse in normal use - is
+        worth asking; the question of whether the control works is asked on
+        the wet renders, where it can be answered.
+    */
     const Target case2Targets[]
     {
         { "bass",  "mix30", kShippingMix },
         { "bass",  "wet",   1.0 },
-        { "vocal", "mix30", kShippingMix },
+        { "vocal", "wet",   1.0 },
     };
 
     manifest << "  " << pad ("file", 30) << pad ("peak", 11)
-             << pad ("loudness", 13) << "vs OFF\n";
+             << pad ("loudness", 13) << pad ("vs OFF", 10)
+             << pad ("LF level", 12) << pad ("vs OFF", 10)
+             << "worst sample\n";
+
+    int case2Nulls = 0, case2Pairs = 0;
 
     for (const auto& t : case2Targets)
     {
-        double loudnessAtOff = 0.0;
+        double loudnessAtOff = 0.0, shareAtOff = 0.0;
+        std::vector<StereoFrame> reference;
 
         for (const auto& v : case2)
         {
@@ -625,23 +653,60 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
 
             const double loudness = integratedLoudnessLufs (frames, sampleRate);
 
-            if (std::string (v.tag) == "off")
+            // Energy below 200 Hz as a share of the total: what a low cut at
+            // 200 or 400 Hz is for. Not a tilt ratio, which saturates.
+            const double share = bandLevelDb (frames, sampleRate, 0.0, 1.0e9, 200.0, false);
+
+            const bool isOff = std::string (v.tag) == "off";
+
+            if (isOff)
+            {
                 loudnessAtOff = loudness;
+                shareAtOff = share;
+                reference = frames;
+            }
 
             double filePeak = 0.0;
 
             for (const auto& f : frames)
                 filePeak = std::max (filePeak, std::max (std::abs (f.l), std::abs (f.r)));
 
+            const double worst = isOff ? 0.0 : worstSampleDifference (reference, frames);
+
             manifest << "  " << pad (name, 30) << pad (fixed (filePeak, 4), 11)
                      << pad (fixed (loudness, 2) + " LUFS", 13)
-                     << fixed (loudness - loudnessAtOff, 2) << " dB\n";
+                     << pad (fixed (loudness - loudnessAtOff, 2) + " dB", 10)
+                     << pad (fixed (share, 2) + " dB", 12)
+                     << pad (fixed (share - shareAtOff, 2) + " dB", 10);
+
+            if (isOff)
+            {
+                manifest << "-   (reference)\n";
+            }
+            else
+            {
+                ++case2Pairs;
+
+                const bool canReveal =
+                    std::abs (loudness - loudnessAtOff) >= kAudibleDb
+                    || std::abs (share - shareAtOff) >= kAudibleDb;
+
+                if (! canReveal)
+                    ++case2Nulls;
+
+                manifest << fixed (worst, 6)
+                         << (canReveal ? "" : "   near-identical: a null trial") << "\n";
+            }
         }
     }
 
-    manifest << "\n  The level drop is the effect, not a flaw in the set. It is NOT\n"
+    manifest << "\n  " << case2Nulls << " of " << case2Pairs
+             << " comparisons are near-identical.\n\n"
+             << "  The level drop is the effect, not a flaw in the set. It is NOT\n"
              << "  matched away: a low cut that removes low-frequency energy is\n"
              << "  quieter, and hiding that would hide half of what the control does.\n\n"
+             << "  Do not strain to hear a difference in a pair flagged as a null\n"
+             << "  trial. If one sounds different, that is a reading of expectation.\n\n"
              << "  WHAT TO LISTEN FOR\n"
              << "    - OFF: the reverb keeps the full low end of the source\n"
              << "    - 200 Hz: the low end of the TAIL cleans up while the source's\n"
@@ -672,19 +737,42 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
         { "6k",  Point { 0.0, lowCutOffHz,  6000.0 } },
     };
 
+    /*
+        The second source here is `snare`, not `vocal`, and the measurement is
+        why.
+
+        The stage suggested bright percussion or a vocal. Rendered, the vocal
+        turned out unable to carry the comparison at all: it holds 12 dB less
+        energy above 3 kHz than below, so a 10 kHz High Cut moved it by 0.05 dB
+        and a 6 kHz cut by 0.15 dB - both null trials by the 0.25 dB line used
+        throughout this project. Handing a listener a pair that is physically
+        near-identical and asking whether the darkening is gentle manufactures
+        a false positive. `snare` is broadband noise hits and carries the
+        change; the vocal's inability to is recorded here rather than silently
+        worked around.
+
+        The split is at 3 kHz rather than 6 kHz: a 6 kHz split and a 6 kHz High
+        Cut coincide, so the measure would sit exactly on the corner it is
+        trying to see.
+    */
     const Target case3Targets[]
     {
         { "hats",  "mix30", kShippingMix },
         { "hats",  "wet",   1.0 },
-        { "vocal", "mix30", kShippingMix },
+        { "snare", "wet",   1.0 },
     };
 
     manifest << "  " << pad ("file", 30) << pad ("peak", 11)
-             << pad ("HF/LF", 13) << "vs OFF\n";
+             << pad ("loudness", 13) << pad ("vs OFF", 10)
+             << pad ("HF level", 12) << pad ("vs OFF", 10)
+             << "worst sample\n";
+
+    int case3Nulls = 0, case3Pairs = 0;
 
     for (const auto& t : case3Targets)
     {
-        double balanceAtOff = 0.0;
+        double loudnessAtOff = 0.0, shareAtOff = 0.0;
+        std::vector<StereoFrame> reference;
 
         for (const auto& v : case3)
         {
@@ -698,26 +786,61 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
 
             ++written;
 
-            const double balance = highToLowDb (frames, sampleRate);
+            const double loudness = integratedLoudnessLufs (frames, sampleRate);
+            const double share = bandLevelDb (frames, sampleRate, 0.0, 1.0e9, 3000.0, true);
 
-            if (std::string (v.tag) == "off")
-                balanceAtOff = balance;
+            const bool isOff = std::string (v.tag) == "off";
+
+            if (isOff)
+            {
+                loudnessAtOff = loudness;
+                shareAtOff = share;
+                reference = frames;
+            }
 
             double filePeak = 0.0;
 
             for (const auto& f : frames)
                 filePeak = std::max (filePeak, std::max (std::abs (f.l), std::abs (f.r)));
 
+            const double worst = isOff ? 0.0 : worstSampleDifference (reference, frames);
+
             manifest << "  " << pad (name, 30) << pad (fixed (filePeak, 4), 11)
-                     << pad (fixed (balance, 2) + " dB", 13)
-                     << fixed (balance - balanceAtOff, 2) << " dB\n";
+                     << pad (fixed (loudness, 2) + " LUFS", 13)
+                     << pad (fixed (loudness - loudnessAtOff, 2) + " dB", 10)
+                     << pad (fixed (share, 2) + " dB", 12)
+                     << pad (fixed (share - shareAtOff, 2) + " dB", 10);
+
+            if (isOff)
+            {
+                manifest << "-   (reference)\n";
+            }
+            else
+            {
+                ++case3Pairs;
+
+                const bool canReveal =
+                    std::abs (loudness - loudnessAtOff) >= kAudibleDb
+                    || std::abs (share - shareAtOff) >= kAudibleDb;
+
+                if (! canReveal)
+                    ++case3Nulls;
+
+                manifest << fixed (worst, 6)
+                         << (canReveal ? "" : "   near-identical: a null trial") << "\n";
+            }
         }
     }
 
-    manifest << "\n  HF/LF is the energy above 6 kHz over the energy below it. It is\n"
-             << "  not a loudness model; only the difference between renders measured\n"
-             << "  identically is used. Note that the 6 kHz High Cut and the 6 kHz\n"
-             << "  measurement split coincide, so that row understates the change.\n\n"
+    manifest << "\n  " << case3Nulls << " of " << case3Pairs
+             << " comparisons are near-identical.\n\n"
+             << "  HF share is the energy above 3 kHz as a share of the total. 3 kHz\n"
+             << "  rather than 6 kHz because a 6 kHz split and a 6 kHz High Cut would\n"
+             << "  coincide, putting the measure on the corner it is trying to see.\n"
+             << "  It is not a loudness model; only differences between renders\n"
+             << "  measured identically are used.\n\n"
+             << "  Do not strain to hear a difference in a pair flagged as a null\n"
+             << "  trial. If one sounds different, that is a reading of expectation.\n\n"
              << "  WHAT TO LISTEN FOR\n"
              << "    - OFF: the tail stays open and present at the top\n"
              << "    - 10 kHz: gentle darkening, the kind that sits a reverb behind a\n"
@@ -744,19 +867,37 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
              << "      decay shortened in the high band, INSIDE the loop\n\n";
 
     /*
-        Choosing C's High Damp by measurement rather than by guess.
+        Choosing C's High Damp by measurement rather than by guess, and the
+        first attempt getting it wrong.
 
-        The comparison is only about the ROLE of the two controls if they are
-        set to produce a comparable AMOUNT of darkening. Pick C's High Damp by
-        hand and the listener is partly judging which one was set harder. So
-        it is searched: render B, measure its HF/LF balance, then find the
-        High Damp value whose balance comes closest to B's with no high cut at
-        all.
+        The comparison is only about the ROLE of the two controls if they end
+        up comparably dark. Pick C by hand and the listener is partly judging
+        which control was turned up further.
 
-        The search is reported, including how close the match got, because a
-        match that failed would change how the answers should be read.
+        THE FIRST ATTEMPT matched on HF/LF balance over the whole render, and
+        it failed: the search ran to the top of the parameter range and High
+        Damp 95 % was still 0.64 dB short of an 8 kHz High Cut, with the trend
+        still improving. That is not a search that needs a wider grid. It is
+        the finding the case exists to produce - High Damp cannot reproduce
+        what a High Cut does, however hard it is driven, because a cut removes
+        the high band from the excitation while damping only shortens how long
+        it lasts once it is in the tank. The high band still ARRIVES at full
+        level.
+
+        So the match moved to the quantity that can be matched and that is the
+        fair one: the high-band level LATE IN THE FREE TAIL, after the source
+        has stopped. Both controls can make the tail end up equally dark. How
+        they get there is the distinction, and it is then visible as the
+        early-tail level, which the match deliberately leaves alone.
     */
     const auto& case4Source = sourceNamed ("hats");
+
+    // The `hats` source is 6 s long, so the free tail starts there.
+    constexpr double kSourceSeconds = 6.0;
+    constexpr double kEarlyFrom = kSourceSeconds + 0.02;
+    constexpr double kEarlyTo   = kSourceSeconds + 0.30;
+    constexpr double kLateFrom  = kSourceSeconds + 0.60;
+    constexpr double kLateTo    = kSourceSeconds + 1.20;
 
     const Point case4A { 0.0, lowCutOffHz, highCutOffHz, kHighDamp };
     const Point case4B { 0.0, lowCutOffHz, 8000.0,       kHighDamp };
@@ -764,44 +905,66 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
     const auto renderA = render (case4Source, sampleRate, case4A, 1.0);
     const auto renderB = render (case4Source, sampleRate, case4B, 1.0);
 
-    const double balanceA = highToLowDb (renderA, sampleRate);
-    const double balanceB = highToLowDb (renderB, sampleRate);
+    const auto earlyOf = [&] (const std::vector<StereoFrame>& f)
+    {
+        return bandLevelDb (f, sampleRate, kEarlyFrom, kEarlyTo);
+    };
+
+    const auto lateOf = [&] (const std::vector<StereoFrame>& f)
+    {
+        return bandLevelDb (f, sampleRate, kLateFrom, kLateTo);
+    };
+
+    const double lateB = lateOf (renderB);
 
     manifest << "  C's High Damp is chosen by measurement, not by guess: the\n"
              << "  comparison is about the two controls' ROLE, and that only works if\n"
-             << "  they are set to produce a comparable amount of darkening.\n"
-             << "  Otherwise part of the answer is which one was turned up further.\n\n"
-             << "  " << pad ("High Damp", 12) << pad ("HF/LF", 12) << "vs B\n";
+             << "  they end up comparably dark. Otherwise part of the answer is which\n"
+             << "  one was turned up further.\n\n"
+             << "  The match is on the high-band level LATE in the free tail, 0.6 to\n"
+             << "  1.2 s after the source stops - still part of the audible tail at a\n"
+             << "  2.5 s Decay. Two earlier versions of this measurement were wrong\n"
+             << "  and both are worth recording.\n\n"
+             << "  The FIRST matched on whole-render HF/LF balance, and the search ran\n"
+             << "  to the top of the parameter range still 0.64 dB short. That was not\n"
+             << "  a grid too narrow - it is the point of the case: High Damp cannot\n"
+             << "  reproduce a High Cut however hard it is driven, because a cut keeps\n"
+             << "  the high band out of the tank while damping only shortens how long\n"
+             << "  it survives once it is in. It still arrives at full level.\n\n"
+             << "  The SECOND put the late window at 1.5 to 2.5 s after the source,\n"
+             << "  where the high band sits around -95 dB. Matching there is matching\n"
+             << "  on inaudible residue, and it chose a High Damp barely above the\n"
+             << "  default. The window now sits inside the part of the tail a listener\n"
+             << "  actually hears.\n\n"
+             << "  " << pad ("High Damp", 12) << pad ("late tail HF", 15) << "vs B\n";
 
     double bestHighDamp = 0.0;
     double bestError = 1.0e30;
-    double bestBalance = 0.0;
 
-    for (int step = 0; step <= 9; ++step)
+    for (int step = 0; step <= 10; ++step)
     {
         const double damp = 0.50 + 0.05 * step;
 
         const Point candidate { 0.0, lowCutOffHz, highCutOffHz, damp };
 
         const auto frames = render (case4Source, sampleRate, candidate, 1.0);
-        const double balance = highToLowDb (frames, sampleRate);
-        const double error = std::abs (balance - balanceB);
+        const double late = lateOf (frames);
+        const double error = std::abs (late - lateB);
 
         manifest << "  " << pad (fixed (damp * 100.0, 0) + " %", 12)
-                 << pad (fixed (balance, 2) + " dB", 12)
-                 << fixed (balance - balanceB, 2) << " dB\n";
+                 << pad (fixed (late, 2) + " dB", 15)
+                 << fixed (late - lateB, 2) << " dB\n";
 
         if (error < bestError)
         {
             bestError = error;
             bestHighDamp = damp;
-            bestBalance = balance;
         }
     }
 
     manifest << "\n  chosen: High Damp " << fixed (bestHighDamp * 100.0, 0)
-             << " %, which lands within " << fixed (bestError, 2)
-             << " dB of B's HF/LF balance\n\n";
+             << " %, within " << fixed (bestError, 2)
+             << " dB of B's late-tail high-band level\n\n";
 
     const Point case4C { 0.0, lowCutOffHz, highCutOffHz, bestHighDamp };
 
@@ -809,22 +972,41 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
 
     // What the two controls are expected to differ in, stated up front.
     manifest << "  What the measurement expects, so that listening confirms or\n"
-             << "  contradicts something specific rather than hunting blind:\n\n"
-             << "  " << pad ("version", 10) << pad ("HF/LF", 12)
-             << pad ("HF decay centroid", 20) << "\n"
-             << "  " << pad ("A", 10) << pad (fixed (balanceA, 2) + " dB", 12)
-             << pad (fixed (highBandCentroidSeconds (renderA, sampleRate), 3) + " s", 20) << "\n"
-             << "  " << pad ("B", 10) << pad (fixed (balanceB, 2) + " dB", 12)
-             << pad (fixed (highBandCentroidSeconds (renderB, sampleRate), 3) + " s", 20) << "\n"
-             << "  " << pad ("C", 10) << pad (fixed (bestBalance, 2) + " dB", 12)
-             << pad (fixed (highBandCentroidSeconds (renderC, sampleRate), 3) + " s", 20) << "\n\n"
-             << "  The HF decay centroid is the centre of gravity in time of the\n"
-             << "  energy above 6 kHz. B and C are matched on HF/LF balance by\n"
-             << "  construction, so if the two controls really do different things\n"
-             << "  the centroid is where it shows: a high CUT scales the high band\n"
-             << "  down without changing when it arrives or how long it lasts, while\n"
-             << "  high DAMP makes it leave earlier. A smaller centroid on C than on\n"
-             << "  B is the whole distinction, in one number.\n\n";
+             << "  contradicts something specific rather than hunting blind.\n\n"
+             << "  High-band level (above 6 kHz) in the free tail, after the source\n"
+             << "  has stopped:\n\n"
+             << "  " << pad ("version", 10) << pad ("early tail", 14)
+             << pad ("late tail", 14) << "fall\n"
+             << "  " << pad ("A", 10)
+             << pad (fixed (earlyOf (renderA), 2) + " dB", 14)
+             << pad (fixed (lateOf  (renderA), 2) + " dB", 14)
+             << fixed (lateOf (renderA) - earlyOf (renderA), 2) << " dB\n"
+             << "  " << pad ("B", 10)
+             << pad (fixed (earlyOf (renderB), 2) + " dB", 14)
+             << pad (fixed (lateOf  (renderB), 2) + " dB", 14)
+             << fixed (lateOf (renderB) - earlyOf (renderB), 2) << " dB\n"
+             << "  " << pad ("C", 10)
+             << pad (fixed (earlyOf (renderC), 2) + " dB", 14)
+             << pad (fixed (lateOf  (renderC), 2) + " dB", 14)
+             << fixed (lateOf (renderC) - earlyOf (renderC), 2) << " dB\n\n"
+             << "  B and C are matched on the LATE column by construction, so the\n"
+             << "  distinction lives in the other two. A high CUT lowers the tail's\n"
+             << "  high band from its first instant and leaves the fall alone: B\n"
+             << "  should start dark and fall like A. A high DAMP leaves the first\n"
+             << "  instant much closer to the default and steepens the fall: C should\n"
+             << "  start near A and fall further. That is the whole claim, and it is\n"
+             << "  what a listener should be able to hear as uniformly darker against\n"
+             << "  brighter-then-darkening.\n\n"
+             << "  One number needs a caveat before it is over-read. B's fall is not\n"
+             << "  exactly A's, and it is not supposed to be: the measured band is\n"
+             << "  everything above 6 kHz while the cut sits at 8 kHz, so the cut\n"
+             << "  reweights the band towards 6-8 kHz, which decays a little\n"
+             << "  differently under a 10 kHz damping corner. That is a property of\n"
+             << "  measuring a wide band with one number, not evidence that the cut\n"
+             << "  reached the decay law. It cannot: STAGE 2.5 proved the cut\n"
+             << "  parameters enter no tank control value, on the complete production\n"
+             << "  tank, and that the signal entering the tank replays bit-identically\n"
+             << "  into a tank that never saw them.\n\n";
 
     /*
         Blinding, for this case only.
@@ -857,8 +1039,9 @@ int exportPhase8ListeningSet (const std::string& directory, double sampleRate)
         << " %   (the shipping default)\n"
         << "  B = High Cut 8 kHz, High Damp " << fixed (kHighDamp * 100.0, 0) << " %\n"
         << "  C = High Cut OFF,   High Damp " << fixed (bestHighDamp * 100.0, 0)
-        << " %   (chosen to match B's HF/LF balance to "
-        << fixed (bestError, 2) << " dB)\n\n"
+        << " %   (chosen so its late-tail high-band level\n"
+        << "                                        lands within "
+        << fixed (bestError, 2) << " dB of B's)\n\n"
         << "  case4-hats-wet-1.wav = C\n"
         << "  case4-hats-wet-2.wav = A\n"
         << "  case4-hats-wet-3.wav = B\n\n";
