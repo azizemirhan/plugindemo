@@ -18,6 +18,7 @@
 // did not, so only building all three caught it.
 #include "DSP/ParameterMapping.h"
 
+#include "DSP/AttackInjection.h"
 #include "DSP/CutFilter.h"
 #include "DSP/ModulationArchitecture.h"
 #include "DSP/MorphingStereoFdn.h"
@@ -71,7 +72,20 @@ struct SmoothedParameters
         excluded: they are read per sample by the render loop. */
     void advanceUnconsumed (int numSamples);
 
-    Level size, earlyDiffusion, lateDiffusion, density, attack;
+    /*
+        PHASE 9: `attack` is gone from here, for the same reason `preDelayMs`
+        went in PHASE 8. A smoothed Attack time read per sample would mean
+        continuously moving tap positions, and the derivative of a delay time
+        is a pitch shift applied to whatever is passing through it.
+        dsp::AttackInjection owns its own transition: it crossfades between
+        two fixed tap schedules and coalesces a pending target.
+
+        `lateDiffusion` and `density` stay, unconsumed. PHASE 9 rejected both
+        as controls - see Docs/Phase9-Stage1-Proposal.md and -Stage2 - but
+        their parameter IDs are part of the serialised state contract and
+        removing them would change what existing sessions restore.
+    */
+    Level size, earlyDiffusion, lateDiffusion, density;
     Level modDepth, lowDamp, highDamp;
     Level width, mix;
 
@@ -183,6 +197,7 @@ private:
         reproduced bit for bit. */
     dsp::StereoCutFilters cutFilters;
     dsp::PreDelay<Real>   preDelay;
+    dsp::AttackInjection  attackInjection;
 
    #if AV_DEV_DIAGNOSTICS
     /** Telemetry. Compiled out entirely unless -DAV_DEV_DIAGNOSTICS=ON: in the

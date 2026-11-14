@@ -32,7 +32,7 @@ void SmoothedParameters::prepare (double sampleRate)
     constexpr double levelRampSeconds     = 0.02;
     constexpr double ratioTimeConstant    = 0.03;
 
-    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density, &attack,
+    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density,
                      &modDepth, &lowDamp, &highDamp, &width, &mix })
         s->prepare (sampleRate, levelRampSeconds);
 
@@ -51,7 +51,6 @@ void SmoothedParameters::updateTargets (const params::RawHandles& raw)
     earlyDiffusion.setTarget (loadPercent (raw.earlyDiffusion));
     lateDiffusion .setTarget (loadPercent (raw.lateDiffusion));
     density       .setTarget (loadPercent (raw.density));
-    attack        .setTarget (loadPercent (raw.attack));
     modDepth      .setTarget (loadPercent (raw.modDepth));
     lowDamp       .setTarget (loadPercent (raw.lowDamp));
     highDamp      .setTarget (loadPercent (raw.highDamp));
@@ -68,7 +67,7 @@ void SmoothedParameters::updateTargets (const params::RawHandles& raw)
 
 void SmoothedParameters::snapToTargets()
 {
-    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density, &attack,
+    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density,
                      &modDepth, &lowDamp, &highDamp, &width, &mix })
         s->snapToTarget();
 
@@ -79,7 +78,7 @@ void SmoothedParameters::snapToTargets()
 
 void SmoothedParameters::advanceUnconsumed (int numSamples)
 {
-    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density, &attack,
+    for (auto* s : { &size, &earlyDiffusion, &lateDiffusion, &density,
                      &modDepth, &lowDamp, &highDamp })
         s->skip (numSamples);
 
@@ -140,8 +139,9 @@ void AuroraVerbProcessor::prepareToPlay (double sampleRate, int maximumExpectedS
     // only allocation point, and the pre-delay's ring buffer is sized here
     // for its full 500 ms at this rate - at 192 kHz that is 96000 samples,
     // rounded up to a power of two by DelayLine, about 2 MB across the pair.
-    cutFilters.prepare (sampleRate);
-    preDelay  .prepare (sampleRate);
+    cutFilters     .prepare (sampleRate);
+    preDelay       .prepare (sampleRate);
+    attackInjection.prepare (sampleRate);
 
     tank.prepare (sampleRate);
     tank.setRt60Seconds (2.0, true);
@@ -266,8 +266,9 @@ void AuroraVerbProcessor::reset()
 
     // PHASE 8. Without this the pre-delay buffer would replay audio from
     // before the stop, which is the classic stale-buffer bug.
-    cutFilters.reset();
-    preDelay  .reset();
+    cutFilters     .reset();
+    preDelay       .reset();
+    attackInjection.reset();
 
     tank.reset();
 
@@ -300,7 +301,16 @@ double AuroraVerbProcessor::getTailLengthSeconds() const
     const auto decay      = static_cast<double> (raw.decay    ->load (std::memory_order_relaxed));
     const auto preDelayMs = static_cast<double> (raw.preDelay ->load (std::memory_order_relaxed));
 
-    return decay + preDelayMs * 0.001;
+    // PHASE 9: Attack spreads the injection over up to its full range, so the
+    // tail starts later by that much. Reported through the stage's own
+    // mapping rather than re-deriving it here, so the two cannot drift.
+    const auto attack = static_cast<double> (raw.attack->load (std::memory_order_relaxed)) * 0.01;
+
+    const auto attackMs = dsp::AttackInjection::defaultMaxSpreadMs
+                        * std::pow (std::clamp (attack, 0.0, 1.0),
+                                    dsp::AttackInjection::mappingExponent);
+
+    return decay + (preDelayMs + attackMs) * 0.001;
 }
 
 // --- Rendering -------------------------------------------------------------
@@ -474,6 +484,32 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
                 preDelay.setDelayMilliseconds (preDelayTargetMs);
 
             preDelay.process (wetL, wetR, count);
+
+            // --- PHASE 9: Attack ------------------------------------------
+            //
+            // A fixed FIR: one immediate tap plus a spread of later taps,
+            // L2-normalised, so the wet onset stays where it is while the
+            // late field is established gradually. Feedforward and outside
+            // the recurrence, so it cannot touch Decay, the damping shelves,
+            // the feedback gains, the loop lengths or the modulation law.
+            //
+            // The raw target, not a smoothed one, for the same reason the
+            // pre-delay takes a raw target: a smoothed Attack would move tap
+            // positions continuously, and a moving delay tap is a pitch
+            // shift. AttackInjection crossfades between fixed schedules.
+            //
+            // Attack 0 is an explicit bypass, bit-exact against PHASE 8 -
+            // not a tap set that sums to unity, which it would not: the 32
+            // weights sum to -0.73 while their squares sum to 1.
+            const auto attackTarget =
+                static_cast<double> (raw.attack->load (std::memory_order_relaxed)) * 0.01;
+
+            if (firstBlockAfterPrepare && offset == 0)
+                attackInjection.snapTo (attackTarget);
+            else
+                attackInjection.setAttack (attackTarget);
+
+            attackInjection.process (wetL, wetR, count);
         }
 
         // --- 2. Reverb engine ---------------------------------------------

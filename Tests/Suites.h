@@ -101,6 +101,7 @@ void runPhase8SystemTests();
 void runPhase8SignoffTests();
 void runPhase9ResearchTests();
 void runPhase9Stage2Tests();
+void runPhase9Stage3Tests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
