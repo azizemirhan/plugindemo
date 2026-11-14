@@ -103,6 +103,7 @@ void runPhase9ResearchTests();
 void runPhase9Stage2Tests();
 void runPhase9Stage3Tests();
 void runPhase10ResearchTests();
+void runPhase10Stage2Tests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
