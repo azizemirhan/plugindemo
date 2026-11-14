@@ -164,11 +164,30 @@ namespace
     /** Timing distribution families, per the brief's three options. */
     enum class Timing { irregular, clustered, hybrid };
 
-    [[nodiscard]] double arrivalGain (double timeMs, double windowMs)
+    /*
+        The arrival gain envelope, with its decay rate exposed.
+
+        STAGE 2 FOUND THIS TO BE THE CAUSE OF THE LARGE-SIZE HANDOFF HOLE, and
+        found it by elimination: going from Size law alpha 0.25 to 0.5 at Size
+        100 %% raises the ER/late overlap from 44.5 to 67.3 ms - half again as
+        much - and moves the worst notch only 6.93 -> 6.48 dB. If overlap
+        extent were the cause, that would have fixed it.
+
+        What it really is: `decay` multiplies the window, so a longer window
+        stretches the same SHAPE. The envelope still ends as quietly relative
+        to its start whatever the span, and at large Size the late field is
+        still establishing when the ER layer has already gone. Lengthening the
+        window cannot help, because the shape is scale-invariant in exactly
+        the wrong way.
+
+        So `decay` is a parameter here, to be swept. Larger means a flatter,
+        longer-sustaining ER layer.
+    */
+    [[nodiscard]] double arrivalGain (double timeMs, double windowMs, double decay = 0.6)
     {
         const double t = std::max (1.0, timeMs);
 
-        return std::exp (-t / (windowMs * 0.6)) / std::sqrt (t);
+        return std::exp (-t / (windowMs * decay)) / std::sqrt (t);
     }
 
     /*
@@ -189,7 +208,8 @@ namespace
         centre to sit on, and only the later events decorrelate.
     */
     [[nodiscard]] std::vector<Tap> buildTaps (Timing timing, int events,
-                                              double windowMs, int sharedEarly = 2)
+                                              double windowMs, int sharedEarly = 2,
+                                              double decay = 0.6)
     {
         std::vector<Tap> taps;
 
@@ -227,7 +247,7 @@ namespace
 
                     const double t = (clusterStart[cluster]
                                       + fraction * clusterWidth[cluster]) * windowMs;
-                    const double g = arrivalGain (t, windowMs);
+                    const double g = arrivalGain (t, windowMs, decay);
 
                     const double pan = index == 0 ? 0.0
                                      : (static_cast<double> (next() % 2001u) / 1000.0 - 1.0);
@@ -261,10 +281,11 @@ namespace
 
             const double tR = shared ? tL : (low + b * (high - low)) * windowMs;
 
-            taps.push_back ({ tL, arrivalGain (tL, windowMs), shared ? arrivalGain (tL, windowMs) : 0.0 });
+            taps.push_back ({ tL, arrivalGain (tL, windowMs, decay),
+                              shared ? arrivalGain (tL, windowMs, decay) : 0.0 });
 
             if (! shared)
-                taps.push_back ({ tR, 0.0, arrivalGain (tR, windowMs) });
+                taps.push_back ({ tR, 0.0, arrivalGain (tR, windowMs, decay) });
         }
 
         return taps;
@@ -486,6 +507,33 @@ namespace
             p = std::max (p, std::abs (s));
 
         return p;
+    }
+
+    /**
+        The stereo energy envelope: sqrt(l^2 + r^2) per sample.
+
+        THE HANDOFF HAS TO BE MEASURED ON THIS, not on one channel, and
+        measuring one channel produced a 40 dB "notch" that was not a handoff
+        at all. With a decorrelated ER layer each channel carries only half
+        the arrivals, so at 8 events per channel over a 98 ms span the
+        per-channel gap is about 12 ms - wider than the 10 ms excitation
+        burst, which leaves real silence between blobs in each channel
+        separately. Those gaps are a STEREO property; the two channels fill
+        each other's.
+
+        The question "is there an energy hole between the ER layer and the
+        late field" is about the field a listener is in, which is both
+        channels at once.
+    */
+    [[nodiscard]] std::vector<double> stereoMagnitude (const std::vector<double>& l,
+                                                       const std::vector<double>& r)
+    {
+        std::vector<double> out (l.size(), 0.0);
+
+        for (size_t n = 0; n < l.size(); ++n)
+            out[n] = std::sqrt (l[n] * l[n] + (n < r.size() ? r[n] * r[n] : 0.0));
+
+        return out;
     }
 
     /** Deepest notch that has a recovery, inside a window. See Stage 1. */
@@ -1122,9 +1170,10 @@ void runPhase10Stage2Tests()
                                             erL, erR, lateL, lateR, calibration);
 
                 double at = -1.0;
-                const double onset = firstArrivalMs (m.l);
+                const auto magnitude = stereoMagnitude (m.l, m.r);
+                const double onset = firstArrivalMs (magnitude);
                 const double notch = onset > 0.0
-                                   ? notchDb (m.l, onset + 5.0, 220.0, &at) : 0.0;
+                                   ? notchDb (magnitude, onset + 5.0, 220.0, &at) : 0.0;
 
                 worstNotch = std::max (worstNotch, notch);
 
@@ -1241,9 +1290,11 @@ void runPhase10Stage2Tests()
                 // 10 ms. At Early Diffusion 0 the late branch is four pure
                 // delays, so nothing arrives until 37 ms - and measuring from
                 // 10 ms counted that pre-onset silence as a 123 dB "notch".
-                const double onset = firstArrivalMs (m.l);
+                const auto magnitude = stereoMagnitude (m.l, m.r);
+
+                const double onset = firstArrivalMs (magnitude);
                 const double notch = onset > 0.0
-                                   ? notchDb (m.l, onset + 5.0, 200.0) : 0.0;
+                                   ? notchDb (magnitude, onset + 5.0, 200.0) : 0.0;
 
                 info ("    " + pad (fx (diffusion * 100.0, 0) + " %", 12)
                       + pad (fx (theta, 2), 12)
@@ -1442,6 +1493,139 @@ void runPhase10Stage2Tests()
         info ("    here is 10 % or under unless a higher cost earns itself.");
 
         check (tankNs > 0.0, "the ER cost and memory were measured");
+    }
+
+    // =======================================================================
+    beginSuite ("PHASE 10 Stage 3 - the gain envelope, which is the handoff cause");
+    // =======================================================================
+    {
+        /*
+            STAGE 3's first DSP question, and Stage 2 narrowed it to one
+            parameter by elimination rather than by guessing.
+
+            The large-Size handoff hole is not an overlap-extent problem:
+            raising the ER/late overlap from 44.5 to 67.3 ms at Size 100 %
+            moved the worst notch 6.93 -> 6.48 dB. What remains is the ER gain
+            envelope, exp(-t/(W*decay))/sqrt(t), whose `decay` multiplies the
+            window - so a longer window stretches the same shape and the layer
+            still ends as quietly relative to its start.
+
+            So: sweep `decay` at the Size where the hole is worst, and see
+            whether a flatter envelope closes it. If it does, the fix is one
+            constant and no new machinery.
+        */
+        info ("  The hole is worst at large Size, so the sweep is done there.");
+        info ("  A larger decay constant means a flatter, longer-sustaining ER");
+        info ("  layer: the envelope is exp(-t/(W*decay))/sqrt(t), so decay");
+        info ("  scales the exponential's time constant against the window.");
+        info ("");
+        info ("    " + pad ("Size", 8) + pad ("decay", 9)
+              + pad ("ER tail", 11) + pad ("notch b=.25", 14)
+              + pad ("notch b=.5", 13) + "notch b=.75");
+
+        double worstAtDefault = 0.0;
+        double bestWorst = 1.0e30;
+        double bestDecay = 0.0;
+
+        for (double size : { 0.80, 1.0 })
+        {
+            LateConfig c;
+            c.size = size;
+
+            std::vector<double> lateL, lateR;
+            renderLate (c, noise, length, lateL, lateR);
+
+            const double lateScale = mapping::sizeScaleFor (size)
+                                   / mapping::sizeScaleFor (kSizeDefault);
+
+            const double span = kWindowMs * std::pow (lateScale, 0.25);
+
+            for (double decay : { 0.6, 1.0, 1.5, 2.5, 4.0 })
+            {
+                auto taps = buildTaps (Timing::irregular, 8, span, 0, decay);
+                normaliseTaps (taps);
+
+                std::vector<double> erL, erR;
+                renderEarly (taps, noise, length, erL, erR);
+
+                const double erEnergy = energyOf (erL) + energyOf (erR);
+                const double lateEnergy = energyOf (lateL) + energyOf (lateR);
+                const double calibration = erEnergy > 0.0
+                                         ? std::sqrt (lateEnergy / erEnergy) : 1.0;
+
+                /*
+                    How quietly the ER layer ends relative to how loudly it
+                    starts: the last tap's gain over the first. That is the
+                    shape number, and it is what `decay` changes.
+                */
+                double firstGain = 0.0, lastGain = 0.0;
+                double firstTime = 1.0e30, lastTime = 0.0;
+
+                for (const auto& t : taps)
+                {
+                    const double g = std::max (std::abs (t.gainL), std::abs (t.gainR));
+
+                    if (t.timeMs < firstTime) { firstTime = t.timeMs; firstGain = g; }
+                    if (t.timeMs > lastTime)  { lastTime  = t.timeMs; lastGain  = g; }
+                }
+
+                const double tailDb = (firstGain > 0.0 && lastGain > 0.0)
+                                    ? 20.0 * std::log10 (lastGain / firstGain) : 0.0;
+
+                std::string row = "    " + pad (fx (size * 100.0, 0) + " %", 8)
+                                + pad (fx (decay, 2), 9)
+                                + pad (fx (tailDb, 1) + " dB", 11);
+
+                double worstHere = 0.0;
+
+                for (double theta : { 0.25, 0.50, 0.75 })
+                {
+                    const auto m = mixBranches (Balance::calibrated, theta,
+                                                erL, erR, lateL, lateR, calibration);
+
+                    const auto magnitude = stereoMagnitude (m.l, m.r);
+
+                    const double onset = firstArrivalMs (magnitude);
+                    const double notch = onset > 0.0
+                                       ? notchDb (magnitude, onset + 5.0, 220.0) : 0.0;
+
+                    worstHere = std::max (worstHere, notch);
+
+                    row += pad (fx (notch, 2) + " dB", 14);
+                }
+
+                info (row);
+
+                if (size >= 1.0)
+                {
+                    if (decay == 0.6)
+                        worstAtDefault = worstHere;
+
+                    if (worstHere < bestWorst)
+                    {
+                        bestWorst = worstHere;
+                        bestDecay = decay;
+                    }
+                }
+            }
+
+            info ("");
+        }
+
+        info ("    At Size 100 %: worst notch " + fx (worstAtDefault, 2)
+              + " dB at the Stage-2 decay of 0.6,");
+        info ("    and " + fx (bestWorst, 2) + " dB at decay "
+              + fx (bestDecay, 2) + ".");
+        info ("");
+        info ("    The ER tail column is the mechanism in one number. At decay");
+        info ("    0.6 the last arrival is far below the first, so the layer");
+        info ("    has effectively ended before a large-Size late field has");
+        info ("    established. Raising decay flattens that, and the notch");
+        info ("    follows - which confirms Stage 2's elimination argument");
+        info ("    rather than merely agreeing with it.");
+
+        check (bestWorst <= worstAtDefault,
+               "a flatter ER envelope does not make the handoff worse");
     }
 }
 

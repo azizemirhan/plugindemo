@@ -15,6 +15,13 @@ variables at the top of `CMakeLists.txt`. No source file hard-codes it.
 
 ## Current status — PHASE 9 complete, shipping build hardened
 
+> **Product scope:** ACTIVE VERB V1 is a focused premium general-purpose
+> algorithmic reverb. The authoritative scope - what is in, what is out, and
+> the remaining work as product blocks - is
+> [`Docs/ActiveVerb-V1-Scope.md`](Docs/ActiveVerb-V1-Scope.md). Shimmer,
+> extreme delay/reverb systems, dedicated modulation-effect architectures and
+> large creative FX layers are **out of scope for V1**.
+
 | Area | State |
 |---|---|
 | `FeedbackMatrix` — orthogonal Hadamard / Householder, verified against a reference multiply | done |

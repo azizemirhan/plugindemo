@@ -11,7 +11,28 @@ namespace
     using APC      = juce::AudioParameterChoice;
     using FloatAtt = juce::AudioParameterFloatAttributes;
 
-    juce::ParameterID pid (const char* name) { return { name, versionHint }; }
+    /*
+        The nineteen shipped parameters. Their hint is frozen at generation 1
+        and must stay there: changing it reorders the AU parameter list for
+        hosts that have cached it. See the note in ParameterIDs.h.
+    */
+    juce::ParameterID pid (const char* name) { return { name, versionHintV1 }; }
+
+    /**
+        A parameter appended after the first release.
+
+        Separate from pid() on purpose. A single shared helper would give an
+        appended parameter the same hint as the originals, which places it
+        among them in the AU identifier sort rather than after them - and that
+        is the one thing the hint exists to control.
+
+        Unused today: PHASE 10 has not added its parameter yet. It is here so
+        that when one is added, the correct call is the obvious one.
+    */
+    [[maybe_unused]] juce::ParameterID appendedPid (const char* name)
+    {
+        return { name, versionHintLatest };
+    }
 
     /** Linear range. */
     juce::NormalisableRange<float> lin (float min, float max, float interval = 0.0f)

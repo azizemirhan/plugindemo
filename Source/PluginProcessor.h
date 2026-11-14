@@ -143,6 +143,19 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    /**
+        Resets every parameter the loaded state does not mention.
+
+        PHASE 10. APVTS reconnects only the parameters that have a child in the
+        loaded tree, so one that is absent keeps its CURRENT value rather than
+        returning to its default - which makes an older preset loaded into a
+        live instance sound wrong. See the implementation comment.
+
+        Public so that the state-compatibility suite can drive it directly
+        against a serialised fixture rather than inferring it from audio.
+    */
+    void resetParametersAbsentFrom (const juce::ValueTree& tree);
+
     // --- Project API ----------------------------------------------------
 
     juce::AudioProcessorValueTreeState& getState() noexcept { return apvts; }

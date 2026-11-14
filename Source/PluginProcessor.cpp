@@ -1076,11 +1076,78 @@ void AuroraVerbProcessor::getStateInformation (juce::MemoryBlock& destData)
         copyXmlToBinary (*xml, destData);
 }
 
+/*
+    PHASE 10. Parameters the loaded state does not mention are reset to their
+    defaults, and that is not a tidiness measure - without it the plugin loads
+    older states wrongly.
+
+    AudioProcessorValueTreeState::replaceState assigns the tree and then
+    reconnects only the parameters that HAVE a child in it:
+    updateParameterConnectionsToChildTrees walks the new tree's children, and
+    setNewState is called once per child found. A parameter with no child is
+    never visited, so it keeps whatever value it currently holds.
+
+    On a freshly constructed instance that value is the default, so loading an
+    older session appears to work. But load an older PRESET into a live
+    instance where the user has already moved a newer control, and that
+    control keeps its moved value - so the preset does not reproduce the sound
+    it was saved from. The older the state, the more controls are affected.
+
+    This matters from PHASE 10 onwards specifically. PHASES 8 and 9 added no
+    parameters: they consumed IDs that already existed, so every saved state
+    mentioned every parameter and nothing was ever missing. PHASE 10 is the
+    first phase to append one.
+
+    Resetting the absent ones is the whole fix, and it is deliberately applied
+    to ALL parameters rather than to a known list of recent additions - a list
+    would have to be maintained, and forgetting to extend it would reintroduce
+    exactly this defect silently.
+*/
+void AuroraVerbProcessor::resetParametersAbsentFrom (const juce::ValueTree& tree)
+{
+    for (auto* parameter : getParameters())
+    {
+        auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (parameter);
+
+        if (hosted == nullptr)
+            continue;
+
+        const auto id = hosted->getParameterID();
+
+        bool present = false;
+
+        for (int i = 0; i < tree.getNumChildren(); ++i)
+        {
+            const auto child = tree.getChild (i);
+
+            if (child.getProperty ("id").toString() == id)
+            {
+                present = true;
+                break;
+            }
+        }
+
+        if (! present)
+            parameter->setValueNotifyingHost (parameter->getDefaultValue());
+    }
+}
+
 void AuroraVerbProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
+    {
         if (xml->hasTagName (apvts.state.getType()))
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+        {
+            const auto tree = juce::ValueTree::fromXml (*xml);
+
+            apvts.replaceState (tree);
+
+            // After, not before: replaceState is what reconnects the
+            // parameters the tree does mention, and this must not be undone
+            // by it.
+            resetParametersAbsentFrom (tree);
+        }
+    }
 
     needsSmootherReset = true;
 

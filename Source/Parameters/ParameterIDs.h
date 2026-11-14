@@ -13,8 +13,47 @@
 namespace av::params
 {
 
-/** Bumped whenever parameters are appended. Never decreases. */
-inline constexpr int versionHint = 1;
+/*
+    Version hints.
+
+    WHAT THIS ACTUALLY DOES, read off JUCE 8.0.15 rather than assumed, because
+    the comment that used to sit here - "bumped whenever parameters are
+    appended" - described the wrong mechanism and would have caused the
+    problem it was trying to avoid.
+
+    `ParameterID`'s hint is consumed in exactly one functional place: the AU
+    wrapper's parameter-list ordering, where the list is sorted by identifier
+    and then STABLE-SORTED by hint, so lower hints come first
+    (juce_audio_plugin_client_AU_1.mm). There is also an AU-only debug
+    assertion that fires if any parameter has hint 0. It is not referenced
+    anywhere in the VST3 wrapper, and it plays no part in state save or load -
+    APVTS keys state by the ID string.
+
+    So appending a parameter does NOT mean bumping one shared constant. A
+    shared constant gives the new parameter the SAME hint as the existing
+    ones, which places it among them in the identifier sort - exactly what the
+    mechanism exists to prevent. And raising the shared constant would change
+    every existing parameter's hint at once, which reorders the AU list for
+    hosts that have cached it.
+
+    The rule is therefore: each generation of parameters gets its own
+    constant, earlier constants NEVER change, and a new parameter uses the
+    newest one. Append constants here; never edit one.
+*/
+
+/** The nineteen parameters the plugin shipped with. Never change this. */
+inline constexpr int versionHintV1 = 1;
+
+/** PHASE 10 and later additions. */
+inline constexpr int versionHintV2 = 2;
+
+/** The newest generation, for parameters being added now. */
+inline constexpr int versionHintLatest = versionHintV2;
+
+/** Deprecated spelling of versionHintV1, kept so no call site changes
+    meaning. Do not use in new code: it reads as "the current hint" and it is
+    not - it is the first generation's. */
+inline constexpr int versionHint = versionHintV1;
 
 // --- Parameter IDs -------------------------------------------------------
 

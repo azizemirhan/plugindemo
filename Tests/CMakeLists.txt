@@ -190,3 +190,46 @@ foreach(target AuroraVerbTests AuroraVerbTestsShared)
         LIBRARY_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/tests"
         LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/tests")
 endforeach()
+
+# ---------------------------------------------------------------------------
+#  State-compatibility suite (PHASE 10)
+#
+#  A SECOND, SEPARATE executable, and the separation is the point. The suites
+#  above deliberately do not link JUCE, which is how the rule that nothing in
+#  Source/DSP may depend on JUCE or on the processor stays enforced.
+#
+#  But a state-compatibility test is about the processor and about APVTS, so it
+#  cannot live there. PHASE 10 Stage 2 found a defect in exactly that area that
+#  source-code reasoning had missed, and its report said not to rely on such
+#  reasoning again - so this target links JUCE and the plugin's shared code and
+#  drives a real serialised fixture.
+#
+#  It is small on purpose. If it grows into a second DSP harness, the rule the
+#  split exists to protect has been lost.
+# ---------------------------------------------------------------------------
+
+add_executable(AuroraVerbStateTests
+    StateCompatibility/StateCompatibilityTests.cpp)
+
+target_include_directories(AuroraVerbStateTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Source)
+
+target_compile_features(AuroraVerbStateTests PRIVATE cxx_std_20)
+
+target_link_libraries(AuroraVerbStateTests
+    PRIVATE
+        AuroraVerb
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# The plugin target's compile definitions are what select the build profile, so
+# the suite has to be built with the same ones or it would be testing a
+# different plugin. JucePlugin_* and the AV_DEV_* flags both come through here.
+target_compile_definitions(AuroraVerbStateTests PRIVATE
+    $<TARGET_PROPERTY:AuroraVerb,INTERFACE_COMPILE_DEFINITIONS>)
+
+target_include_directories(AuroraVerbStateTests PRIVATE
+    $<TARGET_PROPERTY:AuroraVerb,INTERFACE_INCLUDE_DIRECTORIES>)
