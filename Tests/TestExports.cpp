@@ -14,6 +14,7 @@
 #include "DampingListening.h"
 #include "DiagnosticAnalyzer.h"
 #include "Phase8Listening.h"
+#include "Phase9Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -343,6 +344,24 @@ __declspec (dllexport) int ExportAuroraVerbPhase8Listening (const char* director
         return -1;
 
     return avtest::exportPhase8ListeningSet (directory,
+                                             sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/**
+    Renders the PHASE 9 Stage 4 targeted Attack listening set.
+
+    Three cases over three sparse transient sources: the primary Mod-Depth-0
+    periodicity risk at 100 %% wet, normal product use at the shipping Mod
+    Depth and Mix, and a three-file Attack-against-Pre-Delay confirmation.
+    Only the high-Attack pair is blind, and its mapping is in a key file.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase9Listening (const char* directory,
+                                                            double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase9ListeningSet (directory,
                                              sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 

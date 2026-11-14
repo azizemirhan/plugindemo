@@ -100,6 +100,7 @@ set(AV_TEST_SUITE_SOURCES
     PerceptualBridge.cpp
     DampingListening.cpp
     Phase8Listening.cpp
+    Phase9Listening.cpp
     Phase8Filters.cpp
     Phase8System.cpp
     Phase8Signoff.cpp
