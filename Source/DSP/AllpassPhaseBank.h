@@ -82,6 +82,9 @@ public:
 
             engagement[static_cast<size_t> (line)].prepare (currentSampleRate, 0.04);
             engagement[static_cast<size_t> (line)].snapTo (0.0);
+
+            staticEngagement[static_cast<size_t> (line)].prepare (currentSampleRate, 0.04);
+            staticEngagement[static_cast<size_t> (line)].snapTo (0.0);
         }
 
         swingSmoother.prepare (currentSampleRate, 0.02);
@@ -102,6 +105,9 @@ public:
             lane.reset();
 
         for (auto& e : engagement)
+            e.snapToTarget();
+
+        for (auto& e : staticEngagement)
             e.snapToTarget();
 
         swingSmoother.snapToTarget();
@@ -168,6 +174,56 @@ public:
     }
 
     // -----------------------------------------------------------------------
+    //  PHASE 9 STAGE 2 RESEARCH. Not a product control.
+    // -----------------------------------------------------------------------
+    /**
+        Static phase diffusion, independent of Mod Depth.
+
+        PHASE 9 Stage 1 found that the one mechanism which measurably reduces
+        late-field periodicity is adding in-loop allpass sections - and that
+        it is useless as a product control, because this bank disengages
+        entirely at Mod Depth 0. A Late Diffusion knob built on it would stop
+        working when a different knob was turned down.
+
+        This is the research path for that problem. It claims the SPARE
+        section - index 1, already allocated and prepared, unused while
+        sectionsPerLine is 1, which is what production ships - and drives it
+        with a fixed coefficient and its own engagement weight. Modulation
+        keeps section 0; diffusion gets section 1. Neither depends on the
+        other, and the semantics do not change with Mod Depth: section 1 is
+        always what diffusion controls.
+
+        `weight` 0 is an exact bypass. The section is skipped, no smoother
+        reaches the signal, and the output is bit-identical to what this class
+        produced before this path existed - which is the backward-compatibility
+        gate, and it is tested rather than asserted.
+
+        Requires sectionsPerLine == 1, since otherwise modulation and
+        diffusion would both claim section 1. Production ships 1.
+    */
+    void setStaticDiffusion (double weight, double coefficient,
+                             bool immediate = false) noexcept
+    {
+        staticWeight = std::clamp (weight, 0.0, 1.0);
+        staticCoefficient = std::clamp (coefficient, 0.0,
+                                        TimeVaryingAllpass::maxCoefficient);
+
+        for (int line = 0; line < N; ++line)
+        {
+            sections[index (line, 1)].setCoefficient (staticCoefficient);
+
+            const double target = (staticWeight > 0.0 && line < activeLines)
+                                  ? staticWeight : 0.0;
+
+            if (immediate) staticEngagement[static_cast<size_t> (line)].snapTo (target);
+            else           staticEngagement[static_cast<size_t> (line)].setTarget (target);
+        }
+    }
+
+    [[nodiscard]] double getStaticDiffusion() const noexcept { return staticWeight; }
+    [[nodiscard]] double getStaticCoefficient() const noexcept { return staticCoefficient; }
+
+    // -----------------------------------------------------------------------
     //  Process — real-time safe.
     // -----------------------------------------------------------------------
 
@@ -176,7 +232,11 @@ public:
     {
         const double swing = swingSmoother.getNextValue();
 
-        bypassed = swing <= 0.0 && allEngagementSettledOff();
+        // The static diffusion path (PHASE 9 research) keeps the bank alive
+        // even at Mod Depth 0, which is the whole point of it. With that path
+        // at zero this reduces to exactly the previous condition.
+        bypassed = swing <= 0.0 && allEngagementSettledOff()
+                                && allStaticSettledOff();
 
         if (bypassed)
         {
@@ -217,17 +277,35 @@ public:
         if (bypassed)
             return x;
 
-        const double w = engagement[static_cast<size_t> (line)].getNextValue();
+        // Both smoothers advance on every sample the bank is awake for,
+        // whichever path ends up contributing, so they cannot drift apart.
+        const double w  = engagement[static_cast<size_t> (line)].getNextValue();
+        const double sw = staticEngagement[static_cast<size_t> (line)].getNextValue();
 
-        if (w <= 0.0)
-            return x;
+        double y = x;
 
-        double wet = x;
+        if (w > 0.0)
+        {
+            double wet = x;
 
-        for (int section = 0; section < sectionsPerLine; ++section)
-            wet = sections[index (line, section)].processSample (wet);
+            for (int section = 0; section < sectionsPerLine; ++section)
+                wet = sections[index (line, section)].processSample (wet);
 
-        return x + w * (wet - x);
+            y = x + w * (wet - x);
+        }
+
+        // PHASE 9 research: the static diffusion section, after the
+        // modulation cascade and with its own weight. At sw = 0 this is
+        // skipped entirely and `y` is bit-identical to what this function
+        // returned before the path existed.
+        if (sw > 0.0)
+        {
+            const double diffused = sections[index (line, 1)].processSample (y);
+
+            y = y + sw * (diffused - y);
+        }
+
+        return y;
     }
 
     // -----------------------------------------------------------------------
@@ -285,15 +363,35 @@ public:
 
         const double weight = engagement[static_cast<size_t> (line)].getTargetValue();
 
-        if (weight <= 0.0)
-            return 0.0;
+        double added = 0.0;
 
-        double total = 0.0;
+        // No early return on weight <= 0 any more: at Mod Depth 0 the
+        // modulation weight IS zero while the static research path may still
+        // be engaged, and returning early there would hide its group delay
+        // from the decay-gain correction - which is exactly the drift this
+        // function exists to prevent.
+        if (weight > 0.0)
+        {
+            double total = 0.0;
 
-        for (int section = 0; section < sectionsPerLine; ++section)
-            total += sections[index (line, section)].getMeanGroupDelay();
+            for (int section = 0; section < sectionsPerLine; ++section)
+                total += sections[index (line, section)].getMeanGroupDelay();
 
-        return weight * total;
+            added = weight * total;
+        }
+
+        // PHASE 9 research: the static section adds its own group delay, so
+        // the decay-gain correction has to see it too, or raising diffusion
+        // would lengthen the loop without the gain following and the RT60
+        // would drift. Weighted by its own engagement target for the same
+        // reason the modulation path is.
+        const double staticTarget =
+            staticEngagement[static_cast<size_t> (line)].getTargetValue();
+
+        if (staticTarget > 0.0)
+            added += staticTarget * sections[index (line, 1)].getMeanGroupDelay();
+
+        return added;
     }
 
 private:
@@ -335,9 +433,20 @@ private:
         return true;
     }
 
+    /** PHASE 9 research: the same settled-off test for the static path. */
+    [[nodiscard]] bool allStaticSettledOff() const noexcept
+    {
+        for (const auto& e : staticEngagement)
+            if (e.getCurrentValue() > 0.0 || e.isSmoothing())
+                return false;
+
+        return true;
+    }
+
     std::array<TimeVaryingAllpass, static_cast<size_t> (N * maxSections)> sections;
     std::array<Lfo, static_cast<size_t> (N)> lanes;
     std::array<LinearSmoother<double>, static_cast<size_t> (N)> engagement;
+    std::array<LinearSmoother<double>, static_cast<size_t> (N)> staticEngagement;
     std::array<double, static_cast<size_t> (N)> currentCoefficient {};
 
     LinearSmoother<double> swingSmoother;
@@ -352,6 +461,10 @@ private:
     int  activeLines     = allpassMod::defaultActiveLines;
     int  sectionsPerLine = allpassMod::defaultSectionsPerLine;
     bool bypassed        = true;
+
+    // PHASE 9 STAGE 2 research. Zero reproduces PHASE 8 exactly.
+    double staticWeight      = 0.0;
+    double staticCoefficient = 0.0;
 };
 
 } // namespace av::dsp

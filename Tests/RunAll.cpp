@@ -166,6 +166,7 @@ int runAllSuites()
     AV_RUN (runPhase8SystemTests);
     AV_RUN (runPhase8SignoffTests);
     AV_RUN (runPhase9ResearchTests);
+    AV_RUN (runPhase9Stage2Tests);
 
 
     if (suitesRun == 0)

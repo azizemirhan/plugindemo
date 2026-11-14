@@ -104,6 +104,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase8System.cpp
     Phase8Signoff.cpp
     Phase9Research.cpp
+    Phase9Stage2.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp

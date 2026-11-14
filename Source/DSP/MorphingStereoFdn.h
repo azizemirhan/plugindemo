@@ -312,6 +312,21 @@ public:
             bank.setAllpassActiveLines (count);
     }
 
+    /**
+        PHASE 9 STAGE 2 RESEARCH. Not a product control.
+
+        Static in-loop phase diffusion, independent of Mod Depth. Forwarded to
+        both banks so a Size morph does not change it. Weight 0 - the default -
+        reproduces PHASE 8 exactly, and that is tested rather than asserted.
+        See AllpassPhaseBank::setStaticDiffusion.
+    */
+    void setStaticDiffusion (double weight, double coefficient,
+                             bool immediate = false) noexcept
+    {
+        for (auto& bank : banks)
+            bank.getCore().getAllpassBank().setStaticDiffusion (weight, coefficient, immediate);
+    }
+
     void setAllpassSectionsPerLine (int count) noexcept
     {
         for (auto& bank : banks)
