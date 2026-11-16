@@ -175,6 +175,7 @@ int runAllSuites()
     AV_RUN (runPhase10BalanceLawTests);
     AV_RUN (runPhase11StereoAuditTests);
     AV_RUN (runPhase11ReadoutTests);
+    AV_RUN (runPhase11DelaySetTests);
 
 
     if (suitesRun == 0)

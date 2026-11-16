@@ -115,6 +115,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase10BalanceLaw.cpp
     Phase11StereoAudit.cpp
     Phase11Readout.cpp
+    Phase11DelaySet.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
