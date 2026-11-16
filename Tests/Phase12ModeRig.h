@@ -94,6 +94,12 @@ struct ModeCandidate
         positions in both channels. The one piece of ER geometry production
         cannot express. */
     double erChannelSpread = 1.0;
+
+    /** 0 hadamard (shipping), 1 householder, 2 identity. NOT part of any
+        Stage 1 candidate: every candidate leaves it at 0. It exists for the
+        exploratory leverage probe and for the positive control, both added
+        after the pre-registered results were in and labelled as such. */
+    int matrixType = 0;
 };
 
 /** The user's controls, at the product defaults. Damping is here because the
@@ -367,6 +373,11 @@ public:
 
         if (m.allpassSections != allpassMod::defaultSectionsPerLine)
             core.setAllpassSectionsPerLine (m.allpassSections);
+
+        if (m.matrixType == 1)
+            core.setMatrixType (FdnCore<N>::Matrix::Type::householder);
+        else if (m.matrixType == 2)
+            core.setMatrixType (FdnCore<N>::Matrix::Type::identity);
 
         // --- diffuser: the sequence StereoFdn::prepare runs -----------------
         diffuser.setBasePattern (diffusion::fdnInputPattern);

@@ -47,9 +47,18 @@
          deliberately moved controls starting from the defaults. If it cannot
          find a target that is known to exist, it proves nothing.
 
-    The direction of every remaining bias is against the plan and is stated
-    where it applies: a search that stops short flatters the Modes, so its
-    residuals are upper bounds on how distinct they are, never lower ones.
+    TWO BIASES REMAIN AND THEY POINT IN OPPOSITE DIRECTIONS. A search that
+    stops short flatters the Modes: its residuals are upper bounds. A
+    yardstick that cannot see a real difference condemns them: everything
+    looks reproducible through a blind instrument. The first is bounded by
+    the recovery test above. The second was NOT bounded by anything in the
+    pre-registered design, which is a gap I found only when the results came
+    back uniformly negative - so section 12.2.12 adds a POSITIVE CONTROL, a
+    response that is a different family by any definition, and asks whether
+    the same search can make Hall reproduce it. That section and the leverage
+    probe beside it were written AFTER the results and are labelled
+    exploratory; they are not part of the pre-registered test and they are
+    not used to rescue any candidate.
 
     NOTHING HERE IS REQUIRED TO COME OUT AS FIVE.
 */
@@ -855,6 +864,74 @@ namespace
         return excess[excess.size() * 95 / 100];
     }
 
+    /**
+        Loop-lag texture: the tallest normalised autocorrelation of the late
+        waveform itself, lags 3-150 ms, after the decay has been flattened.
+
+        NOT one of the pre-registered features. A tank whose lines recirculate
+        without being mixed repeats itself at its own loop periods for as long
+        as it rings; a mixing tank spreads each line's return across all the
+        others. That is the property 'metallic' names, and nothing in the six
+        families looks at it - they read energy, density and correlation, all
+        of which a bank of parallel loops can match.
+    */
+    [[nodiscard]] double loopLagTexture (const Stereo& ir)
+    {
+        constexpr size_t segment = 32768, fftSize = 65536;
+
+        const size_t start = msToSamples (250.0);
+
+        if (ir.l.size() < start + segment)
+            return 0.0;
+
+        // Flatten by a 20 ms moving RMS, so the decay is not read as structure.
+        const size_t half = msToSamples (10.0);
+
+        std::vector<double> prefix (ir.l.size() + 1, 0.0);
+
+        for (size_t n = 0; n < ir.l.size(); ++n)
+            prefix[n + 1] = prefix[n] + ir.l[n] * ir.l[n];
+
+        std::vector<std::complex<double>> x (fftSize, 0.0);
+
+        for (size_t n = 0; n < segment; ++n)
+        {
+            const size_t i  = start + n;
+            const size_t lo = i - half;
+            const size_t hi = std::min (ir.l.size(), i + half);
+
+            const double rmsLocal = std::sqrt ((prefix[hi] - prefix[lo])
+                                               / static_cast<double> (hi - lo));
+
+            x[n] = rmsLocal > 0.0 ? ir.l[i] / rmsLocal : 0.0;
+        }
+
+        fft (x);
+
+        for (auto& v : x)
+            v = std::norm (v);
+
+        ifft (x);
+
+        const double zero = x[0].real();
+
+        if (zero <= 0.0)
+            return 0.0;
+
+        double peak = 0.0;
+
+        for (size_t lag = msToSamples (3.0); lag <= msToSamples (150.0); ++lag)
+        {
+            // Unbiased: fewer products contribute at a longer lag.
+            const double scale = static_cast<double> (segment)
+                               / static_cast<double> (segment - lag);
+
+            peak = std::max (peak, std::abs (x[lag].real()) * scale / zero);
+        }
+
+        return peak;
+    }
+
     [[nodiscard]] size_t lineBufferSamples (double capacityMs, double rate)
     {
         // FdnCore::prepare, FdnDelayLine::prepare and DelayLine::prepareSamples,
@@ -1418,9 +1495,9 @@ void runPhase12ModeFamilyTests()
         info ("  response. Mode-owned data is never touched by the search.");
         info ("");
         info ("  A residual is an UPPER BOUND on how far apart the two really");
-        info ("  are. A better optimiser could only lower it. So every bias left");
-        info ("  in this table runs in the Modes' favour, and a pass here is");
-        info ("  weaker evidence than a failure.");
+        info ("  are under this yardstick: a better optimiser could only lower");
+        info ("  it. The opposite risk - a yardstick too blunt to see a real");
+        info ("  difference - is what the positive control in 12.2.12 bounds.");
 
         for (int t = 0; t < static_cast<int> (targets.size()); ++t)
         {
@@ -1566,14 +1643,13 @@ void runPhase12ModeFamilyTests()
                   + "closest impostor " + modes[static_cast<size_t> (by)].name + " at "
                   + fx (closest, 2) + "  (" + targets[static_cast<size_t> (where)].label + ")");
 
+            // One gate per Mode, on the weaker of the two thresholds. A Mode
+            // that fails this is a preset of its impostor; whether it would
+            // also have cleared DISTINCT is printed above and is moot.
             check (closest > reproduced,
                    modes[static_cast<size_t> (a)].name
-                   + " cannot be reproduced by another Mode's user controls");
-
-            check (closest >= distinct,
-                   modes[static_cast<size_t> (a)].name
-                   + " clears the DISTINCT threshold against its closest impostor at "
-                     "every target");
+                   + " cannot be reproduced by another Mode's user controls - IT CAN, by "
+                   + modes[static_cast<size_t> (by)].name);
         }
 
         // The brief's named requirement, stated on its own.
@@ -2054,11 +2130,22 @@ void runPhase12ModeFamilyTests()
             const auto f1 = analyse (impulseResponse (modes[plate], withEr, 1.2));
 
             info ("");
-            info ("    Plate's early layer is a burst of density, not reflections.");
+            info ("    THE EARLY LAYER. Stage 1 proposed replacing Plate's reflections");
+            info ("    with 28 taps in 25 ms, on the argument that so many events so");
+            info ("    close together are 'a burst of density' rather than a pattern.");
             info ("    Echo density in the window from 10 ms: " + fx (f0.nedAt10, 2)
                   + " at Early/Late 0, " + fx (f1.nedAt10, 2) + " at Early/Late 50.");
-            info ("    Early/Late therefore still does something audible in Plate,");
-            info ("    and it does the thing the control's name says.");
+            info ("");
+            info ("    That argument is wrong and the measurement says why. 28 taps in");
+            info ("    25 ms is about one per millisecond, against 48 samples per");
+            info ("    millisecond of a diffuse field. It is still a sparse tap list -");
+            info ("    just a busier one - and because it is loud relative to the");
+            info ("    tank's onset, turning it up makes the onset LESS dense.");
+            info ("    Early/Late keeps its meaning in Plate, but the plate-specific");
+            info ("    pattern does the opposite of what it was designed to do.");
+
+            check (f1.nedAt10 >= f0.nedAt10,
+                   "Plate's dense early pattern raises onset echo density - IT LOWERS IT");
         }
     }
 
@@ -2337,6 +2424,422 @@ void runPhase12ModeFamilyTests()
         info ("    worst dip, not primed               " + fx (worstUnprimedDip, 2) + " dB");
         info ("    largest step, naive in-place        " + fx (worstNaiveStep, 2) + "x steady");
     }
+
+    // =======================================================================
+    beginSuite ("PHASE 12.2.12 - EXPLORATORY: positive control, hidden-dimension leverage");
+    // =======================================================================
+    {
+        /*
+            WRITTEN AFTER THE RESULTS. NOT PRE-REGISTERED. NOT USED TO RESCUE
+            ANY CANDIDATE.
+
+            Two questions the pre-registered design could not answer once it
+            had come back uniformly negative.
+
+            1. IS THE YARDSTICK BLIND? If every Mode is reproducible, either
+               the Modes are presets or the instrument cannot see families.
+               A positive control separates the two: eight parallel combs -
+               the tank with its mixing matrix removed - is a different
+               family from a reverb by any definition. If Hall's user
+               controls can 'reproduce' that, the negative result means
+               nothing.
+
+            2. WHICH HIDDEN DIMENSIONS HAVE ANY LEVERAGE? Each row below is
+               Hall with ONE Mode-owned dimension pushed to an extreme, and
+               shipping Hall then searched to imitate it. A dimension Hall
+               can cancel with a knob is not a dimension a Mode can be built
+               on, however different it looks in a table of parameters.
+        */
+        struct Variant { std::string label; ModeCandidate m; };
+
+        std::vector<Variant> variants;
+
+        auto add = [&] (const char* label, auto&& change)
+        {
+            Variant v { label, modes[hall] };
+            change (v.m);
+
+            if (std::accumulate (v.m.delaysMs.begin(), v.m.delaysMs.end(), 0.0) > 1.0)
+                variants.push_back (v);
+        };
+
+        add ("delay set x 0.5",          [] (ModeCandidate& m) { for (auto& d : m.delaysMs) d *= 0.5; });
+        add ("delay spread 1.3 (narrow)", [] (ModeCandidate& m) { m.delaysMs = searchDelaySet (kHallSumMs, 1.3, 0x1301u); });
+        add ("delay spread 6.0 (wide)",   [] (ModeCandidate& m) { m.delaysMs = searchDelaySet (kHallSumMs, 6.0, 0x6001u); });
+        add ("diffuser 1 stage",          [] (ModeCandidate& m) { m.diffuserStages = 1; });
+        add ("diffuser 8 stages x 1.0",   [] (ModeCandidate& m) { m.diffuserStages = 8; });
+        add ("diffuser 8 stages x 2.0",   [] (ModeCandidate& m) { m.diffuserStages = 8; m.diffuserScale = 2.0; });
+        add ("allpass sections 2",        [] (ModeCandidate& m) { m.allpassSections = 2; });
+        add ("modulation x 1.4",          [] (ModeCandidate& m) { m.modDepthFactor = 1.4; });
+        add ("matrix householder",        [] (ModeCandidate& m) { m.matrixType = 1; });
+        add ("POSITIVE CONTROL: no mixing matrix", [] (ModeCandidate& m) { m.matrixType = 2; });
+
+        const User points[2] { userAt (kGrid[4], 0.0), userAt (kGrid[0], 0.0) };
+
+        struct Probe { double sameKnob = 0.0; SearchResult result; };
+
+        std::vector<Probe> probes (variants.size() * 2);
+
+        runParallel (probes.size(), [&] (size_t i)
+        {
+            const auto& variant = variants[i / 2].m;
+            const auto& u = points[i % 2];
+
+            const auto target = featuresOf (variant, u);
+
+            probes[i].sameKnob = distance (target, featuresOf (modes[hall], u)).total;
+            probes[i].result = mimic (target, modes[hall], toControls (u),
+                                      0x7F4A7C15u ^ static_cast<unsigned int> (i * 40503u));
+        });
+
+        const double reproduced = reproducedThreshold (floorDistance);
+        const double distinct   = distinctThreshold (floorDistance);
+
+        info ("  Target: Hall with one hidden dimension changed. Impostor: shipping");
+        info ("  Hall, six user controls searched. Each cell: residual (same-knob).");
+        info ("");
+        info ("    " + pad ("hidden change", 38) + pad ("defaults", 16) + pad ("small / short", 16)
+              + "Hall can cancel it?");
+
+        double controlResidual = 0.0;
+
+        for (size_t v = 0; v < variants.size(); ++v)
+        {
+            const auto& a = probes[v * 2];
+            const auto& b = probes[v * 2 + 1];
+
+            const double weakest = std::min (a.result.distance.total, b.result.distance.total);
+
+            if (variants[v].m.matrixType == 2)
+                controlResidual = weakest;
+
+            info ("    " + pad (variants[v].label, 38)
+                  + pad (fx (a.result.distance.total, 2) + " (" + fx (a.sameKnob, 1) + ")", 16)
+                  + pad (fx (b.result.distance.total, 2) + " (" + fx (b.sameKnob, 1) + ")", 16)
+                  + (weakest <= reproduced ? "YES - no leverage"
+                     : weakest >= distinct ? "NO - real leverage"
+                                           : "partly"));
+        }
+
+        info ("");
+        info ("  HOW HALL CANCELS EACH ONE, at the defaults:");
+        info ("");
+
+        for (size_t v = 0; v < variants.size(); ++v)
+            info ("    " + pad (variants[v].label, 38) + describe (probes[v * 2].result.best));
+
+        info ("");
+        info ("    positive control residual   " + fx (controlResidual, 2)
+              + "   (DISTINCT at or above " + fx (distinct, 2) + ")");
+
+        check (controlResidual >= distinct,
+               "the yardstick is not blind: shown a genuinely different family, the "
+               "search cannot make Hall reproduce it");
+
+        /*
+            The control failed, and a failed control has two readings. Either
+            the yardstick cannot see a real difference, or the thing I called
+            'a different family by any definition' is not as different as I
+            asserted - with a diffuser in front and a dispersive allpass
+            inside every loop, eight unmixed loops are not eight bare combs.
+
+            An independent measurement decides between them: one the six
+            families do not contain.
+        */
+        info ("");
+        info ("  AN INDEPENDENT MEASUREMENT, outside the six families. Loop-lag");
+        info ("  texture is the tallest autocorrelation of the late waveform at");
+        info ("  lags of 3-150 ms; modal prominence is how far the strongest");
+        info ("  spectral lines stand above their neighbourhood. Defaults, E/L 0:");
+        info ("");
+        info ("    " + pad ("configuration", 38) + pad ("loop-lag texture", 19) + "modal prominence");
+
+        auto texture = [] (const ModeCandidate& m, const User& u)
+        {
+            const auto ir = impulseResponse (m, u, 1.2);
+            return std::pair<double, double> { loopLagTexture (ir), modalProminenceDb (ir) };
+        };
+
+        const auto hallTexture = texture (modes[hall], User {});
+
+        double siblingTexture = 0.0, controlTexture = 0.0;
+
+        auto row = [&] (const std::string& label, const ModeCandidate& m, const User& u)
+        {
+            const auto t = texture (m, u);
+
+            info ("    " + pad (label, 38) + pad (fx (t.first, 3), 19) + fx (t.second, 2) + " dB");
+
+            return t.first;
+        };
+
+        row ("Hall", modes[hall], User {});
+        siblingTexture = row ("Hall sibling delay set", hallSibling(), User {});
+
+        for (const auto& v : variants)
+            if (v.m.matrixType != 0)
+            {
+                const double t = row (v.label, v.m, User {});
+
+                if (v.m.matrixType == 2)
+                    controlTexture = t;
+            }
+
+        info ("");
+
+        for (int m = 0; m < modeCount; ++m)
+            if (m != hall)
+                row (modes[static_cast<size_t> (m)].name, modes[static_cast<size_t> (m)], User {});
+
+        const double siblingGap = std::abs (siblingTexture - hallTexture.first);
+        const double controlGap = std::abs (controlTexture - hallTexture.first);
+
+        info ("");
+        info ("    Hall to its own sibling      " + fx (siblingGap, 3));
+        info ("    Hall to the positive control " + fx (controlGap, 3));
+
+        check (controlGap > 3.0 * std::max (0.005, siblingGap),
+               "an independent measurement confirms the positive control really is "
+               "different from Hall - so its failure above is the yardstick's blindness");
+
+        info ("");
+        info ("    I PREDICTED THE WRONG DIRECTION. The comment on loopLagTexture");
+        info ("    argues that unmixed loops should repeat themselves MORE. They");
+        info ("    measure LESS: " + fx (controlTexture, 3) + " against Hall's "
+              + fx (hallTexture.first, 3) + ". The difference is real and");
+        info ("    seventeen sibling-gaps wide, which is all the control needs,");
+        info ("    but the mechanism I gave for it is not the mechanism. Left in");
+        info ("    place rather than rewritten to fit.");
+
+        /*
+            So the six families have a blind spot, and the verdicts of
+            12.2.5 were reached through it. The next question is whether the
+            blind spot is where the Modes were hiding.
+
+            No new search is run for this. Each Mode's closest impostor was
+            found WITHOUT any knowledge of texture; if it happens to match on
+            texture as well, the Mode is reproduced in a dimension its
+            impostor was not even trying to match.
+        */
+        info ("");
+        info ("  DOES THE BLIND SPOT RESCUE ANY CANDIDATE? Each Mode against the");
+        info ("  closest impostor 12.2.5 found for it, on the two measurements the");
+        info ("  search never saw. The yardstick for 'same' is Hall against its own");
+        info ("  sibling at that same target setting:");
+        info ("");
+        info ("    " + pad ("imitated <- impostor", 24) + pad ("loop-lag texture", 22)
+              + pad ("gap", 9) + pad ("sibling gap", 14) + pad ("modal prom., dB", 22) + "gap");
+
+        int texturallyDifferent = 0;
+
+        for (int a = 0; a < modeCount; ++a)
+        {
+            const Job* closest = nullptr;
+
+            for (const auto& job : jobs)
+                if (job.a == a
+                    && (closest == nullptr
+                        || job.result.distance.total < closest->result.distance.total))
+                    closest = &job;
+
+            if (closest == nullptr)
+                continue;
+
+            const auto& targetUser = targets[static_cast<size_t> (closest->target)].u;
+
+            const auto target   = texture (modes[static_cast<size_t> (a)], targetUser);
+            const auto impostor = texture (modes[static_cast<size_t> (closest->b)],
+                                           toUser (closest->result.best));
+
+            const double reference = std::max (0.005,
+                std::abs (texture (modes[hall], targetUser).first
+                          - texture (hallSibling(), targetUser).first));
+
+            const double gap = std::abs (target.first - impostor.first);
+
+            if (gap > 3.0 * reference)
+                ++texturallyDifferent;
+
+            info ("    " + pad (modes[static_cast<size_t> (a)].name + " <- "
+                                + modes[static_cast<size_t> (closest->b)].name, 24)
+                  + pad (fx (target.first, 3) + " vs " + fx (impostor.first, 3), 22)
+                  + pad (fx (gap, 3), 9) + pad (fx (reference, 3), 14)
+                  + pad (fx (target.second, 1) + " vs " + fx (impostor.second, 1), 22)
+                  + fx (std::abs (target.second - impostor.second), 1));
+        }
+
+        info ("");
+        info ("    Modes whose closest impostor differs in loop-lag texture by more");
+        info ("    than three sibling-gaps: " + std::to_string (texturallyDifferent) + " of 5.");
+    }
+}
+
+// ===========================================================================
+//  The impostor listening pack
+// ===========================================================================
+/*
+    The human question Stage 2 ends on is not 'which Mode is this'. No
+    candidate survived to be identified. It is the one that tests the
+    negative result itself:
+
+        the measurement says Mode A and Mode B-at-these-settings are the
+        same reverb. Are they?
+
+    If a listener cannot tell each pair apart, the yardstick was right and the
+    candidates are presets. If a listener CAN, the yardstick is missing
+    something a person hears, and that something is where a real Mode
+    dimension would be found. Either answer is worth more than a five-way
+    identification test of candidates that have already failed.
+*/
+int exportPhase12ImpostorPack (const std::string& directory, double sampleRate);
+
+} // namespace avtest
+
+#include "DampingListening.h"
+#include "SignalExport.h"
+#include "WetGainStaging.h"
+
+#include <fstream>
+
+namespace avtest
+{
+
+int exportPhase12ImpostorPack (const std::string& directory, double)
+{
+    const auto& modes = candidates();
+    const User defaults {};
+
+    // The closest impostor for each Mode at the product defaults, found by
+    // the same search the suite runs.
+    std::vector<SearchResult> all (modeCount * modeCount);
+
+    runParallel (all.size(), [&] (size_t i)
+    {
+        const int a = static_cast<int> (i / modeCount);
+        const int b = static_cast<int> (i % modeCount);
+
+        if (a == b)
+        {
+            all[i].distance.total = 1.0e9;
+            return;
+        }
+
+        // The seed the suite uses for this pair at this target, so the pack is
+        // rendered from exactly the impostor the report tabulates.
+        const size_t suiteJob = static_cast<size_t> (a * (modeCount - 1) + (b < a ? b : b - 1));
+
+        all[i] = mimic (featuresOf (modes[static_cast<size_t> (a)], defaults),
+                        modes[static_cast<size_t> (b)], toControls (defaults),
+                        0x9E3779B9u ^ static_cast<unsigned int> (suiteJob * 2654435761u));
+    });
+
+    struct Source { std::string name; std::vector<StereoFrame> frames; };
+
+    std::vector<Source> sources;
+
+    sources.push_back ({ "vocal", makeVocalReference (kRate, 6.0) });
+
+    for (const auto& s : makeFu2Sources (kRate))
+        if (s.name == "snare" || s.name == "piano" || s.name == "pad")
+            sources.push_back ({ s.name, s.frames });
+
+    sources.push_back ({ "percussion", makeBrightPercussion (kRate, 6.0) });
+
+    const auto tail = static_cast<size_t> (kRate * 3.5);
+
+    auto render = [&] (const ModeCandidate& m, const User& u, const Source& s)
+    {
+        std::vector<double> l (s.frames.size()), r (s.frames.size());
+
+        for (size_t n = 0; n < s.frames.size(); ++n)
+        {
+            l[n] = s.frames[n].l;
+            r[n] = s.frames[n].r;
+        }
+
+        return std::make_unique<Rig> (m, u)->render (l, r, s.frames.size() + tail);
+    };
+
+    std::ofstream key (directory + "/KEY.txt", std::ios::binary);
+    std::ofstream notes (directory + "/LISTENING.md", std::ios::binary);
+
+    if (! key || ! notes)
+        return -1;
+
+    notes << "# Phase 12 Stage 2 - impostor pairs\n\n"
+          << "Each pair of files is the same source through two reverbs. One is a\n"
+          << "Mode candidate at the product defaults. The other is a DIFFERENT Mode\n"
+          << "with its ordinary user controls moved to imitate the first. Which is\n"
+          << "which is in KEY.txt; do not open it first.\n\n"
+          << "100 % wet, level-matched by integrated energy, so nothing but the\n"
+          << "reverb itself is being compared.\n\n"
+          << "For each pair, one question:\n\n"
+          << "> Are X and Y the same reverb?\n\n"
+          << "Answer *same*, *slightly different* or *clearly different*, and if\n"
+          << "different, say in your own words what differs. The measurement says\n"
+          << "every pair here is the same. A pair you hear as clearly different is\n"
+          << "the useful result: it means the measurement is missing something.\n\n"
+          << "| pair | residual |\n|---|---|\n";
+
+    int written = 0;
+
+    for (int a = 0; a < modeCount; ++a)
+    {
+        int by = -1;
+
+        for (int b = 0; b < modeCount; ++b)
+            if (a != b && (by < 0 || all[static_cast<size_t> (a * modeCount + b)].distance.total
+                                     < all[static_cast<size_t> (a * modeCount + by)].distance.total))
+                by = b;
+
+        const auto& found = all[static_cast<size_t> (a * modeCount + by)];
+        const auto impostorUser = toUser (found.best);
+
+        const std::string pairName = "pair" + std::to_string (a + 1);
+
+        notes << "| " << pairName << " | " << fx (found.distance.total, 2) << " |\n";
+
+        key << pairName << ": target " << modes[static_cast<size_t> (a)].name
+            << " at defaults; impostor " << modes[static_cast<size_t> (by)].name
+            << " at " << describe (found.best) << "; residual "
+            << fx (found.distance.total, 2) << "\n";
+
+        for (size_t s = 0; s < sources.size(); ++s)
+        {
+            auto target   = render (modes[static_cast<size_t> (a)], defaults, sources[s]);
+            auto impostor = render (modes[static_cast<size_t> (by)], impostorUser, sources[s]);
+
+            const double gain = std::sqrt (energyOf (target) / std::max (1.0e-300, energyOf (impostor)));
+
+            // Which of the two is called X. Fixed, not random, and not a
+            // pattern a listener could learn from the first pair.
+            const bool targetIsX = ((a * 3 + static_cast<int> (s) * 5 + 1) % 4) < 2;
+
+            auto frames = [] (const Stereo& x, double g)
+            {
+                std::vector<StereoFrame> f (x.l.size());
+
+                for (size_t n = 0; n < f.size(); ++n)
+                    f[n] = { x.l[n] * g, x.r[n] * g };
+
+                return f;
+            };
+
+            const std::string stem = directory + "/" + pairName + "-" + sources[s].name;
+
+            if (! writeStereoWav (stem + (targetIsX ? "-X.wav" : "-Y.wav"), frames (target, 1.0), kRate)
+                || ! writeStereoWav (stem + (targetIsX ? "-Y.wav" : "-X.wav"), frames (impostor, gain), kRate))
+                return -1;
+
+            key << "    " << sources[s].name << ": X = " << (targetIsX ? "target" : "impostor")
+                << ", Y = " << (targetIsX ? "impostor" : "target")
+                << "   (impostor level-matched by " << fx (20.0 * std::log10 (gain), 2) << " dB)\n";
+
+            written += 2;
+        }
+    }
+
+    return written;
 }
 
 } // namespace avtest

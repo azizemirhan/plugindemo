@@ -17,6 +17,7 @@
 #include "Phase9Listening.h"
 #include "Phase10Listening.h"
 #include "Phase11Listening.h"
+#include "Phase12Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -437,6 +438,21 @@ __declspec (dllexport) int ExportAuroraVerbPhase11MonoPack (const char* director
 
     return avtest::exportPhase11MonoPack (directory,
                                           sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/*
+    Renders the PHASE 12 Stage 2 impostor pairs: each Mode candidate at the
+    product defaults beside the closest imitation another Mode can reach with
+    its ordinary user controls. See Phase12Listening.h.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase12ImpostorPack (const char* directory,
+                                                                double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase12ImpostorPack (directory,
+                                              sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"
