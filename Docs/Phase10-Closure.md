@@ -353,7 +353,7 @@ parameter   earlyLate, "Early / Late", 0-100 %, default 0, versionHint 2
 
 ## 7. Commit
 
-`4c2ae71` — "Phase 10 closure".
+`5f0cf51` — "Phase 10 closure".
 
 Phase history: `7b0d2ab` Stage 1 · `81716c8` Stage 2 · `a1328f0` Stage 3
 foundations · `aa8c27e` Stage 3.5 · `d7b5089` crossfade law · `37ae030` final
