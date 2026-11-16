@@ -16,6 +16,7 @@
 #include "Phase8Listening.h"
 #include "Phase9Listening.h"
 #include "Phase10Listening.h"
+#include "Phase11Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -419,6 +420,23 @@ __declspec (dllexport) int ExportAuroraVerbPhase10FinalSanity (const char* direc
 
     return avtest::exportPhase10FinalSanity (directory,
                                              sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/**
+    Renders the PHASE 11 narrow-band mono listening pack.
+
+    Six files, two cases, plus a 60 %% Mix reference. Each file plays a control
+    pitch, the measured failing pitch, then the control again, and each stereo
+    render is paired with its own un-normalised mono fold-down.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase11MonoPack (const char* directory,
+                                                            double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase11MonoPack (directory,
+                                          sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"

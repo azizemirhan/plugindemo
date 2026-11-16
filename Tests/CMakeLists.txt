@@ -116,6 +116,8 @@ set(AV_TEST_SUITE_SOURCES
     Phase11StereoAudit.cpp
     Phase11Readout.cpp
     Phase11DelaySet.cpp
+    Phase11Stage4.cpp
+    Phase11Listening.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
