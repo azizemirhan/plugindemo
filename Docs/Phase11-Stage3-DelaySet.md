@@ -416,7 +416,7 @@ run.
 
 ## 25. Commit
 
-`<recorded on commit>`
+`0ea3a91` — "Phase 11 Stage 3: delay-set and modal-density research".
 
 ---
 
