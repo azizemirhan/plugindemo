@@ -557,7 +557,7 @@ ER pattern fingerprint: **`5065939454054309816`**, unchanged.
 
 ## 20. Closure commit
 
-`<recorded on commit>`
+`9f60d04` — *Phase 11 closure: stereo and spatial finalisation complete*
 
 Phase history: `af2d7d7` Stages 1–2 · `0ea3a91` Stage 3 · `0ebc4d4` Stage 4 ·
 this commit.
