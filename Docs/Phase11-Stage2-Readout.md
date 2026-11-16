@@ -416,7 +416,7 @@ or Stage 2, so no audio changed.
 
 ## 23. Commit
 
-`<recorded on commit>`
+`af2d7d7` — "Phase 11 Stage 1 and 2: stereo audit and readout-topology research".
 
 ---
 
