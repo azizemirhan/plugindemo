@@ -101,6 +101,7 @@ set(AV_TEST_SUITE_SOURCES
     DampingListening.cpp
     Phase8Listening.cpp
     Phase9Listening.cpp
+    Phase10Listening.cpp
     Phase8Filters.cpp
     Phase8System.cpp
     Phase8Signoff.cpp
@@ -109,6 +110,8 @@ set(AV_TEST_SUITE_SOURCES
     Phase9Stage3.cpp
     Phase10Research.cpp
     Phase10Stage2.cpp
+    Phase10Production.cpp
+    Phase10Stage35.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp

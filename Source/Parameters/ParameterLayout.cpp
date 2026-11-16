@@ -26,10 +26,9 @@ namespace
         among them in the AU identifier sort rather than after them - and that
         is the one thing the hint exists to control.
 
-        Unused today: PHASE 10 has not added its parameter yet. It is here so
-        that when one is added, the correct call is the obvious one.
+        First used by PHASE 10's earlyLate.
     */
-    [[maybe_unused]] juce::ParameterID appendedPid (const char* name)
+    juce::ParameterID appendedPid (const char* name)
     {
         return { name, versionHintLatest };
     }
@@ -83,6 +82,16 @@ namespace
                                        float defaultValue, float max = 100.0f)
     {
         return std::make_unique<APF> (pid (paramId), name, lin (0.0f, max, 0.1f), defaultValue,
+                                      FloatAtt().withLabel ("%")
+                                               .withStringFromValueFunction (percentToText));
+    }
+
+    /** As percentParam, but for a parameter added after the first release. */
+    std::unique_ptr<APF> appendedPercentParam (const char* paramId, const juce::String& name,
+                                               float defaultValue, float max = 100.0f)
+    {
+        return std::make_unique<APF> (appendedPid (paramId), name, lin (0.0f, max, 0.1f),
+                                      defaultValue,
                                       FloatAtt().withLabel ("%")
                                                .withStringFromValueFunction (percentToText));
     }
@@ -193,6 +202,32 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 
     layout.add (percentParam (id::mix, "Mix", 30.0f));
 
+    // --- PHASE 10: Early / Late ------------------------------------------
+
+    /*
+        One control for the whole early-reflection layer, and the ONLY public
+        parameter PHASE 10 adds.
+
+        A COMPOSITION CONTROL, NOT A WET LEVEL. 0 % is the late network alone,
+        100 % is the early layer alone, and the energy-calibrated constant-
+        power law between them holds the total wet energy to 0.01 dB across
+        the travel - so moving it changes what the reverb is made of rather
+        than how loud it is. Stage 2 measured the alternatives and both failed
+        on exactly that point: a linear law moves the total by 3.02 dB and an
+        uncalibrated equal-power law by 2.15 dB.
+
+        DEFAULT 0, WHICH IS A COMPATIBILITY DECISION RATHER THAN A TASTE. At 0
+        the processor takes an explicit bypass branch and reproduces the
+        PHASE 9 signal path bit for bit, so every session saved before this
+        parameter existed restores to exactly the sound it was saved with. Any
+        nonzero default would quietly change all of them.
+
+        Appended with versionHintLatest, not versionHintV1. The hint orders
+        the AU parameter list, and an appended parameter sharing the
+        originals' hint would sort among them instead of after them.
+    */
+    layout.add (appendedPercentParam (id::earlyLate, "Early / Late", 0.0f));
+
     return layout;
 }
 
@@ -224,6 +259,7 @@ void RawHandles::attach (juce::AudioProcessorValueTreeState& state)
     lowCut         = get (id::lowCut);
     highCut        = get (id::highCut);
     mix            = get (id::mix);
+    earlyLate      = get (id::earlyLate);
 }
 
 } // namespace av::params

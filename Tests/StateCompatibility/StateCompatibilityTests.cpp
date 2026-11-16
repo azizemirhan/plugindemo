@@ -29,8 +29,10 @@
     build would have written.
 */
 
-#include "PluginProcessor.h"
+#include "ProcessorRender.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -126,8 +128,28 @@ int main()
     {
         av::AuroraVerbProcessor processor;
 
+        /*
+            THE HISTORICAL NINETEEN, BY NAME.
+
+            This check used to be "every parameter is at generation-1 hint",
+            which was true until PHASE 10 added one and is now the wrong
+            statement rather than a failing one. Broadening it to "no hint is
+            zero" would have been a weakening; naming the nineteen is a
+            tightening, because it can now also catch a NEW parameter given
+            the originals' hint - which is the actual mistake the version hint
+            exists to prevent, and which a count could never see.
+        */
+        const std::vector<juce::String> shipped
+        {
+            "mode", "color", "preDelay", "decay", "size", "earlyDiffusion",
+            "lateDiffusion", "attack", "modRate", "modDepth", "density",
+            "lowDamp", "highDamp", "lowDampFreq", "highDampFreq", "width",
+            "lowCut", "highCut", "mix"
+        };
+
         int withZeroHint = 0;
-        int hintV1 = 0, hintOther = 0;
+        int originalsAtV1 = 0, originalsMoved = 0;
+        int appendedAfterV1 = 0, appendedAtV1 = 0;
 
         for (auto* parameter : processor.getParameters())
         {
@@ -137,28 +159,39 @@ int main()
                 continue;
 
             const auto hint = hosted->getVersionHint();
+            const auto id   = hosted->getParameterID();
 
             if (hint == 0)
                 ++withZeroHint;
-            else if (hint == av::params::versionHintV1)
-                ++hintV1;
+
+            const bool original = std::find (shipped.begin(), shipped.end(), id) != shipped.end();
+
+            if (original)
+                (hint == av::params::versionHintV1 ? originalsAtV1 : originalsMoved)++;
             else
-                ++hintOther;
+                (hint > av::params::versionHintV1 ? appendedAfterV1 : appendedAtV1)++;
         }
 
-        info ("  parameters                " + std::to_string (processor.getParameters().size()));
-        info ("  at generation-1 hint      " + std::to_string (hintV1));
-        info ("  at a later hint           " + std::to_string (hintOther));
-        info ("  with hint 0               " + std::to_string (withZeroHint));
+        info ("  parameters                   " + std::to_string (processor.getParameters().size()));
+        info ("  historical nineteen at V1    " + std::to_string (originalsAtV1));
+        info ("  historical, hint changed     " + std::to_string (originalsMoved));
+        info ("  appended, at a later hint    " + std::to_string (appendedAfterV1));
+        info ("  appended, wrongly at V1      " + std::to_string (appendedAtV1));
+        info ("  with hint 0                  " + std::to_string (withZeroHint));
         info ("");
         info ("  A hint of 0 trips an AU-only debug assertion in JUCE, so it is");
         info ("  checked here rather than discovered when an AU build is first");
-        info ("  attempted.");
+        info ("  attempted. Moving a SHIPPED parameter's hint would reorder the");
+        info ("  AU parameter list for hosts that have cached it, which is why");
+        info ("  the nineteen are named rather than counted.");
 
         check (withZeroHint == 0, "no parameter carries version hint 0");
 
-        check (hintV1 == static_cast<int> (processor.getParameters().size()),
-               "every shipped parameter is still at generation-1 hint");
+        check (originalsAtV1 == static_cast<int> (shipped.size()) && originalsMoved == 0,
+               "all nineteen historical parameters are still at generation-1 hint");
+
+        check (appendedAtV1 == 0,
+               "no parameter added after the first release borrows the originals' hint");
     }
 
     info ("");
@@ -405,6 +438,397 @@ int main()
 
         check (afterGarbage == before && afterEmpty == before,
                "unparseable or empty state leaves every parameter untouched");
+    }
+
+    info ("");
+
+    // -----------------------------------------------------------------------
+    info ("PHASE 10: the Early/Late parameter");
+    info ("----------------------------------");
+    // -----------------------------------------------------------------------
+    {
+        av::AuroraVerbProcessor processor;
+
+        auto* parameter = findParameter (processor, "earlyLate");
+
+        check (parameter != nullptr, "the earlyLate parameter exists");
+
+        if (parameter != nullptr)
+        {
+            auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter);
+            auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (parameter);
+
+            const auto range = ranged->getNormalisableRange();
+            const auto hint  = hosted->getVersionHint();
+
+            info ("  name    " + parameter->getName (64).toStdString());
+            info ("  range   " + std::to_string (range.start) + " .. "
+                  + std::to_string (range.end)
+                  + ", interval " + std::to_string (range.interval));
+            info ("  default " + std::to_string (range.convertFrom0to1 (parameter->getDefaultValue())));
+            info ("  hint    " + std::to_string (hint));
+
+            check (parameter->getName (64) == "Early / Late", "it is displayed as Early / Late");
+            check (range.start == 0.0f && range.end == 100.0f, "the range is 0 to 100");
+            check (range.convertFrom0to1 (parameter->getDefaultValue()) == 0.0f,
+                   "the default is 0, so an older session restores unchanged");
+            check (hint == av::params::versionHintV2,
+                   "it carries versionHintV2, so it sorts after the original nineteen");
+        }
+
+        /*
+            THE DUPLICATED CONSTANT, CHECKED RATHER THAN TRUSTED.
+
+            The DSP headers deliberately do not include the parameter layout,
+            so er::referenceSizeControl repeats the Size default instead of
+            sharing it. A repeat that nothing checks is a repeat that drifts.
+        */
+        auto* size = findParameter (processor, "size");
+        const auto sizeDefault = dynamic_cast<juce::RangedAudioParameter*> (size)
+                                   ->getNormalisableRange()
+                                   .convertFrom0to1 (size->getDefaultValue());
+
+        info ("");
+        info ("  Size default " + std::to_string (sizeDefault)
+              + " %, er::referenceSizeControl "
+              + std::to_string (av::dsp::er::referenceSizeControl * 100.0) + " %");
+
+        // Compared with a float's tolerance, because that is what it is: the
+        // default travels through a float normalisation and back, so 60 %
+        // returns as 60.000004. A tighter bound would fail on arithmetic
+        // rather than on drift, which is the opposite of what it is for.
+        check (std::abs (sizeDefault * 0.01 - av::dsp::er::referenceSizeControl) < 1.0e-6,
+               "the ER reference Size matches the Size parameter's default");
+    }
+
+    info ("");
+
+    // -----------------------------------------------------------------------
+    info ("PHASE 10: a PHASE 9 state does not mention earlyLate");
+    info ("----------------------------------------------------");
+    // -----------------------------------------------------------------------
+    {
+        /*
+            The case the whole suite was written for, now with the parameter
+            that actually motivated it. A session saved before PHASE 10 has no
+            earlyLate child; loading it into an instance where the control has
+            been moved must put it back to 0, or the preset does not reproduce
+            the sound it was saved from.
+        */
+        av::AuroraVerbProcessor source;
+        const auto legacy = stateOmitting (source, "earlyLate");
+
+        info ("  fixture children: " + std::to_string (countChildren (legacy))
+              + " (one fewer than the live parameter count)");
+
+        av::AuroraVerbProcessor target;
+
+        if (auto* p = findParameter (target, "earlyLate"))
+            p->setValueNotifyingHost (0.8f);
+
+        const float moved = findParameter (target, "earlyLate")->getValue();
+
+        target.setStateInformation (legacy.getData(), static_cast<int> (legacy.getSize()));
+
+        const float restored = findParameter (target, "earlyLate")->getValue();
+
+        info ("  earlyLate moved to " + std::to_string (moved)
+              + ", after loading the PHASE 9 state " + std::to_string (restored));
+
+        check (moved > 0.0f, "the control really was moved before the load");
+        check (restored == 0.0f, "a state that omits earlyLate restores it to 0");
+
+        info ("");
+        info ("  SCOPE OF THIS BEHAVIOUR, STATED SO IT IS NOT INHERITED BY");
+        info ("  ACCIDENT. resetParametersAbsentFrom() implements the contract");
+        info ("  of a FULL PLUGIN STATE: the blob the host saves describes the");
+        info ("  entire instance, so a parameter it does not mention is one the");
+        info ("  saving build did not have, and the default is the only honest");
+        info ("  thing to restore.");
+        info ("");
+        info ("  That reasoning does NOT transfer to a partial preset. A");
+        info ("  factory or user preset format that deliberately stores only");
+        info ("  some parameters - a 'tone only' preset, say - means the");
+        info ("  opposite by omission: leave the rest as they are. If such a");
+        info ("  format is added later it must carry its own loader, and must");
+        info ("  not reuse this path. Nothing here should be read as deciding");
+        info ("  that question in advance.");
+    }
+
+    info ("");
+
+    // -----------------------------------------------------------------------
+    info ("PHASE 10: legacy neutrality - HARD GATE");
+    info ("---------------------------------------");
+    // -----------------------------------------------------------------------
+    {
+        /*
+            AT EARLY/LATE 0 THE PLUGIN MUST BE THE PHASE 9 PLUGIN, BIT FOR BIT.
+
+            Proved the only way it can honestly be proved: by rendering the
+            same cases on a build of the PHASE 9 commit and comparing the raw
+            bytes. The reference hashes below were produced by building
+            Tests/StateCompatibility/ProcessorRender.h against commit a1328f0
+            in a detached worktree - that header is written to compile there,
+            which is why it names parameters by string and ignores ids the
+            build does not have.
+
+            Reasoning about the bypass branch would not do. PHASE 10 Stage 2
+            found a defect in exactly this area that source-code reasoning had
+            missed, and its report said not to rely on such reasoning again.
+
+            TO REGENERATE, if a future change to the PHASE 9 path makes these
+            stale - which should be a deliberate act, never a convenience:
+
+              git worktree add <dir> a1328f0
+              copy ProcessorRender.h into <dir>/Tests/StateCompatibility/
+              replace <dir>/Tests/StateCompatibility/StateCompatibilityTests.cpp
+                with a main() that prints hashOf(render(...)) per legacyCase
+              configure with the SAME AV_DEV_* flags as the build under test
+                - a different build profile is a different plugin -
+                and AV_JUCE_PATH pointed at the already-fetched JUCE
+              build and run AuroraVerbStateTests there
+              git worktree remove <dir>
+
+            Changing a hash because it stopped matching is how a legacy gate
+            becomes decoration. The only honest reason to touch these is a
+            deliberate, documented change to the PHASE 9 signal path.
+        */
+        struct Expected { const char* name; std::uint64_t hash; };
+
+        const std::vector<Expected> reference
+        {
+            { "defaults, impulse",        0x0dd42237bce4b362ull },
+            { "defaults, noise",          0xdd626d9df1e2a01cull },
+            { "defaults, sine",           0xb79ded6af2d4734aull },
+            { "defaults, transients",     0x201e2a9cb632bfa7ull },
+            { "defaults, vocal-like",     0xad226336582ec15eull },
+            { "uncorrelated stereo",      0xc9259aeb3c6fdb96ull },
+            { "pre-delay 80 ms",          0x872c2da22c6e573bull },
+            { "attack 100 %",             0xec2e1c5e17b3a38eull },
+            { "size 100 %, decay 8 s",    0xba95c0f1e4ebd67bull },
+            { "size 0 %, decay 0.4 s",    0xc566d6cab22d69ceull },
+            { "cuts and damping engaged", 0xf30e2f8a017a46f8ull },
+            { "mix 100 %, width 200 %",   0xccf9041196e8b964ull },
+        };
+
+        const auto cases = avrender::legacyCases();
+
+        check (cases.size() == reference.size(),
+               "every legacy case has a reference hash");
+
+        int matched = 0;
+
+        for (size_t i = 0; i < cases.size() && i < reference.size(); ++i)
+        {
+            const auto out = avrender::render (cases[i].settings, cases[i].signal,
+                                               cases[i].seconds);
+
+            const auto got = avrender::hashOf (out);
+            const bool same = got == reference[i].hash;
+
+            matched += same ? 1 : 0;
+
+            info (std::string ("  ") + (same ? "same  " : "DIFFER")
+                  + "  " + cases[i].name
+                  + "  [" + avrender::nameOf (cases[i].signal) + "]"
+                  + (same ? "" : "  got " + avrender::hex (got)
+                                 + " expected " + avrender::hex (reference[i].hash)));
+        }
+
+        info ("");
+        info ("  " + std::to_string (matched) + " of " + std::to_string (cases.size())
+              + " cases are byte-identical to the PHASE 9 build.");
+
+        check (matched == static_cast<int> (cases.size()),
+               "at Early/Late 0 every case reproduces PHASE 9 bit for bit");
+    }
+
+    info ("");
+
+    // -----------------------------------------------------------------------
+    info ("PHASE 10: what the early layer cannot see");
+    info ("-----------------------------------------");
+    // -----------------------------------------------------------------------
+    {
+        /*
+            At Early/Late 100 % the late gain is EXACTLY zero - the balance law
+            writes that endpoint out rather than letting cos(pi/2) return
+            6.1e-17 - so the output is the early layer alone. Anything that
+            belongs to the late path can then be swept, and the output must
+            not move by a single bit.
+
+            This is the strongest available form of "Attack must never affect
+            ER" and "Early Diffusion must never affect ER": not a tolerance, an
+            identity.
+        */
+        struct Independence { const char* what; const char* id; float a, b; };
+
+        const std::vector<Independence> cases
+        {
+            { "Attack",          "attack",       0.0f,   100.0f },
+            { "Early Diffusion", "earlyDiffusion", 0.0f,  100.0f },
+            { "Late Diffusion",  "lateDiffusion",  0.0f,  100.0f },
+            { "High Damp",       "highDamp",     0.0f,   100.0f },
+            { "Low Damp",        "lowDamp",      0.0f,   100.0f },
+            { "High Damp Freq",  "highDampFreq", 500.0f, 20000.0f },
+            { "Decay",           "decay",        0.4f,   20.0f },
+            { "Mod Depth",       "modDepth",     0.0f,   100.0f },
+        };
+
+        int identical = 0;
+
+        for (const auto& c : cases)
+        {
+            const auto first  = avrender::render ({ { "earlyLate", 100.0f },
+                                                    { "mix", 100.0f },
+                                                    { c.id, c.a } },
+                                                  avrender::Signal::transient, 1.0);
+
+            const auto second = avrender::render ({ { "earlyLate", 100.0f },
+                                                    { "mix", 100.0f },
+                                                    { c.id, c.b } },
+                                                  avrender::Signal::transient, 1.0);
+
+            const bool same = avrender::hashOf (first) == avrender::hashOf (second);
+            identical += same ? 1 : 0;
+
+            info (std::string ("  ") + (same ? "unchanged" : "CHANGED  ")
+                  + "  " + c.what + " swept across its range");
+        }
+
+        check (identical == static_cast<int> (cases.size()),
+               "at Early/Late 100 % no late-path control changes a single sample");
+
+        /*
+            And the converse, so the test is not passing because the whole
+            thing is silent: the early layer has to actually be producing
+            something.
+        */
+        const auto early = avrender::render ({ { "earlyLate", 100.0f }, { "mix", 100.0f } },
+                                             avrender::Signal::transient, 1.0);
+
+        double peak = 0.0;
+
+        for (float s : early)
+            peak = std::max (peak, static_cast<double> (std::abs (s)));
+
+        info ("");
+        info ("  Early-only output peak: " + std::to_string (peak)
+              + " - the identities above are not the identity of silence.");
+
+        check (peak > 0.01, "the early layer is audibly present at Early/Late 100 %");
+    }
+
+    info ("");
+
+    // -----------------------------------------------------------------------
+    info ("PHASE 10: Pre-Delay moves both branches equally");
+    info ("-----------------------------------------------");
+    // -----------------------------------------------------------------------
+    {
+        /*
+            The reason the split sits AFTER the pre-delay. If Pre-Delay reached
+            one branch before the other it would be a hidden early/late timing
+            control, which PHASE 10's brief rules out by name.
+
+            MEASURED AGAINST A CONTROL, BECAUSE THE OBVIOUS TEST IS WRONG.
+
+            The first version of this asked for a residual of exactly zero
+            after shifting, and the composed output gave 4.2e-4. That looks
+            like a leak and is not one: the LATE PATH ALONE gives the same
+            residual. The tank is not perfectly time invariant even at Mod
+            Depth 0 - the modulation architecture is still in the loop - so
+            feeding it the same impulse 960 samples later does not produce an
+            exactly shifted response, and no amount of correct pre-delay
+            behaviour would make it.
+
+            So the control is the late path on its own, at Early/Late 0. The
+            question this can actually answer is whether composing the early
+            layer in makes the shift any worse than the late path already is.
+            A branch the pre-delay did not reach would leave its unshifted
+            self behind and the residual would jump by orders of magnitude,
+            not by a few percent.
+        */
+        auto residualFor = [] (float balance, float ms)
+        {
+            const std::vector<avrender::Setting> at
+            {
+                { "earlyLate", balance }, { "mix", 100.0f },
+                { "modDepth", 0.0f }, { "preDelay", 0.0f }
+            };
+
+            const std::vector<avrender::Setting> shiftedSettings
+            {
+                { "earlyLate", balance }, { "mix", 100.0f },
+                { "modDepth", 0.0f }, { "preDelay", ms }
+            };
+
+            const auto zero    = avrender::render (at, avrender::Signal::impulse, 1.0);
+            const auto shifted = avrender::render (shiftedSettings,
+                                                   avrender::Signal::impulse, 1.0);
+
+            const auto offset = static_cast<size_t> (
+                std::lround (ms * 0.001 * avrender::sampleRate)) * 2;
+
+            double worst = 0.0, peak = 0.0;
+
+            for (size_t i = 0; i + offset < zero.size(); ++i)
+            {
+                worst = std::max (worst, static_cast<double> (
+                    std::abs (shifted[i + offset] - zero[i])));
+
+                peak = std::max (peak, static_cast<double> (std::abs (zero[i])));
+            }
+
+            return peak > 0.0 ? worst / peak : worst;
+        };
+
+        info ("  Residual after shifting back, relative to the output's peak:");
+        info ("");
+        info ("    Early/Late    20 ms          80 ms");
+
+        bool composedIsNoWorse = true;
+
+        double lateOnly20 = 0.0, lateOnly80 = 0.0;
+
+        for (float balance : { 0.0f, 50.0f, 100.0f })
+        {
+            const double r20 = residualFor (balance, 20.0f);
+            const double r80 = residualFor (balance, 80.0f);
+
+            if (balance == 0.0f)
+            {
+                lateOnly20 = r20;
+                lateOnly80 = r80;
+            }
+            else
+            {
+                // A tolerance of 2x on a number that would rise by orders of
+                // magnitude if a branch were missed.
+                composedIsNoWorse = composedIsNoWorse
+                                 && r20 <= lateOnly20 * 2.0 + 1.0e-9
+                                 && r80 <= lateOnly80 * 2.0 + 1.0e-9;
+            }
+
+            info ("    " + std::to_string (static_cast<int> (balance)) + " %"
+                  + std::string (balance < 100.0f ? "          " : "         ")
+                  + std::to_string (r20) + "       " + std::to_string (r80));
+        }
+
+        info ("");
+        info ("  The Early/Late 0 row is the control: that residual is the");
+        info ("  tank's own imperfect time invariance and has nothing to do");
+        info ("  with PHASE 10. Composing the early layer in does not raise");
+        info ("  it, which is what 'both branches moved by the same amount'");
+        info ("  looks like when the thing they feed is not perfectly LTI.");
+        info ("");
+        info ("  KNOWN MEASUREMENT CHARACTERISTIC, NOT A SHIPPING ISSUE: this");
+        info ("  gate cannot be tightened to an exact identity until the tank");
+        info ("  is exactly time invariant at Mod Depth 0, which it is not.");
+
+        check (composedIsNoWorse,
+               "composing the early layer in does not worsen how Pre-Delay shifts the output");
     }
 
     // -----------------------------------------------------------------------

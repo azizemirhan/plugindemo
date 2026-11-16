@@ -38,6 +38,9 @@ struct RawHandles
     std::atomic<float>* lowCut         = nullptr;
     std::atomic<float>* highCut        = nullptr;
     std::atomic<float>* mix            = nullptr;
+
+    /** PHASE 10. Early/Late composition, 0..100. 0 is the late network alone. */
+    std::atomic<float>* earlyLate      = nullptr;
 };
 
 } // namespace av::params

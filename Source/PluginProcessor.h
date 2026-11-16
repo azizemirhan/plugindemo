@@ -20,6 +20,7 @@
 
 #include "DSP/AttackInjection.h"
 #include "DSP/CutFilter.h"
+#include "DSP/EarlyReflections.h"
 #include "DSP/ModulationArchitecture.h"
 #include "DSP/MorphingStereoFdn.h"
 #include "DSP/PreDelay.h"
@@ -211,6 +212,30 @@ private:
     dsp::StereoCutFilters cutFilters;
     dsp::PreDelay<Real>   preDelay;
     dsp::AttackInjection  attackInjection;
+
+    /** PHASE 10. The explicit early-reflection layer and the control that
+        composes it against the late network.
+
+            ... -> Pre-Delay -+-> Attack -> tank -> trim -+-> balance -> Width
+                              |                           |
+                              +-> early reflections ------+
+
+        The split is AFTER the pre-delay so that Pre-Delay moves both branches
+        by the same amount, and BEFORE Attack so that Attack cannot reach the
+        early layer. Both are topology rather than discipline: there is no
+        path by which Attack, Early Diffusion or the late damping shelves can
+        see the ER branch.
+
+        At Early/Late 0 the balance reports itself bypassed, the combine step
+        is skipped entirely and the PHASE 9 path is reproduced bit for bit.
+        The ER delay line is still written, so the first move away from 0
+        reads current history rather than whatever was last passing through. */
+    dsp::EarlyReflections  earlyReflections;
+    dsp::EarlyLateBalance  earlyLateBalance;
+
+    /** The ER branch's output for the current chunk. Allocated in
+        prepareToPlay alongside wetBuffer and sized to match it. */
+    juce::AudioBuffer<Real> erBuffer;
 
    #if AV_DEV_DIAGNOSTICS
     /** Telemetry. Compiled out entirely unless -DAV_DEV_DIAGNOSTICS=ON: in the

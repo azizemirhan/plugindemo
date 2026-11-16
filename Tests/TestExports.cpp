@@ -15,6 +15,7 @@
 #include "DiagnosticAnalyzer.h"
 #include "Phase8Listening.h"
 #include "Phase9Listening.h"
+#include "Phase10Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -363,6 +364,24 @@ __declspec (dllexport) int ExportAuroraVerbPhase9Listening (const char* director
 
     return avtest::exportPhase9ListeningSet (directory,
                                              sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/**
+    Renders the PHASE 10 Stage 3 early-reflection listening set.
+
+    Four cases over four sources: the large-Size handoff valley at 100 %% wet,
+    discrete slap and rhythm on a sparse transient, coloration at the shipping
+    Mix, and the stereo image against its own mono downmix. Only the
+    primary-risk pair is blind, and its mapping is in a key file.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase10Listening (const char* directory,
+                                                             double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase10ListeningSet (directory,
+                                              sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"

@@ -78,6 +78,17 @@ namespace id
     inline constexpr const char* lowCut          = "lowCut";
     inline constexpr const char* highCut         = "highCut";
     inline constexpr const char* mix             = "mix";
+
+    /*
+        PHASE 10. The first parameter added after the original nineteen, and
+        the first to carry versionHintV2.
+
+        Appended rather than placed beside Early Diffusion, where it would
+        read better. The order of this list is part of what hosts cache, and
+        readability is not worth a reordered automation lane in a session
+        somebody has already written.
+    */
+    inline constexpr const char* earlyLate       = "earlyLate";
 }
 
 // --- Algorithm bank ------------------------------------------------------

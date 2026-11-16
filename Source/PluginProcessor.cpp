@@ -132,6 +132,10 @@ void AuroraVerbProcessor::prepareToPlay (double sampleRate, int maximumExpectedS
     // splits anything bigger into chunks rather than reallocating.
     wetBuffer.setSize (2, juce::jmax (currentBlockSize, 512), false, true, true);
 
+    // PHASE 10. The ER branch's output. Same length as the wet buffer, so the
+    // chunk loop can never produce more ER samples than there is room for.
+    erBuffer.setSize (2, wetBuffer.getNumSamples(), false, true, true);
+
     smoothed.prepare (sampleRate);
     needsSmootherReset = true;
 
@@ -142,6 +146,11 @@ void AuroraVerbProcessor::prepareToPlay (double sampleRate, int maximumExpectedS
     cutFilters     .prepare (sampleRate);
     preDelay       .prepare (sampleRate);
     attackInjection.prepare (sampleRate);
+
+    // PHASE 10. Sized for the longest span any pattern may ask for rather
+    // than for the current Size, so changing Size never allocates.
+    earlyReflections.prepare (sampleRate);
+    earlyLateBalance.prepare (sampleRate);
 
     tank.prepare (sampleRate);
     tank.setRt60Seconds (2.0, true);
@@ -262,13 +271,16 @@ void AuroraVerbProcessor::releaseResources()
 void AuroraVerbProcessor::reset()
 {
     wetBuffer.clear();
+    erBuffer .clear();
     needsSmootherReset = true;
 
     // PHASE 8. Without this the pre-delay buffer would replay audio from
-    // before the stop, which is the classic stale-buffer bug.
-    cutFilters     .reset();
-    preDelay       .reset();
-    attackInjection.reset();
+    // before the stop, which is the classic stale-buffer bug. The ER layer
+    // is a delay line too and has exactly the same exposure.
+    cutFilters      .reset();
+    preDelay        .reset();
+    attackInjection .reset();
+    earlyReflections.reset();
 
     tank.reset();
 
@@ -310,7 +322,27 @@ double AuroraVerbProcessor::getTailLengthSeconds() const
                         * std::pow (std::clamp (attack, 0.0, 1.0),
                                     dsp::AttackInjection::mappingExponent);
 
-    return decay + (preDelayMs + attackMs) * 0.001;
+    // PHASE 10: the ER layer is PARALLEL to the late one, so the tail is the
+    // longer of the two branches and not their sum. It only exists at all
+    // above Early/Late 0, and its span follows Size through the same law the
+    // engine uses, rather than a second copy of it here.
+    const auto earlyLate = static_cast<double> (raw.earlyLate->load (std::memory_order_relaxed));
+
+    double earlyMs = 0.0;
+
+    if (earlyLate > 0.0)
+    {
+        const auto size = static_cast<double> (raw.size->load (std::memory_order_relaxed)) * 0.01;
+
+        earlyMs = dsp::er::spanFor (dsp::er::defaultPattern,
+                                    dsp::mapping::sizeScaleFor (size)
+                                      / dsp::mapping::sizeScaleFor (dsp::er::referenceSizeControl));
+    }
+
+    const auto lateSeconds  = decay + attackMs * 0.001;
+    const auto earlySeconds = earlyMs * 0.001;
+
+    return preDelayMs * 0.001 + std::max (lateSeconds, earlySeconds);
 }
 
 // --- Rendering -------------------------------------------------------------
@@ -442,9 +474,16 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
         // long a band takes to decay. Neither is a substitute for the other
         // and a test measures the difference rather than asserting it.
         //
-        // A future Early/Late split belongs after the filters and before the
-        // pre-delay: the filters condition both paths, and a pre-delay is a
-        // late-path control because early reflections should start early.
+        // PHASE 10 put the Early/Late split AFTER the pre-delay, not before
+        // it. An earlier note here predicted the opposite, on the reasoning
+        // that early reflections should start early; that reasoning was
+        // wrong, and it is left visible rather than quietly deleted. A
+        // pre-delay in front of a reverb delays the SOURCE, and a reflection
+        // of a delayed source is delayed with it. Splitting ahead of the
+        // pre-delay would have made Pre-Delay a hidden early/late timing
+        // control - the one thing PHASE 10's brief rules out by name.
+
+        bool earlyLateActive = false;
 
         {
             auto* wetL = wetBuffer.getWritePointer (0);
@@ -484,6 +523,54 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
                 preDelay.setDelayMilliseconds (preDelayTargetMs);
 
             preDelay.process (wetL, wetR, count);
+
+            // --- PHASE 10: the Early/Late split ---------------------------
+            //
+            // Everything above this line conditions BOTH branches; everything
+            // below it until the combine belongs to the late one. The ER
+            // branch reads the pre-delayed signal here and writes its own
+            // buffer, so Attack - which runs next, in place on the wet
+            // buffer - cannot reach it.
+            //
+            // The span follows Size through the engine's own law. Rebuilding
+            // the schedule crossfades, and two Size values that round to the
+            // same integer span do not restart the fade, so a Size smoother
+            // creeping by a fraction of a sample costs nothing.
+            {
+                const auto sizeRatio =
+                    dsp::mapping::sizeScaleFor (smoothed.size.getCurrentValue())
+                    / dsp::mapping::sizeScaleFor (dsp::er::referenceSizeControl);
+
+                const auto balance =
+                    static_cast<double> (raw.earlyLate->load (std::memory_order_relaxed)) * 0.01;
+
+                if (firstBlockAfterPrepare && offset == 0)
+                {
+                    earlyReflections.snapToSizeRatio (sizeRatio);
+                    earlyLateBalance.snapTo (balance);
+                }
+                else
+                {
+                    earlyReflections.setSizeScaleRatio (sizeRatio);
+                    earlyLateBalance.setBalance (balance);
+                }
+
+                // Asked of the target and the smoothing state, never of the
+                // current value: a gain that has arrived at zero still has to
+                // be KNOWN to have arrived before the branch can be skipped.
+                earlyLateActive = ! earlyLateBalance.isBypassed();
+
+                if (earlyLateActive)
+                    earlyReflections.process (wetL, wetR,
+                                              erBuffer.getWritePointer (0),
+                                              erBuffer.getWritePointer (1), count);
+                else
+                    // Silent, but still fed. A delay line that stops being
+                    // written goes stale, and the first move away from 0
+                    // would read whatever was passing through when the
+                    // control was last touched.
+                    earlyReflections.writeOnly (wetL, wetR, count);
+            }
 
             // --- PHASE 9: Attack ------------------------------------------
             //
@@ -606,6 +693,48 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
             {
                 wetL[i] *= trim;
                 wetR[i] *= trim;
+            }
+        }
+
+        // --- 2b. PHASE 10: combine the two branches ------------------------
+        //
+        // AFTER the trim, and that placement is a decision rather than an
+        // accident of ordering. The trim is a DECAY-AWARE compensation for
+        // the TANK's level: it keeps Decay from doubling as a volume control
+        // by undoing the level the recurrence builds. The ER layer has no
+        // recurrence and nothing to undo, so passing it through the same trim
+        // would make the early layer's loudness follow Decay - a late
+        // property that the early one does not have, and an Early/Late
+        // control whose meaning changed with the Decay knob.
+        //
+        // Before Width and Mix, so both act on the composed wet signal. An ER
+        // layer outside Width would be a stereo image Width could not reach.
+        //
+        // Skipped entirely at Early/Late 0 - not multiplied by gains that
+        // happen to be 1 and 0. PHASE 9 established the distinction and it is
+        // the same one here: `x * 1.0 + y * 0.0` is arithmetic the compiler
+        // must perform, and performing it on a denormal or an infinity is not
+        // the identity. Taking the branch is what makes the legacy path bit
+        // exact rather than merely very close.
+
+        if (earlyLateActive)
+        {
+            auto* wetL = wetBuffer.getWritePointer (0);
+            auto* wetR = wetBuffer.getWritePointer (1);
+
+            const auto* erL = erBuffer.getReadPointer (0);
+            const auto* erR = erBuffer.getReadPointer (1);
+
+            for (int i = 0; i < count; ++i)
+            {
+                // Per sample, so a balance move is a ramp rather than a step
+                // at the chunk boundary. The ramp is on the GAINS; nothing
+                // here can move a reflection in time.
+                const Real lateG  = static_cast<Real> (earlyLateBalance.nextLate());
+                const Real earlyG = static_cast<Real> (earlyLateBalance.nextEarly());
+
+                wetL[i] = lateG * wetL[i] + earlyG * erL[i];
+                wetR[i] = lateG * wetR[i] + earlyG * erR[i];
             }
         }
 
