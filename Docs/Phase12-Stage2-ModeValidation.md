@@ -1059,7 +1059,7 @@ order. Run undisturbed, with no build in parallel.
 
 Pre-registration of the yardstick, before any candidate was scored: `5073e1e`
 
-Results: `<recorded on commit>`
+Results: `2f9c062`
 
 ---
 
