@@ -106,6 +106,7 @@ void runPhase10ResearchTests();
 void runPhase10Stage2Tests();
 void runPhase10ProductionTests();
 void runPhase10Stage35Tests();
+void runPhase10BalanceLawTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

@@ -488,4 +488,161 @@ int exportPhase10ListeningSet (const std::string& directory, double sampleRate)
     return written;
 }
 
+// ===========================================================================
+
+int exportPhase10OccupancyAb (const std::string& directory, double sampleRate)
+{
+    if (sampleRate <= 0.0)
+        return -1;
+
+    constexpr double kLow  = 0.20;
+    constexpr double kHigh = 0.40;
+
+    const auto fu2 = makeFu2Sources (sampleRate);
+
+    const std::vector<StereoFrame>* snare = nullptr;
+
+    for (const auto& s : fu2)
+        if (s.name == "snare")
+            snare = &s.frames;
+
+    if (snare == nullptr)
+        return -1;
+
+    const auto vocal = makeVocalReference (sampleRate, 6.0);
+
+    int written = 0;
+
+    std::ostringstream key, md;
+
+    key << "AuroraVerb - PHASE 10 occupancy A/B key\n"
+        << "=======================================\n\n"
+        << "DO NOT READ until both answers are written down.\n\n"
+        << "cellOccupancy " << fixed (kLow, 2)
+        << "   handoff valley 7.26 dB at Size 100 %, 1/3-oct ripple 5.18 dB\n"
+        << "cellOccupancy " << fixed (kHigh, 2)
+        << "   handoff valley 8.86 dB at Size 100 %, 1/3-oct ripple 3.76 dB\n\n"
+        << "Both are fully aperiodic (0 % gap repetition, 15/15 distinct\n"
+        << "intervals) and indistinguishable on correlation and mono downmix.\n"
+        << "The measurements disagree about which is better, which is why this\n"
+        << "comparison exists.\n\n"
+        << "The mapping is randomised independently per case.\n\n";
+
+    struct Case
+    {
+        const char* name;
+        const std::vector<StereoFrame>* source;
+        double size, balance, mix;
+        bool firstIsLow;
+    };
+
+    /*
+        O2 uses 100 % wet rather than the shipping Mix, and that is a
+        deliberate reading of "the most revealing sensible Mix value". The
+        question is about the reverb's internal structure - a handoff and a
+        tonal character - and at Mix 30 % seventy per cent of what reaches the
+        listener is a dry vocal that is identical in both files. Burying the
+        thing under test under unchanged material does not make the test more
+        realistic, it makes it less sensitive.
+    */
+    const std::vector<Case> cases
+    {
+        { "caseO1", snare,  1.00, 0.25, 1.0, false },
+        { "caseO2", &vocal, 1.00, 0.50, 1.0, true  },
+    };
+
+    std::vector<double> levelGaps;
+
+    for (const auto& c : cases)
+    {
+        const double first  = c.firstIsLow ? kLow  : kHigh;
+        const double second = c.firstIsLow ? kHigh : kLow;
+
+        const auto a = render (*c.source, sampleRate, { c.size, c.balance, first  }, c.mix);
+        const auto b = render (*c.source, sampleRate, { c.size, c.balance, second }, c.mix);
+
+        if (! writeStereoWav (directory + "/" + c.name + "-1.wav", a, sampleRate)
+            || ! writeStereoWav (directory + "/" + c.name + "-2.wav", b, sampleRate))
+            return -1;
+
+        written += 2;
+
+        levelGaps.push_back (std::abs (levelDb (a) - levelDb (b)));
+
+        key << c.name << "-1  =  cellOccupancy " << fixed (first, 2)
+            << "   peak " << fixed (peakOf (a), 4)
+            << "   level " << fixed (levelDb (a), 2) << " dB\n"
+            << c.name << "-2  =  cellOccupancy " << fixed (second, 2)
+            << "   peak " << fixed (peakOf (b), 4)
+            << "   level " << fixed (levelDb (b), 2) << " dB\n";
+    }
+
+    md << "# AuroraVerb - PHASE 10 early reflections: the final occupancy A/B\n\n"
+       << "Four files, two cases, both blind. Please answer case O1 completely\n"
+       << "before listening to case O2, and do not open `KEY.txt` until both\n"
+       << "are written down.\n\n"
+       << "This replaces the earlier eight-file set. That one compared the\n"
+       << "current production value against one alternative; the research has\n"
+       << "since ruled the production value out on structural grounds, and the\n"
+       << "two files in each pair here are the two remaining candidates.\n\n"
+       << "Everything except the one pattern constant under test is identical\n"
+       << "between the two files of a pair: same source, same gain, same sample\n"
+       << "rate, same length, same Size, same Early/Late, same envelope decay.\n"
+       << "**Level is not a cue here, and that was checked rather than\n"
+       << "assumed.** Nothing is loudness-matched, but the pairs happen to\n"
+       << "differ in integrated level by only "
+       << fixed (levelGaps[0], 2) << " dB and "
+       << fixed (levelGaps[1], 2) << " dB, so whatever you\n"
+       << "hear is structure and not loudness. Peak level does differ a little\n"
+       << "more, which is the effect itself - the same energy arriving in a\n"
+       << "different pattern - and is not something to judge on.\n\n"
+       << "---\n\n"
+       << "## CASE O1 - `caseO1-1.wav` / `caseO1-2.wav`\n\n"
+       << "Snare, Size 100 %, Early/Late 25 %, 100 % wet.\n\n"
+       << "1. A, B, or no meaningful preference?\n"
+       << "2. Any discrete slap?\n"
+       << "3. Any rhythmic multitap impression?\n"
+       << "4. Any obvious hole between the early reflections and the late tail?\n"
+       << "5. Any tonal coloration, or any unnatural smoothness?\n\n"
+       << "---\n\n"
+       << "## CASE O2 - `caseO2-1.wav` / `caseO2-2.wav`\n\n"
+       << "Vocal, Size 100 %, Early/Late 50 %, 100 % wet.\n\n"
+       << "1. A, B, or no meaningful preference?\n"
+       << "2. Any discrete slap?\n"
+       << "3. Any rhythmic multitap impression?\n"
+       << "4. Any obvious hole between the early reflections and the late tail?\n"
+       << "5. Any tonal coloration, or any unnatural smoothness?\n\n"
+       << "---\n\n"
+       << "## What this decides\n\n"
+       << "Which of two candidate values of one early-reflection constant\n"
+       << "becomes the shipping candidate. Neither is accepted; the production\n"
+       << "value is a third value that the measurements have ruled out, and it\n"
+       << "stays in place until these answers exist.\n\n"
+       << "The measurements disagree about which candidate is better - one has\n"
+       << "the cleaner handoff, the other the flatter tone - so there is no\n"
+       << "expected answer here, and question 5 matters as much as question 4.\n";
+
+    {
+        std::ofstream f (directory + "/LISTENING.md", std::ios::binary);
+
+        if (! f)
+            return -1;
+
+        f << md.str();
+        ++written;
+    }
+
+    {
+        std::ofstream f (directory + "/KEY.txt", std::ios::binary);
+
+        if (! f)
+            return -1;
+
+        f << key.str();
+        ++written;
+    }
+
+    return written;
+}
+
 } // namespace avtest

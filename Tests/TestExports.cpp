@@ -384,4 +384,22 @@ __declspec (dllexport) int ExportAuroraVerbPhase10Listening (const char* directo
                                               sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
+/**
+    Renders the final PHASE 10 occupancy A/B: cellOccupancy 0.20 against 0.40.
+
+    Four files, two blind cases - a transient at Size 100 / Early/Late 25, and
+    a vocal at Size 100 / Early/Late 50. Replaces the earlier eight-file set,
+    whose primary comparison the research has overtaken. The mapping is
+    randomised per case and lives in a key file.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase10OccupancyAb (const char* directory,
+                                                               double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase10OccupancyAb (directory,
+                                             sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
 } // extern "C"

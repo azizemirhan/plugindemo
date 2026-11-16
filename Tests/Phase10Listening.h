@@ -65,4 +65,30 @@ namespace avtest
 */
 int exportPhase10ListeningSet (const std::string& directory, double sampleRate = 48000.0);
 
+/**
+    The final occupancy A/B: cellOccupancy 0.20 against 0.40.
+
+    FOUR WAV FILES, TWO CASES. A separate set from the one above, and the
+    reason is that the earlier pack asks a question the research has since
+    overtaken. It compared the shipped 0.70 against 0.20, and 0.70 is no
+    longer a structural candidate: it carries a 16.47 dB large-Size handoff
+    valley against 7.26 dB at 0.20, with no gain in aperiodicity to show for
+    it.
+
+    The measurement finalists are 0.20 and 0.40, and between them the
+    measurements disagree rather than decide. 0.20 has the better handoff -
+    7.26 dB against 8.86 dB at Size 100 % - and 0.40 the better third-octave
+    flatness, 3.76 dB of ripple against 5.18 dB. Both are fully aperiodic,
+    both are indistinguishable on correlation and mono, and neither can cost
+    more CPU than the other. That is where measurement stops.
+
+    NEITHER IS A SHIPPING CANDIDATE YET and the production constant is
+    untouched at 0.70. 0.20 and 0.40 exist here only as render-time Pattern
+    data.
+
+    Blind: the A/B mapping is randomised independently per case, appears in no
+    filename, and lives in KEY.txt.
+*/
+int exportPhase10OccupancyAb (const std::string& directory, double sampleRate = 48000.0);
+
 } // namespace avtest
