@@ -173,6 +173,8 @@ int runAllSuites()
     AV_RUN (runPhase10ProductionTests);
     AV_RUN (runPhase10Stage35Tests);
     AV_RUN (runPhase10BalanceLawTests);
+    AV_RUN (runPhase11StereoAuditTests);
+    AV_RUN (runPhase11ReadoutTests);
 
 
     if (suitesRun == 0)

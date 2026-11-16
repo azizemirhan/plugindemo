@@ -113,6 +113,8 @@ set(AV_TEST_SUITE_SOURCES
     Phase10Production.cpp
     Phase10Stage35.cpp
     Phase10BalanceLaw.cpp
+    Phase11StereoAudit.cpp
+    Phase11Readout.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp

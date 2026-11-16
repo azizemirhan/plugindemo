@@ -108,6 +108,11 @@ void runPhase10ProductionTests();
 void runPhase10Stage35Tests();
 void runPhase10BalanceLawTests();
 
+// --- PHASE 11: stereo and spatial ----------------------------------------
+
+void runPhase11StereoAuditTests();
+void runPhase11ReadoutTests();
+
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
 
