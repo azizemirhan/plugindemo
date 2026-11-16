@@ -75,7 +75,15 @@ struct Pattern
 
             gain(t) = exp(-t / (windowMs * decay)) / sqrt(t)
 
-        PRODUCTION LISTENING CANDIDATE, not a settled shipping constant.
+        ACCEPTED SHIPPING CONSTANT, PHASE 10 closure. It was a listening
+        candidate through Stages 3 and 3.5; the final sanity listening found
+        no audible collapse or disconnection on pad, vocal or piano, and the
+        snare returned no repeatable defect. Do not reopen without new
+        evidence.
+
+        The reasoning that selected it is kept below rather than trimmed to a
+        verdict, because the next person to touch this will need the argument
+        and not the conclusion.
 
         Stage 2 showed the large-Size handoff valley is driven by this rather
         than by the ER span: raising the ER/late overlap from 44.5 to 67.3 ms
@@ -114,8 +122,10 @@ struct Pattern
         eventually puts two events on adjacent sides of a cell boundary, which
         is an audible doublet rather than two reflections.
 
-        0.40 IS THE PHASE 10 FINAL CANDIDATE, AND IT REPLACED 0.70 ON
-        EVIDENCE. The occupancy sweep found this field dominates the
+        0.40 IS THE ACCEPTED PHASE 10 CONSTANT, AND IT REPLACED 0.70 ON
+        EVIDENCE. Accepted at closure after the final sanity listening; do
+        not reopen without new evidence. The occupancy sweep found this field
+        dominates the
         large-Size handoff valley: 16.47 dB at 0.70 against 8.86 dB here and
         7.26 dB at 0.20, with 0.70 sitting just below a cliff (0.95 gives
         42 dB). The blind A/B that followed - 0.20 against 0.40, a transient
