@@ -806,7 +806,7 @@ identity there or it does not; the settings are not adjusted to help it.
 | 4 | Hall ≡ the current engine, bit for bit | **yes**, unless Stage 2 shows the Hall target needs otherwise |
 | 5 | Mode carries no tonal data at all | **yes**, leaving brightness wholly to Phase 13 |
 
-Commit: `<recorded on commit>`
+Commit: `52a23b4`
 
 ---
 
