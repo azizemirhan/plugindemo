@@ -416,4 +416,4 @@ attribution the whole pass was structured to preserve.
 
 ## 21. Commit
 
-Recorded in the commit that carries this document; the hash is reported with it.
+`aa8c27e` - "Phase 10 Stage 3.5: balance calibration and ER occupancy research".
