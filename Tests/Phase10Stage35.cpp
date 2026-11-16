@@ -1438,7 +1438,7 @@ void runPhase10Stage35Tests()
         check (fast <= held * 1.05 + 1.0e-12,
                "nor does the same sweep eight times faster");
 
-        check (er::gainsForBalance (0.0).early == 0.0,
+        check (er::gainsForBalance (0.0, er::balanceCalibration).early == 0.0,
                "the early gain at Early/Late 0 is exactly zero, so K cannot "
                "reach the legacy endpoint");
     }

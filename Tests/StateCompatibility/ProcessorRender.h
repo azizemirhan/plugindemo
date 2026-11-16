@@ -158,8 +158,11 @@ inline bool applySetting (av::AuroraVerbProcessor& processor, const Setting& s)
     signal paths.
 */
 [[nodiscard]] inline std::vector<float> render (const std::vector<Setting>& settings,
-                                                Signal kind, double seconds)
+                                                Signal kind, double seconds,
+                                                int blockOverride = 0)
 {
+    const int blockSize = blockOverride > 0 ? blockOverride : avrender::blockSize;
+
     av::AuroraVerbProcessor processor;
 
     processor.setPlayConfigDetails (2, 2, sampleRate, blockSize);

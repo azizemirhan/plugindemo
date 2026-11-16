@@ -108,13 +108,35 @@ struct Pattern
     /**
         The share of each cell an event may land in, centred.
 
-        0.70 leaves a 15 % guard at each end, so two consecutive arrivals in
-        one channel are never closer than 0.30 of a cell nor further apart
-        than 1.70. Without it a pseudo-random draw eventually puts two events
-        on adjacent sides of a cell boundary, which is an audible doublet
-        rather than two reflections.
+        0.40 leaves a 30 % guard at each end, so two consecutive arrivals in
+        one channel are never closer than 0.60 of a cell nor further apart
+        than 1.40. Some guard is essential: without it a pseudo-random draw
+        eventually puts two events on adjacent sides of a cell boundary, which
+        is an audible doublet rather than two reflections.
+
+        0.40 IS THE PHASE 10 FINAL CANDIDATE, AND IT REPLACED 0.70 ON
+        EVIDENCE. The occupancy sweep found this field dominates the
+        large-Size handoff valley: 16.47 dB at 0.70 against 8.86 dB here and
+        7.26 dB at 0.20, with 0.70 sitting just below a cliff (0.95 gives
+        42 dB). The blind A/B that followed - 0.20 against 0.40, a transient
+        and a vocal, both at Size 100 % - returned NO MEANINGFUL PREFERENCE
+        on either case, so the choice between the two survivors fell back to
+        measurement.
+
+        0.40 wins that on the axis the valley does not cover. Third-octave
+        ripple is 3.76 dB here against 5.18 dB at 0.20, and arrivals sit
+        further from their cell centres, which is the direction away from
+        regular spacing and therefore away from slap. Both values are fully
+        aperiodic - 0 % gap repetition, fifteen distinct intervals out of
+        fifteen - where 0.15 and 0.30 are not, and both are indistinguishable
+        on correlation, mono downmix and CPU.
+
+        So: 0.40 gives up 1.6 dB of handoff against 0.20 and takes 1.4 dB of
+        spectral smoothness for it, having been told by a listener that
+        neither difference was audible. That is a defensible compromise
+        rather than an optimum, and it is recorded as a compromise.
     */
-    double cellOccupancy = 0.70;
+    double cellOccupancy = 0.40;
 
     /** Share of the window the first event may not precede, as a fraction. */
     double earliestFraction = 0.0;
@@ -140,65 +162,193 @@ inline constexpr double maxSpanMs = 160.0;
 inline constexpr int maxEvents = 32;
 
 // ===========================================================================
-//  Balance
+//  Balance: the parameter-aware calibration, and the gain law
 // ===========================================================================
 /**
-    Static energy calibration between the two branches.
+    BAL-4. The Early/Late calibration, as a function of Decay and Size.
 
-    The ER branch and the late branch do not arrive with comparable energy at
-    unit gain, so a plain crossfade between them would also be a level change.
-    `K` equalises them once.
+    WHY A FUNCTION AND NOT A CONSTANT. The ER branch and the late branch do not
+    arrive with comparable energy at unit gain, so a crossfade between them is
+    also a level change unless something equalises them. PHASE 10 shipped a
+    single constant for that and Stage 3.5 measured what it costs: the ideal
+    ratio spans 30.68 dB across the Decay x Size plane, so one number is wrong
+    by up to 26.26 dB at the short-Decay corner. The ER branch is not the
+    variable - its energy moves 0.02 dB over the whole plane, because the taps
+    are L2-normalised - so all of it is the late branch, and all of it is a
+    deterministic function of two parameters.
 
-    IT IS A CONSTANT, DELIBERATELY. Computing it from the running signal would
-    be dynamic normalisation - gain pumping, program-dependent semantics, an
-    AGC in all but name - and PHASE 10's brief forbids all three. So it is
-    measured once at the reference configuration and frozen here, and a test
-    re-measures the ratio and fails if the constant has drifted away from it.
+    WHAT IT IS NOT. It is not derived from the audio. No level detection, no
+    envelope follower, no correlation measurement, no source classification,
+    no AGC. K changes when the user changes Decay or Size and at no other
+    time, which is what makes the control predictable and automatable. The
+    alternative - tracking the programme material - was rejected on purpose: a
+    balance that calibrated itself to the signal would behave differently on a
+    snare and on a pad, which is exactly the unpredictability a composition
+    control must not have.
 
-    MEASURED AGAINST THE TRIMMED LATE BRANCH. Stage 2 reported 0.7811, taken
-    against an untrimmed one, and that figure does not transfer: production
-    multiplies the tank by the decay-aware compensation and the early layer by
-    nothing, so the ratio the balance actually sees is a different ratio. The
-    value here is 62.659 over 121.322 at Size 60 %, Decay 2.5 s, Early
-    Diffusion 70 %, Mod Depth 30 %, driven by a 10 ms noise burst. With it the
-    total wet energy moves 0.03 dB across the whole Early/Late travel.
+    WHY A TABLE AND NOT A FORMULA. Stage 3.5 fitted three analytic forms and
+    the best of them, a four-coefficient log-quadratic, leaves 8.71 dB at
+    Decay 0.1 s where this table leaves 1.26 dB. The surface has an inverted
+    corner there - ideal K FALLS with Size at 0.1 s while rising with it
+    everywhere else, because the decay-aware trim's 12 dB safety limit is
+    active - and a smooth formula cannot pass through it without bending
+    everywhere else. Fifteen measured numbers can.
 
-    THE COST, STATED RATHER THAN HIDDEN. The late branch's energy moves with
-    Decay and Size and a fixed K cannot follow it, so the calibration is exact
-    at the reference and approximate elsewhere. Over Decay 0.5-10 s and Size
-    20-100 % the worst error is 6.14 dB, at short Decay and small Size where
-    the late branch is quietest. In other words Early/Late is a clean
-    composition control at and near the defaults, and at the extremes it also
-    changes the level somewhat. That is the price of refusing to normalise
-    dynamically, and it is a reported characteristic rather than a defect
-    awaiting a detector.
+    HOW IT IS INTERPOLATED. Bilinearly in log(rt60) x log(sizeScale). The log
+    domain is what keeps the surface monotone between knots, so turning Decay
+    up never makes the early layer quieter on one side of a knot and louder on
+    the other. Outside the knots it clamps rather than extrapolating.
+
+    MEASURED WITH THE FINAL PATTERN. The table is a property of the ER
+    pattern, so it was re-measured after cellOccupancy became 0.40 rather than
+    carried over. A test re-measures it and fails on drift, and the pattern
+    fingerprint test fails if the pattern changes at all.
+*/
+inline constexpr int calibrationDecayKnots = 5;
+inline constexpr int calibrationSizeKnots  = 3;
+
+/**
+    The knot axes, in RT60 seconds and in Size scale - the engine's units, not
+    the control's.
+
+    Stated as literals so this header needs no dependency on the parameter
+    mapping, and checked against mapping::rt60For and mapping::sizeScaleFor by
+    a test, so the duplication cannot drift silently. They correspond to Decay
+    0.1 / 0.5 / 2.5 / 10 / 60 s and Size 0 / 50 / 100 %.
+*/
+inline constexpr double calibrationRt60[calibrationDecayKnots]
+    { 0.1, 0.5, 2.5, 10.0, 60.0 };
+
+inline constexpr double calibrationSizeScale[calibrationSizeKnots]
+    { 0.25, 0.70710678118654752, 2.0 };
+
+/**
+    The measured ideal K at each knot: sqrt(late energy / ER energy) with the
+    production pattern, a 10 ms noise burst, a 4 s window, and every other
+    control at its default.
+
+    Indexed [decay][size].
+*/
+inline constexpr double calibrationTable[calibrationDecayKnots][calibrationSizeKnots]
+{
+    //  Size 0 %   Size 50 %  Size 100 %
+    { 0.0963,    0.0643,    0.0350 },   // Decay  0.1 s
+    { 0.3049,    0.4245,    0.5210 },   // Decay  0.5 s
+    { 0.4156,    0.6575,    1.0324 },   // Decay  2.5 s
+    { 0.4426,    0.7217,    1.1937 },   // Decay 10.0 s
+    { 0.3750,    0.6169,    1.0375 },   // Decay 60.0 s
+};
+
+/*
+    THE 0.1 s ROW RUNS THE OTHER WAY, and that is measured rather than a typo.
+
+    Every other row rises with Size. That one falls - 0.0963 down to 0.0350 -
+    because at a 0.1 s decay the trim's 12 dB safety limit is active and the
+    late branch is not being compensated the way it is everywhere else.
+    PHASE 6 recorded that limit as a known unmet target at exactly this decay
+    and attributed it to the limit rather than to its table.
+
+    This is the corner that rules out an analytic fit: a smooth surface cannot
+    invert here without bending everywhere else, and the best four-coefficient
+    fit leaves 8.71 dB at this decay where the table leaves 1.26 dB.
+*/
+
+/**
+    K for an RT60 and a Size scale. Real-time safe: two logs, a short search
+    over five and three knots, and four more logs for the corners. No
+    allocation, no branches on data the audio thread cannot see.
+
+    The corner values are interpolated in the LOG domain and exponentiated
+    once, which makes the result a geometric blend rather than an arithmetic
+    one - a gain should interpolate as a ratio.
+*/
+[[nodiscard]] inline double calibrationFor (double rt60, double sizeScale) noexcept
+{
+    const double lr = std::log (std::max (1.0e-6, rt60));
+    const double ls = std::log (std::max (1.0e-6, sizeScale));
+
+    auto axis = [] (const double* knots, int count, double value,
+                    int& lower, double& t)
+    {
+        lower = 0;
+
+        while (lower + 2 < count && value > std::log (knots[lower + 1]))
+            ++lower;
+
+        const double lo = std::log (knots[lower]);
+        const double hi = std::log (knots[lower + 1]);
+
+        t = hi > lo ? (value - lo) / (hi - lo) : 0.0;
+        t = std::clamp (t, 0.0, 1.0);          // clamp, never extrapolate
+    };
+
+    int di = 0, si = 0;
+    double dt = 0.0, st = 0.0;
+
+    axis (calibrationRt60,      calibrationDecayKnots, lr, di, dt);
+    axis (calibrationSizeScale, calibrationSizeKnots,  ls, si, st);
+
+    const double a = std::log (calibrationTable[di][si]);
+    const double b = std::log (calibrationTable[di][si + 1]);
+    const double c = std::log (calibrationTable[di + 1][si]);
+    const double d = std::log (calibrationTable[di + 1][si + 1]);
+
+    const double top    = a + st * (b - a);
+    const double bottom = c + st * (d - c);
+
+    return std::exp (top + dt * (bottom - top));
+}
+
+/**
+    The reference configuration's K - Decay 2.5 s, Size 60 % - for tests and
+    for the report.
+
+    IT IS NO LONGER THE CALIBRATION. Production looks K up from the table
+    above; this is one point on that surface, kept because a handful of tests
+    need a single representative value and because the earlier reports quote
+    it. Anything that uses this where it should use `calibrationFor` is a bug,
+    and the name is deliberately not `balanceCalibrationConstant` so that it
+    reads as a reference rather than as a setting.
 */
 inline constexpr double balanceCalibration = 0.7187;
 
 /**
-    Branch gains for a balance position.
+    Branch gains for a balance position, given that position's K.
 
-    BAL-B, the energy-calibrated constant-power law Stage 2 selected: it held
-    total wet energy to 0.01 dB across the travel, against 2.15 dB for an
-    uncalibrated equal-power law and 3.02 dB for a linear one.
+    THE LAW IS LINEAR IN POWER, and that is a change from PHASE 10's original
+    trigonometric form rather than a restatement of it:
 
-        theta = balance * pi/2
-        late  = cos(theta)
-        er    = sin(theta) * K
+        late  = sqrt(1 - t)
+        early = sqrt(t) * K
 
-    BOTH ENDPOINTS ARE EXACT, AND THEY ARE WRITTEN OUT RATHER THAN TRUSTED TO
-    THE LIBRARY. cos(0) is exactly 1 and sin(0) is exactly 0, so the lower end
-    would come out right anyway. The upper end would NOT: pi/2 is not
-    representable, so cos of the nearest double is about 6.1e-17 instead of
-    zero, and the late branch at "early only" would sit 324 dB down rather
-    than silent.
+    Both forms are exactly constant power - the squared gains sum to one - and
+    they are not equivalent. This one splits POWER linearly in the control,
+    which makes the total energy
 
-    That is inaudible and it is still worth removing, because it is the
-    difference between a property that can be MEASURED and one that can only
-    be approximated. With an exact endpoint, "Attack cannot reach the early
-    layer" is a bit-level comparison at balance 100 %; with 6.1e-17 of late
-    leaking through it is a test with a tolerance, and a tolerance is a thing
-    that gets widened later.
+        total / Le  =  (1 - t)  +  t * (K^2 Ee / Le)
+
+    a straight line in t for ANY K, right or wrong. The trigonometric form
+    also sums to one, but its split is not linear in t, so a mismatched K
+    makes the curve bow away from its own chord - a dip in the middle of the
+    control rather than a clean tilt.
+
+    THAT PROPERTY IS THE WHOLE REASON FOR THE CHANGE, because K will always be
+    somewhat wrong: it is a function of two parameters and the ideal value also
+    depends on the programme material, by 6 to 7.6 dB. Measured across a 24 dB
+    span of deliberate mis-calibration the trigonometric form bows by up to
+    0.189 dB and this one stays flat to three decimals; on a sustained pad the
+    worst sag falls from 1.28 dB to 0.08 dB.
+
+    An exponent family between constant power and linear amplitude was also
+    measured and rejected: sag grows monotonically with the exponent on every
+    source, because the branches never get correlated enough - 0.199 at worst -
+    for amplitude addition to be the better model.
+
+    BOTH ENDPOINTS ARE WRITTEN OUT EXPLICITLY. sqrt(0) and sqrt(1) are exact
+    in IEEE arithmetic, so the branches are redundant; they are here anyway,
+    because an endpoint that is correct by coincidence of the library is not
+    the same claim as one that is correct by construction, and PHASE 10 has
+    been bitten once already by trusting cos(pi/2) to be zero.
 
     At balance 0 the processor does not multiply by these gains at all. It
     takes an explicit bypass branch, because PHASE 9 showed that arithmetic
@@ -207,16 +357,14 @@ inline constexpr double balanceCalibration = 0.7187;
 */
 struct BranchGains { double late = 1.0, early = 0.0; };
 
-[[nodiscard]] inline BranchGains gainsForBalance (double balance01) noexcept
+[[nodiscard]] inline BranchGains gainsForBalance (double balance01, double k) noexcept
 {
     const double u = std::clamp (balance01, 0.0, 1.0);
 
     if (u <= 0.0) return { 1.0, 0.0 };
-    if (u >= 1.0) return { 0.0, balanceCalibration };
+    if (u >= 1.0) return { 0.0, k };
 
-    const double theta = u * 1.5707963267948966;   // pi/2
-
-    return { std::cos (theta), std::sin (theta) * balanceCalibration };
+    return { std::sqrt (1.0 - u), std::sqrt (u) * k };
 }
 
 /** The span, in milliseconds, for a pattern at a Size scale ratio. */

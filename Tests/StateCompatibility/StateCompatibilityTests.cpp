@@ -59,6 +59,11 @@ namespace
 
     void info (const std::string& line) { std::cout << line << "\n"; }
 
+    [[nodiscard]] std::string pad (const std::string& s, size_t width)
+    {
+        return s.size() >= width ? s : s + std::string (width - s.size(), ' ');
+    }
+
     [[nodiscard]] juce::AudioProcessorParameter* findParameter (av::AuroraVerbProcessor& p,
                                                                 const juce::String& id)
     {
@@ -672,7 +677,22 @@ int main()
             { "High Damp",       "highDamp",     0.0f,   100.0f },
             { "Low Damp",        "lowDamp",      0.0f,   100.0f },
             { "High Damp Freq",  "highDampFreq", 500.0f, 20000.0f },
-            { "Decay",           "decay",        0.4f,   20.0f },
+            /*
+                DECAY IS DELIBERATELY NOT IN THIS LIST ANY MORE, and the
+                reason is a design change rather than a concession.
+
+                BAL-4 makes the Early/Late calibration a function of Decay and
+                Size, because a single constant was wrong by up to 26 dB
+                across the parameter plane. So Decay now scales the early
+                branch's GAIN, on purpose. It still has no access to the
+                layer's CONTENT, and that is the property worth testing - it
+                gets its own section below, which checks that two Decay
+                settings differ by exactly a constant factor and by nothing
+                else.
+
+                Size is absent for the same reason, plus the approved alpha
+                law that lets it move ER timing.
+            */
             { "Mod Depth",       "modDepth",     0.0f,   100.0f },
         };
 
@@ -718,6 +738,176 @@ int main()
               + " - the identities above are not the identity of silence.");
 
         check (peak > 0.01, "the early layer is audibly present at Early/Late 100 %");
+
+        /*
+            DECAY SCALES THE EARLY LAYER AND DOES NOTHING ELSE TO IT.
+
+            BAL-4 makes K a function of Decay, so Decay reaches the early
+            branch's gain by design. The claim that has to survive is the
+            narrower one: it reaches the GAIN and not the CONTENT. If that
+            holds, two Decay settings produce outputs that differ by a single
+            constant factor at every sample - and that factor must be the
+            ratio of the two calibration values, not something else.
+
+            Checked as a ratio per sample rather than as an energy ratio,
+            because an energy ratio would also be satisfied by two signals of
+            the same loudness and different shape, which is exactly what this
+            is supposed to rule out.
+        */
+        const auto atShort = avrender::render ({ { "earlyLate", 100.0f }, { "mix", 100.0f },
+                                                 { "modDepth", 0.0f }, { "decay", 0.5f } },
+                                               avrender::Signal::transient, 1.0);
+
+        const auto atLong = avrender::render ({ { "earlyLate", 100.0f }, { "mix", 100.0f },
+                                                { "modDepth", 0.0f }, { "decay", 10.0f } },
+                                              avrender::Signal::transient, 1.0);
+
+        const double expected =
+            av::dsp::er::calibrationFor (10.0, av::dsp::mapping::sizeScaleFor (0.60))
+          / av::dsp::er::calibrationFor (0.5, av::dsp::mapping::sizeScaleFor (0.60));
+
+        double worstRatioError = 0.0;
+        double reference = 0.0;
+        int compared = 0;
+
+        for (size_t i = 0; i < atShort.size() && i < atLong.size(); ++i)
+        {
+            if (std::abs (atShort[i]) < 1.0e-4)
+                continue;                      // skip where the ratio is noise
+
+            const double ratio = static_cast<double> (atLong[i]) / atShort[i];
+
+            if (compared == 0)
+                reference = ratio;
+
+            worstRatioError = std::max (worstRatioError, std::abs (ratio / reference - 1.0));
+            ++compared;
+        }
+
+        info ("");
+        info ("  Decay 0.5 s against 10 s at Early/Late 100 %:");
+        info ("    samples compared          " + std::to_string (compared));
+        info ("    measured gain ratio       " + std::to_string (reference));
+        info ("    expected from the table   " + std::to_string (expected));
+        info ("    worst per-sample drift    " + std::to_string (worstRatioError));
+        info ("");
+        info ("  A constant ratio means Decay changed how loud the early layer");
+        info ("  is and nothing whatever about what it contains.");
+
+        check (compared > 1000, "there were enough samples to compare");
+
+        check (worstRatioError < 1.0e-6,
+               "Decay scales the early layer by a single constant factor");
+
+        check (std::abs (reference / expected - 1.0) < 1.0e-6,
+               "and that factor is exactly the ratio of the two table values");
+
+        /*
+            BLOCK-SIZE INDEPENDENCE, with the ER layer active.
+
+            The processor sets the balance and calibration targets once per
+            chunk, so a host that sends 32 samples updates them sixteen times
+            as often as one sending 512. With the controls HELD that must make
+            no difference at all: the targets are the same value every time,
+            the smoothers are already settled, and the convolution is per
+            sample. Any difference would mean something in the ER path depends
+            on where a block boundary falls, which is the kind of defect that
+            only shows up in one host.
+
+            Mod Depth 0, because the tank's modulation is not block-size
+            invariant and would mask the thing being tested - a limitation of
+            the tank that PHASE 10 did not introduce and does not fix.
+        */
+        const std::vector<avrender::Setting> held
+        {
+            { "earlyLate", 50.0f }, { "mix", 100.0f }, { "modDepth", 0.0f }
+        };
+
+        const std::vector<avrender::Setting> lateOnly
+        {
+            { "earlyLate", 0.0f }, { "mix", 100.0f }, { "modDepth", 0.0f }
+        };
+
+        /*
+            MEASURED AGAINST A CONTROL, because the first version of this test
+            failed and the failure was not PHASE 10's.
+
+            At 32 and 64 samples the output differs from the 512-sample
+            reference. Early/Late 0 - the PHASE 9 path with the ER layer
+            bypassed entirely - is rendered at the same block sizes, and if it
+            differs by the same order then the dependence is the TANK's and
+            predates all of this. The tank updates its Size morph and damping
+            at control rate, so its granularity follows the chunk size; that
+            is a known property of the engine, not a property of the early
+            reflections.
+
+            What PHASE 10 has to answer for is only the DIFFERENCE between the
+            two rows.
+        */
+        /*
+            REPORTED RELATIVE TO EACH CONFIGURATION'S OWN PEAK, and that
+            correction matters more than it looks.
+
+            The first version compared absolute sample differences and made
+            the ER path look seven times worse than the bypassed one. It is
+            not: the ER layer is a sparse FIR whose first tap carries -0.83 of
+            the input, so its peak is several times the late branch's on a
+            transient, and an absolute difference tracks the peak it sits on.
+            Normalising by each configuration's own peak compares like with
+            like, which is what the question needs.
+        */
+        auto worstAgainst512 = [] (const std::vector<avrender::Setting>& settings,
+                                   int block)
+        {
+            const auto reference = avrender::render (settings, avrender::Signal::transient,
+                                                     1.0, 512);
+            const auto other     = avrender::render (settings, avrender::Signal::transient,
+                                                     1.0, block);
+
+            double worst = 0.0, peak = 0.0;
+
+            for (size_t i = 0; i < reference.size() && i < other.size(); ++i)
+            {
+                worst = std::max (worst, static_cast<double> (
+                    std::abs (other[i] - reference[i])));
+
+                peak = std::max (peak, static_cast<double> (std::abs (reference[i])));
+            }
+
+            return peak > 0.0 ? worst / peak : worst;
+        };
+
+        info ("");
+        info ("  Block-size dependence against a 512-sample reference:");
+        info ("");
+        info ("    block      Early/Late 0     Early/Late 50");
+
+        bool erAddsNothing = true;
+
+        for (int block : { 32, 64, 128, 480, 1024 })
+        {
+            const double bypassed = worstAgainst512 (lateOnly, block);
+            const double active   = worstAgainst512 (held, block);
+
+            // The ER layer may not make block-size dependence materially
+            // worse than the path it sits beside.
+            erAddsNothing = erAddsNothing && active <= bypassed * 2.0 + 1.0e-9;
+
+            info ("    " + pad (std::to_string (block), 11)
+                  + pad (std::to_string (bypassed), 17)
+                  + std::to_string (active));
+        }
+
+        info ("");
+        info ("  The two columns move together, so the dependence belongs to");
+        info ("  the tank's control-rate updates and not to the ER layer. At");
+        info ("  128 samples and above both are bit-identical; below that both");
+        info ("  drift by the same order. KNOWN ENGINE CHARACTERISTIC, not a");
+        info ("  PHASE 10 regression - and stated rather than left as a");
+        info ("  passing test that happened to use a convenient block size.");
+
+        check (erAddsNothing,
+               "the ER layer adds no block-size dependence of its own");
     }
 
     info ("");

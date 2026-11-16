@@ -474,24 +474,39 @@ public:
         lateGain .prepare (sampleRate, rampSeconds);
         earlyGain.prepare (sampleRate, rampSeconds);
 
-        snapTo (0.0);
+        // Balance 0, where the early gain is exactly zero whatever K is -
+        // so the value passed here cannot matter, and the reference one is
+        // passed rather than inventing a sentinel that could be mistaken for
+        // a real calibration.
+        snapTo (0.0, er::balanceCalibration);
     }
 
-    void setBalance (double balance01) noexcept
+    /**
+        `k` is the parameter-aware calibration for the current Decay and Size,
+        from `er::calibrationFor`.
+
+        IT ARRIVES AS AN ARGUMENT RATHER THAN BEING LOOKED UP HERE, so that
+        this class stays a pair of smoothers and knows nothing about the
+        parameter mapping. It also means a K change is handled by exactly the
+        same path as a balance change - a new target for the early gain - so
+        moving Decay or Size cannot produce a step that moving Early/Late
+        would not.
+    */
+    void setBalance (double balance01, double k) noexcept
     {
         balance = std::clamp (balance01, 0.0, 1.0);
 
-        const auto g = er::gainsForBalance (balance);
+        const auto g = er::gainsForBalance (balance, k);
 
         lateGain .setTarget (g.late);
         earlyGain.setTarget (g.early);
     }
 
-    void snapTo (double balance01) noexcept
+    void snapTo (double balance01, double k) noexcept
     {
         balance = std::clamp (balance01, 0.0, 1.0);
 
-        const auto g = er::gainsForBalance (balance);
+        const auto g = er::gainsForBalance (balance, k);
 
         lateGain .snapTo (g.late);
         earlyGain.snapTo (g.early);

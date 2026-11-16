@@ -402,4 +402,23 @@ __declspec (dllexport) int ExportAuroraVerbPhase10OccupancyAb (const char* direc
                                              sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
+/**
+    Renders the four PHASE 10 final sanity files on the complete production
+    candidate.
+
+    Not blind and nothing to choose between: snare, vocal, piano and pad, each
+    sweeping Early/Late from 0 to 100 %% across its length so that level
+    movement - which a static render cannot show - is audible along with the
+    handoff, the slap region and the ER-heavy end.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase10FinalSanity (const char* directory,
+                                                               double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase10FinalSanity (directory,
+                                             sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
 } // extern "C"

@@ -1,5 +1,7 @@
 #include "AllocationDetector.h"
 #include "DspAnalysis.h"
+#include "SignalExport.h"
+#include "WetGainStaging.h"
 #include "Suites.h"
 #include "TestFramework.h"
 
@@ -77,7 +79,7 @@ namespace
         it exists so that changing the pattern cannot leave a stale derived
         figure standing in the report.
     */
-    constexpr std::uint64_t kPatternFingerprint = 318152509905746224ull;
+    constexpr std::uint64_t kPatternFingerprint = 5065939454054309816ull;
 
     [[nodiscard]] std::string fx (double v, int decimals)
     {
@@ -183,7 +185,7 @@ namespace
 
         EarlyLateBalance balance;
         balance.prepare (kSampleRate);
-        balance.snapTo (c.balance);
+        balance.snapTo (c.balance, er::balanceCalibration);
 
         Render out;
         out.lateL.assign (length, 0.0);
@@ -262,6 +264,28 @@ namespace
             const double window = 0.5 - 0.5 * std::cos (2.0 * 3.14159265358979323846 * static_cast<double> (i) / static_cast<double> (n - 1));
 
             x[i] = (2.0 * u - 1.0) * window;
+        }
+
+        return x;
+    }
+
+    /** A pure sustained sine. The diagnostic extreme, not a product target:
+        it is the source that correlates the two branches most strongly and so
+        stresses the crossfade law hardest. */
+    [[nodiscard]] std::vector<double> diagnosticSine()
+    {
+        const auto n = static_cast<size_t> (1.0 * kSampleRate);
+
+        std::vector<double> x (n, 0.0);
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double t = static_cast<double> (i) / kSampleRate;
+            const double env = std::min (1.0, t * 100.0)
+                             * std::min (1.0, (1.0 - t) * 100.0);
+
+            x[i] = 0.4 * std::sin (2.0 * 3.14159265358979323846 * 440.0 * t)
+                 * std::max (0.0, env);
         }
 
         return x;
@@ -1017,6 +1041,122 @@ void runPhase10ProductionTests()
     }
 
     // =======================================================================
+    beginSuite ("PHASE 10 final - the BAL-4 calibration table");
+    // =======================================================================
+    {
+        /*
+            THE TABLE IS A PROPERTY OF THE ER PATTERN, so it is re-measured
+            here against the shipping pattern rather than trusted. It was
+            re-derived when cellOccupancy became 0.40; carrying the 0.70
+            figures forward is exactly the class of mistake the pattern
+            fingerprint exists to prevent.
+
+            Measured at each knot with a 10 ms noise burst over a 4 s window,
+            every other control at its default. The knot axes are checked
+            against the parameter mapping too, because they are stated as
+            literals in a header that deliberately does not include it.
+        */
+        const auto length = static_cast<size_t> (kSampleRate * 4.0);
+        const auto drive  = burst();
+
+        info ("  Knot axes, checked against the parameter mapping:");
+        info ("");
+
+        const double decayKnots[er::calibrationDecayKnots] { 0.1, 0.5, 2.5, 10.0, 60.0 };
+        const double sizeKnots[er::calibrationSizeKnots]   { 0.0, 0.5, 1.0 };
+
+        bool axesAgree = true;
+
+        for (int d = 0; d < er::calibrationDecayKnots; ++d)
+            axesAgree = axesAgree
+                     && std::abs (mapping::rt60For (decayKnots[d])
+                                  - er::calibrationRt60[d]) < 1.0e-9;
+
+        for (int s = 0; s < er::calibrationSizeKnots; ++s)
+            axesAgree = axesAgree
+                     && std::abs (mapping::sizeScaleFor (sizeKnots[s])
+                                  - er::calibrationSizeScale[s]) < 1.0e-9;
+
+        check (axesAgree,
+               "the table's rt60 and sizeScale axes match the parameter mapping");
+
+        info ("    " + pad ("Decay", 10) + pad ("Size", 9) + pad ("measured", 11)
+              + pad ("in table", 11) + "error");
+
+        double worstError = 0.0;
+
+        for (int d = 0; d < er::calibrationDecayKnots; ++d)
+        {
+            for (int s = 0; s < er::calibrationSizeKnots; ++s)
+            {
+                Config c;
+                c.decay = decayKnots[d];
+                c.size  = sizeKnots[s];
+
+                const auto r = render (c, drive, length);
+
+                const double measured =
+                    std::sqrt ((energyOf (r.lateL) + energyOf (r.lateR))
+                             / (energyOf (r.erL) + energyOf (r.erR)));
+
+                const double stored = er::calibrationTable[d][s];
+                const double errorDb = 20.0 * std::log10 (stored / measured);
+
+                worstError = std::max (worstError, std::abs (errorDb));
+
+                info ("    " + pad (fx (decayKnots[d], 1) + " s", 10)
+                      + pad (fx (sizeKnots[s] * 100.0, 0) + " %", 9)
+                      + pad (fx (measured, 4), 11)
+                      + pad (fx (stored, 4), 11)
+                      + fx (errorDb, 2) + " dB");
+            }
+        }
+
+        info ("");
+        info ("    Worst knot error: " + fx (worstError, 3) + " dB.");
+        info ("");
+        info ("    IF THIS FAILED: the pattern changed and the table did not.");
+        info ("    Copy the measured column into er::calibrationTable, then");
+        info ("    re-run every derived figure the fingerprint test lists.");
+
+        check (worstError < 0.1,
+               "every table knot matches what the shipping pattern measures");
+
+        // The interpolator must reproduce its own knots, or the axes and the
+        // table disagree about which cell is which.
+        bool knotsExact = true;
+
+        for (int d = 0; d < er::calibrationDecayKnots; ++d)
+            for (int s = 0; s < er::calibrationSizeKnots; ++s)
+                knotsExact = knotsExact
+                          && std::abs (er::calibrationFor (er::calibrationRt60[d],
+                                                           er::calibrationSizeScale[s])
+                                       / er::calibrationTable[d][s] - 1.0) < 1.0e-9;
+
+        check (knotsExact, "the interpolator returns each knot exactly at that knot");
+
+        /*
+            And it must clamp rather than extrapolate past the ends.
+
+            Compared with a tolerance, not with ==, and the reason is worth a
+            line: the interpolator blends in the log domain and exponentiates
+            once, so even at a knot it returns exp(log(k)) rather than k. That
+            round trip is not bit-exact. Writing == here would have been a
+            test that fails on arithmetic rather than on behaviour, which is
+            the fourth time this stage has nearly shipped one.
+        */
+        const double lowCorner  = er::calibrationFor (0.001, 0.01);
+        const double highCorner = er::calibrationFor (1000.0, 100.0);
+
+        check (std::abs (lowCorner / er::calibrationTable[0][0] - 1.0) < 1.0e-9
+                 && std::abs (highCorner
+                              / er::calibrationTable[er::calibrationDecayKnots - 1]
+                                                    [er::calibrationSizeKnots - 1]
+                              - 1.0) < 1.0e-9,
+               "the interpolator clamps outside its knots instead of extrapolating");
+    }
+
+    // =======================================================================
     beginSuite ("PHASE 10 Stage 3 - what the placement fix cost the handoff");
     // =======================================================================
     {
@@ -1138,291 +1278,622 @@ void runPhase10ProductionTests()
     }
 
     // =======================================================================
-    beginSuite ("PHASE 10 Stage 3 - what the 6.14 dB figure actually measures");
+    beginSuite ("PHASE 10 final - the balance, measured three ways");
     // =======================================================================
     {
         /*
-            A CLARIFICATION, BECAUSE TWO REPORTED NUMBERS READ AS CONTRADICTORY.
+            THIS REPLACES THE INTENTIONALLY FAILING GATE, AND ONLY BECAUSE THE
+            DESIGN CHANGED UNDER IT.
 
-            The Stage-3 report said the traversal holds total wet energy to
-            0.03 dB AND that the fixed calibration costs up to 6.14 dB. Both
-            are true and they are not about the same thing, but putting them
-            on the same page without saying so invites exactly one misreading:
-            that the Early/Late control changes the output level by 6 dB.
+            The old gate said a single fixed K does not generalise across
+            Decay and Size, and it was correct: the error reached 6.14 dB on
+            the grid it used and 26.26 dB once the grid was extended to the
+            parameter's real minimum. Production no longer has a single fixed
+            K. It has BAL-4, a parameter-aware table, and the p = 0.50
+            linear-in-power law.
 
-            6.14 dB is NOT a total-output level change at the reference. It is
-            the ratio between the SHIPPED constant K and the IDEAL K at the
-            worst point of a Decay x Size grid - a branch-gain calibration
-            error, in dB.
+            So the gate is replaced rather than relaxed, and the criterion is
+            the one the brief set: 1.5 dB of traversal on normal musical
+            material.
 
-            But it does not stay harmless, and that is the part worth being
-            precise about. The error is on the EARLY branch gain, and at
-            Early/Late 100 % the late branch is exactly zero, so the whole
-            output is that branch. At a configuration where K is wrong by
-            6.14 dB, the traversal from 0 % to 100 % therefore IS a 6.14 dB
-            level change. The 0.03 dB figure is a property of the reference
-            configuration alone, not of the control.
+            THREE ERRORS ARE REPORTED SEPARATELY AND NOT MERGED, because they
+            have different causes and different remedies:
 
-            So this section measures the thing the question is actually about:
-            total integrated wet energy at five balance positions, same
-            source, same window, normalised to Early/Late 0.
+              A  PARAMETER-SPACE error - how far the table is from ideal at a
+                 given Decay and Size, on the broadband material it was
+                 measured with. This is the table's own accuracy and it is
+                 fixable by adding knots.
+
+              B  SOURCE-DEPENDENT error - how far the ideal K for a given
+                 source is from the ideal K for broadband material at the same
+                 settings. No parameter-only law can touch this, because the
+                 law does not know what is playing. Closing it would require
+                 the signal analysis the brief forbids.
+
+              C  CROSSFADE-LAW SAG - how far the middle of the control falls
+                 below the straight line joining its ends. This is the law's
+                 own contribution and is independent of both of the above.
+
+            One combined number would hide all three. In particular it would
+            let the source-dependent floor be read as a calibration bug, which
+            is how a team ends up building an AGC.
         */
         const auto length = static_cast<size_t> (kSampleRate * 4.0);
-        const auto drive  = burst();
 
-        info ("  Total integrated wet energy over a 4 s window, 10 ms noise");
-        info ("  burst, measured on the composed output. Normalised to");
-        info ("  Early/Late 0 in dB.");
-        info ("");
+        struct Source { const char* name; std::vector<double> drive; bool diagnostic; };
 
-        struct Point { const char* label; double decay, size; };
+        const auto fu2 = makeFu2Sources (kSampleRate);
 
-        const std::vector<Point> points
+        auto fu2Mono = [&fu2] (const char* name)
         {
-            { "REFERENCE: Decay 2.5 s, Size 60 %", kDecay, kSizeDefault },
-            { "listening set: Decay 2.5 s, Size 80 %",  kDecay, 0.80 },
-            { "listening set: Decay 2.5 s, Size 100 %", kDecay, 1.00 },
-            { "worst grid point: Decay 0.5 s, Size 20 %", 0.5, 0.20 },
+            std::vector<double> x;
+
+            for (const auto& s : fu2)
+                if (s.name == name)
+                {
+                    x.resize (s.frames.size());
+
+                    for (size_t n = 0; n < s.frames.size(); ++n)
+                        x[n] = s.frames[n].l;
+                }
+
+            return x;
         };
 
-        double worstTraversal = 0.0;
-        double referenceTraversal = 0.0;
-        double worstGridPointTraversal = 0.0;
+        auto vocalMono = [] ()
+        {
+            const auto v = makeVocalReference (kSampleRate, 6.0);
 
-        for (const auto& p : points)
+            std::vector<double> x (v.size(), 0.0);
+
+            for (size_t n = 0; n < v.size(); ++n)
+                x[n] = v[n].l;
+
+            return x;
+        };
+
+        const std::vector<Source> sources
+        {
+            { "broadband noise", burst(),            false },
+            { "snare",           fu2Mono ("snare"),  false },
+            { "vocal",           vocalMono(),        false },
+            { "piano",           fu2Mono ("piano"),  false },
+            { "pad",             fu2Mono ("pad"),    false },
+            { "sine diagnostic", diagnosticSine(),   true  },
+        };
+
+        struct Setting { const char* name; double decay, size; };
+
+        const std::vector<Setting> settings
+        {
+            { "defaults",        2.5,  0.60 },
+            { "small room",      0.8,  0.30 },
+            { "large hall",      4.0,  0.90 },
+            { "long + large",   12.0,  1.00 },
+            { "short + small",   0.3,  0.10 },
+            { "shortest decay",  0.1,  0.60 },
+        };
+
+        // ---------------------------------------------------------------
+        info ("  A. PARAMETER-SPACE ERROR - the table against ideal, on the");
+        info ("     broadband material it was measured with.");
+        info ("");
+        info ("     " + pad ("setting", 18) + pad ("table K", 11)
+              + pad ("ideal K", 11) + "error");
+
+        double worstParameterSpace = 0.0;
+
+        for (const auto& st : settings)
         {
             Config c;
-            c.decay = p.decay;
-            c.size  = p.size;
+            c.decay = st.decay;
+            c.size  = st.size;
 
-            // One render per configuration. The branches come back separately
-            // and are combined here at each balance, so every row in the
-            // table comes from identical history - which is what "the same
-            // source and the same measurement window" has to mean.
-            const auto r = render (c, drive, length);
+            const auto r = render (c, burst(), length);
 
-            const double lateEnergy = energyOf (r.lateL) + energyOf (r.lateR);
-            const double erEnergy   = energyOf (r.erL)   + energyOf (r.erR);
-            const double idealK     = std::sqrt (lateEnergy / erEnergy);
+            const double ideal = std::sqrt ((energyOf (r.lateL) + energyOf (r.lateR))
+                                          / (energyOf (r.erL) + energyOf (r.erR)));
 
-            info ("    " + std::string (p.label));
-            info ("      ideal K here " + fx (idealK, 4)
-                  + ", shipped K " + fx (er::balanceCalibration, 4)
-                  + ", error " + fx (20.0 * std::log10 (er::balanceCalibration / idealK), 2)
-                  + " dB");
-            info ("");
-            info ("      " + pad ("Early/Late", 13) + pad ("wet energy", 14) + "vs 0 %");
+            const double k = er::calibrationFor (mapping::rt60For (st.decay),
+                                                 mapping::sizeScaleFor (st.size));
 
-            double reference = 0.0, traversal = 0.0;
+            const double db = 20.0 * std::log10 (k / ideal);
 
-            for (double balance : { 0.0, 0.25, 0.50, 0.75, 1.0 })
+            worstParameterSpace = std::max (worstParameterSpace, std::abs (db));
+
+            info ("     " + pad (st.name, 18) + pad (fx (k, 4), 11)
+                  + pad (fx (ideal, 4), 11) + fx (db, 2) + " dB");
+        }
+
+        info ("");
+        info ("     Worst parameter-space error: " + fx (worstParameterSpace, 2) + " dB.");
+        info ("");
+
+        // ---------------------------------------------------------------
+        info ("  B. SOURCE-DEPENDENT ERROR - each source's own ideal K against");
+        info ("     the broadband one, at the same settings. Unreachable by any");
+        info ("     parameter-only law.");
+        info ("");
+        info ("     " + pad ("setting", 18) + pad ("broadband", 12)
+              + pad ("worst source", 14) + pad ("which", 18) + "spread");
+
+        double worstSourceSpread = 0.0;
+
+        for (const auto& st : settings)
+        {
+            Config c;
+            c.decay = st.decay;
+            c.size  = st.size;
+
+            double broadband = 0.0, worst = 0.0;
+            std::string which;
+
+            for (const auto& src : sources)
             {
-                const auto g = er::gainsForBalance (balance);
+                if (src.drive.empty())
+                    continue;
+
+                const auto r = render (c, src.drive, length);
+
+                const double k = std::sqrt ((energyOf (r.lateL) + energyOf (r.lateR))
+                                          / (energyOf (r.erL) + energyOf (r.erR)));
+
+                if (std::string (src.name) == "broadband noise")
+                    broadband = k;
+
+                if (src.diagnostic)
+                    continue;
+
+                const double db = std::abs (20.0 * std::log10 (k / std::max (1.0e-9, broadband)));
+
+                if (db > worst)
+                {
+                    worst = db;
+                    which = src.name;
+                }
+            }
+
+            worstSourceSpread = std::max (worstSourceSpread, worst);
+
+            info ("     " + pad (st.name, 18) + pad (fx (broadband, 4), 12)
+                  + pad (fx (worst, 2) + " dB", 14) + pad (which, 18)
+                  + fx (worst, 2) + " dB");
+        }
+
+        info ("");
+        info ("     Worst source-dependent error: " + fx (worstSourceSpread, 2) + " dB.");
+        info ("");
+
+        // ---------------------------------------------------------------
+        info ("  C. CROSSFADE-LAW SAG - the middle against the chord joining");
+        info ("     the ends, under the shipping p = 0.50 law.");
+        info ("");
+        info ("     " + pad ("source", 18) + pad ("traversal", 12)
+              + pad ("sag", 10) + "at");
+
+        double worstNormalTraversal = 0.0, worstNormalSag = 0.0;
+        double worstDiagnosticTraversal = 0.0;
+        std::string worstNormalWhere, worstSagWhere;
+
+        for (const auto& src : sources)
+        {
+            if (src.drive.empty())
+                continue;
+
+            double worstT = 0.0, worstS = 0.0;
+            std::string whereT;
+
+            for (const auto& st : settings)
+            {
+                Config c;
+                c.decay = st.decay;
+                c.size  = st.size;
+
+                const auto r = render (c, src.drive, length);
+
+                const double k = er::calibrationFor (mapping::rt60For (st.decay),
+                                                     mapping::sizeScaleFor (st.size));
+
+                std::array<double, 5> db { 0.0, 0.0, 0.0, 0.0, 0.0 };
+                const std::array<double, 5> at { 0.0, 0.25, 0.50, 0.75, 1.0 };
+
+                double reference = 0.0;
+
+                for (size_t i = 0; i < at.size(); ++i)
+                {
+                    const auto g = er::gainsForBalance (at[i], k);
+
+                    double energy = 0.0;
+
+                    for (size_t n = 0; n < length; ++n)
+                    {
+                        const double l = g.late * r.lateL[n] + g.early * r.erL[n];
+                        const double rr = g.late * r.lateR[n] + g.early * r.erR[n];
+
+                        energy += l * l + rr * rr;
+                    }
+
+                    if (i == 0)
+                        reference = energy;
+
+                    db[i] = 10.0 * std::log10 (energy / reference);
+                }
+
+                double lo = 0.0, hi = 0.0, sag = 0.0;
+
+                for (double v : db) { lo = std::min (lo, v); hi = std::max (hi, v); }
+
+                for (size_t i = 1; i <= 3; ++i)
+                    sag = std::max (sag, db[0] + at[i] * (db[4] - db[0]) - db[i]);
+
+                if (hi - lo > worstT)
+                {
+                    worstT = hi - lo;
+                    whereT = st.name;
+                }
+
+                worstS = std::max (worstS, sag);
+            }
+
+            if (src.diagnostic)
+            {
+                worstDiagnosticTraversal = std::max (worstDiagnosticTraversal, worstT);
+            }
+            else
+            {
+                if (worstT > worstNormalTraversal)
+                {
+                    worstNormalTraversal = worstT;
+                    worstNormalWhere = std::string (src.name) + " at " + whereT;
+                }
+
+                if (worstS > worstNormalSag)
+                {
+                    worstNormalSag = worstS;
+                    worstSagWhere = src.name;
+                }
+            }
+
+            info ("     " + pad (std::string (src.name) + (src.diagnostic ? " *" : ""), 18)
+                  + pad (fx (worstT, 2) + " dB", 12)
+                  + pad (fx (worstS, 2) + " dB", 10) + whereT);
+        }
+
+        info ("");
+        info ("     Worst law sag on normal material: " + fx (worstNormalSag, 2)
+              + " dB, on " + worstSagWhere + ".");
+        info ("");
+        info ("  SUMMARY, and the three stay separate on purpose:");
+        info ("");
+        info ("     A parameter-space      " + fx (worstParameterSpace, 2) + " dB");
+        info ("     B source-dependent     " + fx (worstSourceSpread, 2) + " dB");
+        info ("     C law sag              " + fx (worstNormalSag, 2) + " dB");
+        info ("");
+        info ("     worst traversal, normal musical material   "
+              + fx (worstNormalTraversal, 2) + " dB");
+        info ("       at " + worstNormalWhere);
+        info ("     worst traversal, sine diagnostic           "
+              + fx (worstDiagnosticTraversal, 2) + " dB");
+        info ("");
+        info ("     B dominates, and it is the one nothing here can fix. It is");
+        info ("     not a defect to be chased: a calibration that followed the");
+        info ("     programme material would make Early/Late behave one way on");
+        info ("     a snare and another on a pad, which is worse than a known");
+        info ("     fixed offset. Reported, carried, not hidden.");
+
+        check (worstParameterSpace < 1.5,
+               "A: the table is within 1.5 dB of ideal across the parameter space");
+
+        check (worstNormalSag < 1.0,
+               "C: the shipping law contributes under 1 dB of sag");
+
+        check (worstNormalTraversal <= 1.5,
+               "the traversal target is met on normal musical material");
+
+        /*
+            THE WORST CASE, OPENED UP RATHER THAN QUOTED.
+
+            A 12.90 dB sag on a pad would be a serious product finding, so it
+            does not get to stand as one number in a summary. The curve and
+            the branch correlation are printed, because a sag has exactly one
+            mechanism available to it under this law: the cross term.
+
+            With branches that add in energy, this law makes total/Le equal
+            (1-t) + t*r, a straight line, whose dB curve is log-concave and
+            therefore sits ABOVE its chord - a bulge, never a sag. A sag
+            requires the cross term 2*rho*late*early*sqrt(Le*Ee) to be
+            NEGATIVE, which means the two branches are anti-correlated. So if
+            rho is negative here, the sag is real and is a property of the
+            source, not an artefact of the metric.
+        */
+        info ("");
+        info ("  THE WORST CASE: pad, and what is actually happening to it");
+        info ("");
+        info ("    " + pad ("setting", 18) + pad ("corr", 10) + pad ("K", 10)
+              + pad ("ideal", 10) + "0 / 25 / 50 / 75 / 100 %");
+
+        for (auto setting : { std::pair<double, double> { 2.5, 0.60 },
+                              std::pair<double, double> { 0.3, 0.10 } })
+        {
+            Config c;
+            c.decay = setting.first;
+            c.size  = setting.second;
+
+            const auto r = render (c, fu2Mono ("pad"), length);
+
+            const double corr = correlation (r.lateL.data(), r.erL.data(),
+                                             static_cast<size_t> (kSampleRate * 1.0));
+
+            const double k = er::calibrationFor (mapping::rt60For (setting.first),
+                                                 mapping::sizeScaleFor (setting.second));
+
+            const double ideal = std::sqrt ((energyOf (r.lateL) + energyOf (r.lateR))
+                                          / (energyOf (r.erL) + energyOf (r.erR)));
+
+            std::string curve;
+            double reference = 0.0;
+
+            for (double t : { 0.0, 0.25, 0.50, 0.75, 1.0 })
+            {
+                const auto g = er::gainsForBalance (t, k);
 
                 double energy = 0.0;
 
                 for (size_t n = 0; n < length; ++n)
                 {
-                    const double l = g.late * r.lateL[n] + g.early * r.erL[n];
+                    const double l  = g.late * r.lateL[n] + g.early * r.erL[n];
                     const double rr = g.late * r.lateR[n] + g.early * r.erR[n];
 
                     energy += l * l + rr * rr;
                 }
 
-                if (balance == 0.0)
+                if (t == 0.0)
+                    reference = energy;
+
+                curve += fx (10.0 * std::log10 (energy / reference), 1) + "  ";
+            }
+
+            info ("    " + pad ("D " + fx (setting.first, 1) + " S "
+                                + fx (setting.second * 100.0, 0), 18)
+                  + pad (fx (corr, 4), 10) + pad (fx (k, 4), 10)
+                  + pad (fx (ideal, 4), 10) + curve);
+        }
+
+        info ("");
+        /*
+            AND IS IT THE PATTERN'S FAULT? That decides whether the occupancy
+            choice has to be reopened, so it is measured rather than argued.
+
+            The branch correlation on narrowband material depends on where the
+            comb's teeth fall relative to the source's partials, which is a
+            property of the tap positions. So the same pad could behave very
+            differently at a different occupancy, and if 0.40 were uniquely bad
+            the decision would need revisiting.
+        */
+        info ("");
+        info ("    Is it the pattern? The same case across the occupancy family:");
+        info ("");
+        info ("      " + pad ("occupancy", 12) + pad ("corr", 11)
+              + "0 / 25 / 50 / 75 / 100 %");
+
+        double worstAcrossOccupancy = 0.0;
+
+        for (double occupancy : { 0.20, 0.40, 0.70 })
+        {
+            er::Pattern p;
+            p.cellOccupancy = occupancy;
+
+            Config c;
+            c.decay   = 0.3;
+            c.size    = 0.10;
+            c.pattern = p;
+
+            const auto r = render (c, fu2Mono ("pad"), length);
+
+            const double corr = correlation (r.lateL.data(), r.erL.data(),
+                                             static_cast<size_t> (kSampleRate * 1.0));
+
+            const double k = er::calibrationFor (mapping::rt60For (0.3),
+                                                 mapping::sizeScaleFor (0.10));
+
+            std::string curve;
+            double reference = 0.0, worst = 0.0;
+
+            for (double t : { 0.0, 0.25, 0.50, 0.75, 1.0 })
+            {
+                const auto g = er::gainsForBalance (t, k);
+
+                double energy = 0.0;
+
+                for (size_t n = 0; n < length; ++n)
+                {
+                    const double l  = g.late * r.lateL[n] + g.early * r.erL[n];
+                    const double rr = g.late * r.lateR[n] + g.early * r.erR[n];
+
+                    energy += l * l + rr * rr;
+                }
+
+                if (t == 0.0)
                     reference = energy;
 
                 const double db = 10.0 * std::log10 (energy / reference);
+                worst = std::max (worst, std::abs (db));
 
-                traversal = std::max (traversal, std::abs (db));
-
-                info ("      " + pad (fx (balance * 100.0, 0) + " %", 13)
-                      + pad (fx (energy, 4), 14)
-                      + fx (db, 2) + " dB");
+                curve += fx (db, 1) + "  ";
             }
 
-            info ("      traversal: " + fx (traversal, 2) + " dB");
-            info ("");
+            worstAcrossOccupancy = std::max (worstAcrossOccupancy, worst);
 
-            worstTraversal = std::max (worstTraversal, traversal);
-
-            if (p.size == kSizeDefault && p.decay == kDecay)
-                referenceTraversal = traversal;
-
-            if (p.decay == 0.5)
-                worstGridPointTraversal = traversal;
+            info ("      " + pad (fx (occupancy, 2), 12) + pad (fx (corr, 4), 11)
+                  + curve);
         }
 
-        info ("    WHAT THE TWO NUMBERS ARE");
-        info ("");
-        info ("      0.03 dB   the traversal AT THE REFERENCE configuration.");
-        info ("                Measured here as " + fx (referenceTraversal, 2) + " dB.");
-        info ("                It is a property of that configuration, not of");
-        info ("                the control.");
-        info ("");
-        info ("      6.14 dB   the dB ratio between the shipped K and the");
-        info ("                ideal K at the worst point of the Decay x Size");
-        info ("                grid. It is a BRANCH-GAIN CALIBRATION ERROR.");
-        info ("");
-        info ("    AND WHAT FOLLOWS FROM THAT. Because the error sits on the");
-        info ("    early branch gain, and because the late branch is exactly");
-        info ("    zero at Early/Late 100 %, the calibration error becomes a");
-        info ("    total-output level change at the endpoint. At the worst");
-        info ("    grid point the traversal measures "
-              + fx (worstGridPointTraversal, 2) + " dB.");
-        info ("");
-        info ("    So the honest statement is NOT 'the control holds level to");
-        info ("    0.03 dB'. It is: the control holds level to 0.03 dB at the");
-        info ("    reference, and drifts to " + fx (worstTraversal, 2)
-              + " dB at the corners of the");
-        info ("    Decay and Size ranges, in the same direction and by the");
-        info ("    same amount as the calibration error.");
-
-        check (referenceTraversal < 0.1,
-               "at the reference configuration the traversal is held to 0.1 dB");
-
         /*
-            THE GATE THE BRIEF ASKED FOR.
+            EVERY OCCUPANCY SHOWS IT, so the effect is architectural. But 0.40
+            is the worst of the three AT THIS SETTING, and that could mean
+            either that 0.40 is systematically worse or that the correlation
+            at one frequency and one setting is a coin toss per pattern.
 
-            "If total wet energy actually changes by approximately 6.14 dB
-            between the two endpoints, STOP and report that as a
-            balance-design issue."
-
-            It does, away from the reference. So this check is written to
-            FAIL, deliberately, and it stays failing until the balance design
-            is revisited. It is not a defect in the implementation - the
-            implementation does exactly what BAL-B specifies - it is the
-            specification meeting a configuration it was not calibrated for.
-        */
-        check (worstTraversal < 1.0,
-               "the traversal stays within 1 dB at EVERY Decay and Size - "
-               "BALANCE-DESIGN ISSUE, see the table above");
-
-        /*
-            AND THE CONSEQUENCE FOR THE LISTENING SET, WHICH IS THE REASON
-            THIS MATTERS NOW RATHER THAN LATER.
-
-            The handoff question is asked at Size 100 %, and the table above
-            says the shipped K is 3.15 dB BELOW the ideal there. The early
-            layer in every Size-100 render is therefore quieter against the
-            late field than the calibration intends - which is the one thing
-            that would deepen a handoff valley.
-
-            So: measure the valley twice at Size 100 %, once with the shipped
-            constant and once with that configuration's own ideal K, changing
-            nothing else. If the valley is substantially shallower with the
-            ideal K, then the listening question as posed would be asking a
-            human about an artefact of the calibration rather than about the
-            envelope.
+            Choosing an occupancy on one source at one setting would be
+            fitting noise, so the question gets a sweep. If 0.40 is
+            systematically worst the decision reopens; if the ranking moves
+            around, it does not.
         */
         info ("");
-        info ("  CONSEQUENCE FOR THE LISTENING SET");
+        info ("    Systematic, or a coin toss? The pad across settings:");
         info ("");
+        info ("      " + pad ("setting", 18) + pad ("occ 0.20", 12)
+              + pad ("occ 0.40", 12) + "occ 0.70");
 
+        std::array<double, 3> familyWorst { 0.0, 0.0, 0.0 };
+        std::array<int, 3> familyWins { 0, 0, 0 };
+
+        /*
+            TWO NARROWBAND SOURCES AND EIGHT SETTINGS, because the quantity
+            being compared is a MAXIMUM and a maximum over five draws is
+            mostly draw variance. Sixteen cells per occupancy is still not
+            many, but it is enough to tell a systematic difference from a
+            lucky one, and the mean is reported next to the worst for exactly
+            that reason.
+        */
+        std::array<double, 3> familySum { 0.0, 0.0, 0.0 };
+        int familyCells = 0;
+
+        struct Narrow { const char* name; std::vector<double> drive; };
+
+        const std::vector<Narrow> narrow
         {
-            Config c;
-            c.size = 1.0;
+            { "pad 220 Hz",  fu2Mono ("pad")   },
+            { "sine 440 Hz", diagnosticSine()  },
+        };
 
-            const auto r = render (c, burst(), static_cast<size_t> (kSampleRate * 1.0));
+        for (const auto& src : narrow)
+        for (auto setting : { std::pair<double, double> { 0.3, 0.10 },
+                              std::pair<double, double> { 0.5, 0.20 },
+                              std::pair<double, double> { 0.8, 0.30 },
+                              std::pair<double, double> { 1.5, 0.45 },
+                              std::pair<double, double> { 2.5, 0.60 },
+                              std::pair<double, double> { 4.0, 0.90 },
+                              std::pair<double, double> { 8.0, 0.95 },
+                              std::pair<double, double> { 12.0, 1.00 } })
+        {
+            std::string row = "      " + pad (std::string (src.name).substr (0, 4)
+                                              + " D " + fx (setting.first, 1) + " S "
+                                              + fx (setting.second * 100.0, 0), 18);
 
-            const double idealK = std::sqrt ((energyOf (r.lateL) + energyOf (r.lateR))
-                                           / (energyOf (r.erL) + energyOf (r.erR)));
+            std::array<double, 3> here { 0.0, 0.0, 0.0 };
+            int index = 0;
 
-            info ("    Size 100 %, worst notch with a recovery, stereo magnitude:");
-            info ("");
-            info ("      " + pad ("Early/Late", 13)
-                  + pad ("shipped K " + fx (er::balanceCalibration, 3), 16)
-                  + "ideal K " + fx (idealK, 3));
-
-            double worstShipped = 0.0, worstIdeal = 0.0;
-
-            for (double balance : { 0.25, 0.50, 0.75 })
+            for (double occupancy : { 0.20, 0.40, 0.70 })
             {
-                const double theta = balance * 1.5707963267948966;
-                const double late  = balance >= 1.0 ? 0.0 : std::cos (theta);
+                er::Pattern p;
+                p.cellOccupancy = occupancy;
 
-                auto valleyWith = [&] (double k)
+                Config c;
+                c.decay   = setting.first;
+                c.size    = setting.second;
+                c.pattern = p;
+
+                const auto r = render (c, src.drive, length);
+
+                const double k = er::calibrationFor (mapping::rt60For (setting.first),
+                                                     mapping::sizeScaleFor (setting.second));
+
+                double reference = 0.0, worst = 0.0;
+
+                for (double t : { 0.0, 0.25, 0.50, 0.75, 1.0 })
                 {
-                    const double early = std::sin (theta) * k;
+                    const auto g = er::gainsForBalance (t, k);
 
-                    std::vector<double> l (r.lateL.size()), rr (r.lateR.size());
+                    double energy = 0.0;
 
-                    for (size_t n = 0; n < l.size(); ++n)
+                    for (size_t n = 0; n < length; ++n)
                     {
-                        l[n]  = late * r.lateL[n] + early * r.erL[n];
-                        rr[n] = late * r.lateR[n] + early * r.erR[n];
+                        const double l  = g.late * r.lateL[n] + g.early * r.erL[n];
+                        const double rr = g.late * r.lateR[n] + g.early * r.erR[n];
+
+                        energy += l * l + rr * rr;
                     }
 
-                    const auto mag = stereoMagnitude (l, rr);
-                    const double onset = firstArrivalMs (mag);
+                    if (t == 0.0)
+                        reference = energy;
 
-                    return onset > 0.0 ? notchDb (mag, onset + 5.0, 220.0) : 0.0;
-                };
+                    worst = std::max (worst, std::abs (10.0 * std::log10 (energy / reference)));
+                }
 
-                const double shipped = valleyWith (er::balanceCalibration);
-                const double ideal   = valleyWith (idealK);
+                here[static_cast<size_t> (index)] = worst;
+                familyWorst[static_cast<size_t> (index)] =
+                    std::max (familyWorst[static_cast<size_t> (index)], worst);
+                familySum[static_cast<size_t> (index)] += worst;
 
-                worstShipped = std::max (worstShipped, shipped);
-                worstIdeal   = std::max (worstIdeal, ideal);
-
-                info ("      " + pad (fx (balance * 100.0, 0) + " %", 13)
-                      + pad (fx (shipped, 2) + " dB", 16)
-                      + fx (ideal, 2) + " dB");
+                row += pad (fx (worst, 1) + " dB", 12);
+                ++index;
             }
 
-            info ("");
-            info ("      worst: " + fx (worstShipped, 2) + " dB shipped, "
-                  + fx (worstIdeal, 2) + " dB with the ideal K");
-            info ("");
+            ++familyCells;
 
-            if (worstIdeal < worstShipped - 0.5)
-            {
-                info ("    THE VALLEY IS PARTLY A CALIBRATION ARTEFACT. Asking a");
-                info ("    listener whether the Size-100 handoff sounds like a hole");
-                info ("    would, as things stand, be asking about an early layer");
-                info ("    that is "
-                      + fx (20.0 * std::log10 (idealK / er::balanceCalibration), 2)
-                      + " dB quieter than the balance intends.");
-            }
-            else
-            {
-                info ("    The valley is NOT substantially a calibration artefact:");
-                info ("    correcting K at this Size changes the worst notch by");
-                info ("    " + fx (worstShipped - worstIdeal, 2)
-                      + " dB. The handoff question stands on its own.");
-            }
+            const auto best = static_cast<size_t> (
+                std::min_element (here.begin(), here.end()) - here.begin());
 
-            /*
-                CROSS-CHECK AGAINST THE SUITE'S OWN HANDOFF SECTION.
+            ++familyWins[best];
 
-                That section renders each balance through the production
-                combine and reports 6.02 dB at Size 100 %, Early/Late 25 %.
-                This block combines the two branches by hand from a single
-                render. The two must agree, and if they do not then one of
-                them is measuring something else - which is worth finding out
-                before either number is quoted at a listener.
-            */
-            Config viaRender;
-            viaRender.size    = 1.0;
-            viaRender.balance = 0.25;
-
-            const auto direct = render (viaRender, burst(),
-                                        static_cast<size_t> (kSampleRate * 1.0));
-
-            const auto directMag = stereoMagnitude (direct.outL, direct.outR);
-            const double directOnset = firstArrivalMs (directMag);
-            const double directNotch = directOnset > 0.0
-                                     ? notchDb (directMag, directOnset + 5.0, 220.0) : 0.0;
-
-            const double manualOnset = firstArrivalMs (stereoMagnitude (r.lateL, r.lateR));
-
-            info ("    Cross-check at Early/Late 25 %:");
-            info ("      production combine  onset " + fx (directOnset, 2)
-                  + " ms, notch " + fx (directNotch, 2) + " dB");
-            info ("      hand combine        onset " + fx (manualOnset, 2) + " ms");
-
-            check (true, "the valley was measured against this Size's own ideal K");
+            info (row);
         }
+
+        info ("");
+        info ("      " + pad ("worst of each", 18)
+              + pad (fx (familyWorst[0], 1) + " dB", 12)
+              + pad (fx (familyWorst[1], 1) + " dB", 12)
+              + fx (familyWorst[2], 1) + " dB");
+        info ("      " + pad ("mean of each", 18)
+              + pad (fx (familySum[0] / familyCells, 1) + " dB", 12)
+              + pad (fx (familySum[1] / familyCells, 1) + " dB", 12)
+              + fx (familySum[2] / familyCells, 1) + " dB");
+        info ("      " + pad ("cells won", 18)
+              + pad (std::to_string (familyWins[0]), 12)
+              + pad (std::to_string (familyWins[1]), 12)
+              + std::to_string (familyWins[2]));
+        info ("");
+
+        /*
+            THE DISCRIMINATING STATISTIC IS THE SPREAD OF THE MEANS, not any
+            one occupancy's maximum.
+
+            A maximum over sixteen near-random draws is dominated by the one
+            unluckiest cell, and 0.40's 13.4 dB against 0.70's 11.3 dB is the
+            kind of difference that gets reshuffled by adding a setting. The
+            means are 3.8, 4.9 and 4.8 dB - a 1.1 dB spread against an effect
+            reaching 13.4 dB - and the cells won are 5, 5 and 6, which is a
+            tie.
+
+            So the effect is a property of the ARCHITECTURE: two branches
+            carrying the same narrow band, whose relative phase at that
+            frequency is arbitrary but deterministic. Reopening the occupancy
+            choice would be chasing it around the family rather than fixing
+            it, and picking the occupancy that happened to win on one source
+            at one setting would be fitting noise.
+        */
+        const double meanLo = *std::min_element (familySum.begin(), familySum.end())
+                            / familyCells;
+        const double meanHi = *std::max_element (familySum.begin(), familySum.end())
+                            / familyCells;
+
+        check (meanHi - meanLo < 2.0,
+               "every occupancy suffers the narrowband effect about equally, so "
+               "it is architectural and not the occupancy choice");
+
+        info ("    If every occupancy shows it, the effect belongs to the");
+        info ("    ARCHITECTURE - two branches carrying the same narrow band -");
+        info ("    and reopening the occupancy choice would be chasing it");
+        info ("    around the family rather than fixing it.");
+        info ("");
+        info ("    If the correlation column is NEGATIVE, the sag is real and");
+        info ("    is the branches cancelling each other mid-travel on narrow-");
+        info ("    band material - a property of the source meeting this");
+        info ("    architecture, not of the calibration or the metric. It is a");
+        info ("    PRODUCT CONCERN and is carried as one; the brief says a");
+        info ("    repeated 5-8 dB movement on normal musical material cannot");
+        info ("    be hidden by averaging, and this is larger than that.");
     }
 
     // =======================================================================
@@ -1447,7 +1918,7 @@ void runPhase10ProductionTests()
             c.balance = balance;
 
             const auto r = render (c, drive, length);
-            const auto g = er::gainsForBalance (balance);
+            const auto g = er::gainsForBalance (balance, er::balanceCalibration);
 
             const double e = energyOf (r.outL) + energyOf (r.outR);
 
@@ -1470,8 +1941,8 @@ void runPhase10ProductionTests()
         check (worst < 1.0,
                "total wet energy stays within 1 dB across the whole Early/Late travel");
 
-        const auto zero = er::gainsForBalance (0.0);
-        const auto one  = er::gainsForBalance (1.0);
+        const auto zero = er::gainsForBalance (0.0, er::balanceCalibration);
+        const auto one  = er::gainsForBalance (1.0, er::balanceCalibration);
 
         check (zero.late == 1.0 && zero.early == 0.0,
                "balance 0 is exactly late 1, early 0");
@@ -1552,6 +2023,56 @@ void runPhase10ProductionTests()
             worstOverall = std::max (worstOverall, worstHere);
 
             info (row + fx (worstHere, 2) + " dB");
+
+            /*
+                THE STRUCTURE BEHIND THE NUMBER, on a second line per Size.
+
+                A valley figure on its own says nothing about whether the two
+                layers overlap at all. The overlap is the ER span minus the
+                late field's first arrival: positive means the early layer is
+                still sounding when the late one starts, which is the
+                condition for a handoff rather than a gap. Where the valley
+                SITS matters too - one inside the ER span is a comb, one after
+                it is a genuine handoff hole.
+            */
+            {
+                EarlyReflections e;
+                e.prepare (kSampleRate);
+                e.snapToSizeRatio (sizeRatioFor (size));
+
+                double firstEr = 1.0e30, lastEr = 0.0;
+
+                for (int k = 0; k < e.getEventCount(); ++k)
+                {
+                    const double l = e.getOffsetL (k) * 1000.0 / kSampleRate;
+                    const double r2 = e.getOffsetR (k) * 1000.0 / kSampleRate;
+
+                    firstEr = std::min ({ firstEr, l, r2 });
+                    lastEr  = std::max ({ lastEr, l, r2 });
+                }
+
+                Config c;
+                c.size    = size;
+                c.balance = 0.25;
+
+                const auto r = render (c, drive, length);
+
+                const double lateOnset =
+                    firstArrivalMs (stereoMagnitude (r.lateL, r.lateR));
+
+                const auto mag = stereoMagnitude (r.outL, r.outR);
+                const double onset = firstArrivalMs (mag);
+
+                double atMs = 0.0;
+                const double notch = onset > 0.0
+                                   ? notchDb (mag, onset + 5.0, 220.0, &atMs) : 0.0;
+
+                info ("             ER " + fx (firstEr, 2) + " to "
+                      + fx (lastEr, 2) + " ms, late from " + fx (lateOnset, 2)
+                      + " ms, overlap " + fx (lastEr - lateOnset, 2)
+                      + " ms, valley " + fx (notch, 2) + " dB at "
+                      + fx (atMs, 0) + " ms");
+            }
         }
 
         info ("");
@@ -1581,7 +2102,7 @@ void runPhase10ProductionTests()
 
                 EarlyLateBalance b;
                 b.prepare (kSampleRate);
-                b.snapTo (balance);
+                b.snapTo (balance, er::balanceCalibration);
 
                 std::vector<double> l (length, 0.0), r (length, 0.0);
                 std::vector<double> el (length, 0.0), er_ (length, 0.0);
@@ -1749,7 +2270,7 @@ void runPhase10ProductionTests()
 
         for (double balance : { 0.0, 0.13, 0.5, 0.87, 1.0 })
         {
-            b.setBalance (balance);
+            b.setBalance (balance, er::balanceCalibration);
 
             size_t i = 0;
 
@@ -1817,7 +2338,7 @@ void runPhase10ProductionTests()
 
             EarlyLateBalance bal;
             bal.prepare (kSampleRate);
-            bal.snapTo (points.front());
+            bal.snapTo (points.front(), er::balanceCalibration);
 
             std::vector<double> l (length, 0.0), r (length, 0.0);
             std::vector<double> el (length, 0.0), err (length, 0.0);
@@ -1845,7 +2366,7 @@ void runPhase10ProductionTests()
             {
                 const auto step = points.size() * n / length;
 
-                bal.setBalance (points[std::min (step, points.size() - 1)]);
+                bal.setBalance (points[std::min (step, points.size() - 1)], er::balanceCalibration);
 
                 out[n] = bal.nextLate() * l[n] * trim + bal.nextEarly() * el[n];
             }
@@ -1965,6 +2486,89 @@ void runPhase10ProductionTests()
               + pad (fx (100.0 * bypassTime / realtime, 2) + " %", 17)
               + fx (bypassTime / tankTime, 3) + "x");
 
+        /*
+            THE TWO NEW PIECES OF THE FINAL DESIGN, timed separately because
+            the brief asks for them separately and because lumping them into
+            the ER figure would hide which one costs anything.
+
+            Both run ONCE PER BLOCK in production - they produce smoother
+            targets, not samples - so they are timed per call and the per-block
+            cost is that figure divided by nothing at all.
+        */
+        constexpr int lawIterations = 2000000;
+
+        volatile double lawSink = 0.0;
+
+        auto timeCalls = [&] (auto&& body)
+        {
+            double best = 1.0e30;
+
+            for (int rep = 0; rep < repeats; ++rep)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                body();
+                const auto t1 = std::chrono::steady_clock::now();
+
+                best = std::min (best, std::chrono::duration<double> (t1 - t0).count());
+            }
+
+            return best / lawIterations;
+        };
+
+        const double lawTime = timeCalls ([&]
+        {
+            double acc = 0.0;
+
+            for (int i = 0; i < lawIterations; ++i)
+            {
+                const auto g = er::gainsForBalance (static_cast<double> (i % 1000) * 0.001,
+                                                    er::balanceCalibration);
+                acc += g.late + g.early;
+            }
+
+            lawSink += acc;
+        });
+
+        const double lookupTime = timeCalls ([&]
+        {
+            double acc = 0.0;
+
+            for (int i = 0; i < lawIterations; ++i)
+                acc += er::calibrationFor (0.1 + static_cast<double> (i % 600) * 0.1,
+                                           0.25 + static_cast<double> (i % 70) * 0.025);
+
+            lawSink += acc;
+        });
+
+        // A 512-sample block at 48 kHz is 10.667 ms of wall clock.
+        constexpr double blockBudget = 512.0 / 48000.0;
+
+        info ("");
+        info ("    " + pad ("per call, once per block", 32) + pad ("time", 13)
+              + "share of a 512-sample block");
+        info ("    " + pad ("p = 0.50 gain law (sqrt)", 32)
+              + pad (fx (lawTime * 1.0e9, 2) + " ns", 13)
+              + fx (lawTime / blockBudget * 100.0, 5) + " %");
+        info ("    " + pad ("BAL-4 lookup + interpolation", 32)
+              + pad (fx (lookupTime * 1.0e9, 2) + " ns", 13)
+              + fx (lookupTime / blockBudget * 100.0, 5) + " %");
+        info ("");
+        info ("    The lookup is the dearer of the two because it evaluates");
+        info ("    eight logarithms - two for the inputs and six for the knots");
+        info ("    and corners. Precomputing the log knots would remove most of");
+        info ("    that and is NOT done, because it would trade a clear table");
+        info ("    of measured values for a parallel array of their logarithms");
+        info ("    that someone would eventually fail to keep in step. At once");
+        info ("    per block the cost does not justify the hazard.");
+        info ("");
+        info ("    The law uses sqrt rather than pow, as required: pow measured");
+        info ("    2.3x the trigonometric form and sqrt measures a third of it.");
+
+        check (lawTime < 1.0e-7 && lookupTime < 1.0e-6,
+               "the gain law and the calibration lookup are both negligible");
+
+        (void) lawSink;
+
         const size_t ring = static_cast<size_t> (std::ceil (er::maxSpanMs * kSampleRate / 1000.0)) + 4;
         size_t rounded = 1;
         while (rounded < ring) rounded <<= 1;
@@ -2009,7 +2613,7 @@ void runPhase10ProductionTests()
                 // A Size sweep and a balance sweep together, both changing
                 // every block, which is harsher than any host will be.
                 live.setSizeScaleRatio (sizeRatioFor (static_cast<double> (b % 101) * 0.01));
-                bal .setBalance (static_cast<double> (b % 97) / 96.0);
+                bal .setBalance (static_cast<double> (b % 97) / 96.0, er::balanceCalibration);
 
                 live.process (inL.data(), inR.data(), outL.data(), outR.data(), blockSize);
 

@@ -91,4 +91,24 @@ int exportPhase10ListeningSet (const std::string& directory, double sampleRate =
 */
 int exportPhase10OccupancyAb (const std::string& directory, double sampleRate = 48000.0);
 
+/**
+    The four final sanity renders, on the complete production candidate.
+
+    NOT another parameter search and not blind. Everything is at the shipping
+    value - cellOccupancy 0.40, envelopeDecay 1.5, the p = 0.50 linear-in-power
+    law, the recalibrated BAL-4 table - and the files exist to be listened to
+    once for anything obviously wrong.
+
+    EACH FILE SWEEPS EARLY/LATE FROM 0 TO 100 % across its length, and that is
+    the one design decision here worth defending. A static render cannot show
+    unnatural level movement, which is one of the six things these files are
+    meant to check; a sweep shows it directly, and also walks through the
+    handoff, the slap region and the ER-heavy end in a single pass. It drives
+    the real production automation path rather than a sequence of static
+    settings.
+
+    Size 80 %, Mix 30 %, everything else at its default.
+*/
+int exportPhase10FinalSanity (const std::string& directory, double sampleRate = 48000.0);
+
 } // namespace avtest

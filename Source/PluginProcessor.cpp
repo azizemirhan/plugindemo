@@ -537,22 +537,44 @@ void AuroraVerbProcessor::processInternal (juce::AudioBuffer<FloatType>& buffer)
             // same integer span do not restart the fade, so a Size smoother
             // creeping by a fraction of a sample costs nothing.
             {
-                const auto sizeRatio =
-                    dsp::mapping::sizeScaleFor (smoothed.size.getCurrentValue())
+                const auto sizeScale =
+                    dsp::mapping::sizeScaleFor (smoothed.size.getCurrentValue());
+
+                const auto sizeRatio = sizeScale
                     / dsp::mapping::sizeScaleFor (dsp::er::referenceSizeControl);
 
                 const auto balance =
                     static_cast<double> (raw.earlyLate->load (std::memory_order_relaxed)) * 0.01;
 
+                /*
+                    BAL-4. The calibration that equalises the two branches is
+                    a function of Decay and Size, looked up once per chunk.
+
+                    A single constant was shipped first and the error reaches
+                    26 dB at the short-Decay corner, because the late branch's
+                    energy moves with both controls and the early branch's
+                    does not. This is NOT derived from the audio: it changes
+                    when the user changes Decay or Size and at no other time,
+                    which is what separates a deterministic calibration from
+                    the gain normalisation PHASE 10 rules out.
+
+                    It reaches the audio through the balance's own early-gain
+                    smoother, so a Decay or Size move is ramped by exactly the
+                    machinery that ramps an Early/Late move.
+                */
+                const auto calibration = dsp::er::calibrationFor (
+                    dsp::mapping::rt60For (smoothed.decaySeconds.getCurrentValue()),
+                    sizeScale);
+
                 if (firstBlockAfterPrepare && offset == 0)
                 {
                     earlyReflections.snapToSizeRatio (sizeRatio);
-                    earlyLateBalance.snapTo (balance);
+                    earlyLateBalance.snapTo (balance, calibration);
                 }
                 else
                 {
                     earlyReflections.setSizeScaleRatio (sizeRatio);
-                    earlyLateBalance.setBalance (balance);
+                    earlyLateBalance.setBalance (balance, calibration);
                 }
 
                 // Asked of the target and the smoothing state, never of the

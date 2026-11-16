@@ -53,6 +53,10 @@ namespace
         double size      = 0.80;   ///< the Size control, 0..1
         double balance   = 0.0;    ///< the Early/Late control, 0..1
         double occupancy = kShippedOccupancy;
+
+        /** Sweeps Early/Late from 0 to 100 % across the render instead of
+            holding `balance`. A static render cannot show level movement. */
+        bool sweepBalance = false;
     };
 
     [[nodiscard]] std::unique_ptr<Morph> makeTank (double sampleRate, double sizeControl)
@@ -141,11 +145,24 @@ namespace
         early.prepare (sampleRate, pattern);
         early.snapToSizeRatio (sizeRatio);
 
+        /*
+            The calibration comes from the production table, not from the
+            reference constant - these renders have to be the product, and
+            at Size 80 % the table gives a materially different K from the
+            value at the reference Size.
+        */
+        const double calibration =
+            er::calibrationFor (mapping::rt60For (kDecaySeconds),
+                                mapping::sizeScaleFor (point.size));
+
         EarlyLateBalance balance;
         balance.prepare (sampleRate);
-        balance.snapTo (point.balance);
+        balance.snapTo (point.sweepBalance ? 0.0 : point.balance, calibration);
 
-        const bool erActive = ! balance.isBypassed();
+        // A swept render is active throughout even though it starts at 0:
+        // writeOnly would skip the convolution for the whole first block and
+        // the layer would arrive a block late.
+        const bool erActive = point.sweepBalance || ! balance.isBypassed();
 
         const double trim = mapping::previewWetTrim (mapping::rt60For (kDecaySeconds),
                                                       mapping::sizeScaleFor (point.size));
@@ -171,6 +188,12 @@ namespace
                 wetL[static_cast<size_t> (i)] = n < dry.size() ? dry[n].l : 0.0;
                 wetR[static_cast<size_t> (i)] = n < dry.size() ? dry[n].r : 0.0;
             }
+
+            // Per block, exactly as the processor sets its own targets.
+            if (point.sweepBalance)
+                balance.setBalance (std::min (1.0, static_cast<double> (base)
+                                                   / static_cast<double> (out.size())),
+                                    calibration);
 
             preDelay.process (wetL.data(), wetR.data(), count);
 
@@ -482,6 +505,120 @@ int exportPhase10ListeningSet (const std::string& directory, double sampleRate)
             return -1;
 
         f << key.str();
+        ++written;
+    }
+
+    return written;
+}
+
+// ===========================================================================
+
+int exportPhase10FinalSanity (const std::string& directory, double sampleRate)
+{
+    if (sampleRate <= 0.0)
+        return -1;
+
+    const auto fu2 = makeFu2Sources (sampleRate);
+
+    auto named = [&fu2] (const char* name) -> const std::vector<StereoFrame>*
+    {
+        for (const auto& s : fu2)
+            if (s.name == name)
+                return &s.frames;
+
+        return nullptr;
+    };
+
+    const auto vocal = makeVocalReference (sampleRate, 6.0);
+
+    struct Case { const char* name; const std::vector<StereoFrame>* source; };
+
+    const std::vector<Case> cases
+    {
+        { "snare", named ("snare") },
+        { "vocal", &vocal          },
+        { "piano", named ("piano") },
+        { "pad",   named ("pad")   },
+    };
+
+    int written = 0;
+
+    std::ostringstream md;
+
+    md << "# AuroraVerb - PHASE 10 final sanity renders\n\n"
+       << "Four files, not blind, nothing to choose between. Everything is at\n"
+       << "the production candidate:\n\n"
+       << "    cellOccupancy   0.40\n"
+       << "    envelopeDecay   1.5\n"
+       << "    gain law        linear-in-power, late = sqrt(1-t), early = sqrt(t)*K\n"
+       << "    calibration     the recalibrated BAL-4 table\n"
+       << "    Size            80 %\n"
+       << "    Mix             " << fixed (kShippingMix * 100.0, 0) << " %\n"
+       << "    everything else at its default\n\n"
+       << "**Each file sweeps Early/Late from 0 to 100 % across its length.**\n"
+       << "That is deliberate. A static render cannot show unnatural level\n"
+       << "movement, which is one of the six things these files exist to check;\n"
+       << "a sweep shows it directly and walks through the handoff, the slap\n"
+       << "region and the ER-heavy end in one pass, driving the real automation\n"
+       << "path rather than a row of static settings.\n\n"
+       << "So the reverb starts as the late network alone and ends as the early\n"
+       << "layer alone. Listen once through each, for:\n\n"
+       << "1. **Disconnected early/late behaviour** - does the reverb ever come\n"
+       << "   apart into two separate sounds, or develop a hole as the balance\n"
+       << "   moves?\n"
+       << "2. **Discrete slap** - do individual reflections become audible as\n"
+       << "   separate events?\n"
+       << "3. **Metallic repetition** - any ringing or comb-like character?\n"
+       << "4. **Tonal coloration** - does the reverb impose a pitch or a\n"
+       << "   hollowness the source does not have?\n"
+       << "5. **Unnatural level movement** - does the loudness lurch as the\n"
+       << "   control travels? A gradual trend is expected and documented; a\n"
+       << "   lurch or a dip in the middle is not.\n"
+       << "6. **Unstable stereo image** - does the image pull, wander, or\n"
+       << "   collapse?\n\n"
+       << "## One thing is already known and measured, so it is not a surprise\n\n"
+       << "On **sustained narrowband material** - the pad especially - the two\n"
+       << "branches can become strongly correlated or anti-correlated at the\n"
+       << "source's own frequency, and the sweep then shows a level trend of\n"
+       << "several dB, up to 13 dB at small Size with a short Decay. It is a\n"
+       << "property of two layers carrying the same narrow band, it is present\n"
+       << "at every ER pattern measured, and no calibration removes it.\n\n"
+       << "It is carried as an explicit product concern rather than hidden.\n"
+       << "What the listening is for is whether it is objectionable in use, not\n"
+       << "whether it exists.\n\n"
+       << "## Files\n\n";
+
+    for (const auto& c : cases)
+    {
+        if (c.source == nullptr)
+            return -1;
+
+        const auto out = render (*c.source, sampleRate,
+                                 { 0.80, 0.0, er::defaultPattern.cellOccupancy, true },
+                                 kShippingMix);
+
+        const auto path = std::string ("final-") + c.name + "-sweep.wav";
+
+        if (! writeStereoWav (directory + "/" + path, out, sampleRate))
+            return -1;
+
+        ++written;
+
+        md << "- `" << path << "` - peak " << fixed (peakOf (out), 4)
+           << ", integrated " << fixed (levelDb (out), 2) << " dB\n";
+    }
+
+    md << "\nSample rate " << fixed (sampleRate, 0) << " Hz, 32-bit float stereo.\n"
+       << "Nothing is level-matched; the level trend is part of what is being\n"
+       << "checked.\n";
+
+    {
+        std::ofstream f (directory + "/LISTENING.md", std::ios::binary);
+
+        if (! f)
+            return -1;
+
+        f << md.str();
         ++written;
     }
 
