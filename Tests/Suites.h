@@ -114,6 +114,7 @@ void runPhase11StereoAuditTests();
 void runPhase11ReadoutTests();
 void runPhase11DelaySetTests();
 void runPhase11Stage4Tests();
+void runPhase12ModeFamilyTests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

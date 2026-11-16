@@ -118,6 +118,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase11DelaySet.cpp
     Phase11Stage4.cpp
     Phase11Listening.cpp
+    Phase12ModeFamilies.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
