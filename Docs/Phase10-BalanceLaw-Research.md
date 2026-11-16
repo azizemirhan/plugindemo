@@ -330,7 +330,7 @@ shipping candidate until these answers exist.
 
 ## 17. Commit
 
-`71f6c1e` - "Phase 10: crossfade law research; final occupancy A/B pack".
+`d7b5089` - "Phase 10: crossfade law research; final occupancy A/B pack".
 
 ---
 
