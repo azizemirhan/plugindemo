@@ -52,6 +52,9 @@ namespace structural
 
         stage3::Structure impostor;
 
+        /** A family left out of the search and the verdict, or -1. */
+        int ignoreFamily = -1;
+
         SearchResult result;
     };
 
@@ -68,7 +71,8 @@ namespace structural
     [[nodiscard]] SearchResult mimic (const stage3::Features& target,
                                       const stage3::Structure& impostor,
                                       const stage3::Floor& floor,
-                                      const Controls& startAt, unsigned int seed);
+                                      const Controls& startAt, unsigned int seed,
+                                      int ignoreFamily = -1);
 
     [[nodiscard]] stage3::User userAt (const Point& p);
     [[nodiscard]] stage3::Structure hall();

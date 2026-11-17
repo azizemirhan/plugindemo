@@ -150,14 +150,21 @@ namespace structural
     */
     [[nodiscard]] SearchResult mimic (const Features& target, const Structure& impostor,
                                       const Floor& floor, const Controls& startAt,
-                                      unsigned int seed)
+                                      unsigned int seed, int ignoreFamily)
     {
         SearchResult result;
 
         auto evaluate = [&] (const Controls& c)
         {
             ++result.evaluations;
-            return score (distance (target, featuresOf (impostor, toUser (c))), floor);
+            auto d = distance (target, featuresOf (impostor, toUser (c)));
+
+            // A family can be left out, to ask what remains for a listener
+            // who cannot hear it (a centred source and the lateral family).
+            if (ignoreFamily >= 0)
+                d.family[ignoreFamily] = 0.0;
+
+            return score (d, floor);
         };
 
         struct Scored { Controls c; Score s; };
@@ -349,7 +356,8 @@ namespace structural
                 t.target = featuresOf (t.structure, t.user);
 
             t.result = mimic (t.target, t.impostor, gFloor, toControls (t.user),
-                              0x9E3779B9u ^ static_cast<unsigned int> ((i + 1) * 2654435761u));
+                              0x9E3779B9u ^ static_cast<unsigned int> ((i + 1) * 2654435761u),
+                              t.ignoreFamily);
         });
     }
 
@@ -974,10 +982,18 @@ void runPhase12StructuralTests()
 
     if (std::getenv ("AV_S3_PROBE") != nullptr) { runProbe(); return; }
 
+    // AV_S3_QUICK skips the two control batches (nine minutes) while the
+    // candidate sections are being developed. The floor is always measured.
+    const bool quick = std::getenv ("AV_S3_QUICK") != nullptr;
+
     runCore();
     runFloor();
-    runNegativeControls();
-    runPositiveControls();
+
+    if (! quick)
+    {
+        runNegativeControls();
+        runPositiveControls();
+    }
 
     runPhase12StructuralCandidates();
 

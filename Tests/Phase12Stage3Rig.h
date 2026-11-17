@@ -119,6 +119,13 @@ struct Structure
     InjectionKind injection = InjectionKind::all;
     double        staggerMs = 0.0;
 
+    /** Block injection and readout vectors. false: sign vectors, which turned
+        out to be ROWS of the block's own Hadamard matrix, so the block maps
+        them onto a single line and back - found in 12.3.6, kept so those
+        results stay reproducible. true: four orthonormal vectors aligned
+        with nothing. */
+    bool genericVectors = false;
+
     // I
     ReadoutKind readout     = ReadoutKind::ends;
     bool        erFeedsTank = false;
@@ -461,6 +468,43 @@ namespace patterns
     inline constexpr double quadC[4] {  0.5, -0.5, -0.5,  0.5 };
     inline constexpr double quadD[4] { -0.5,  0.5,  0.5,  0.5 };
 
+    /** Four orthonormal 4-vectors with no relation to the Hadamard rows:
+        Gram-Schmidt on four fixed, unremarkable vectors. */
+    [[nodiscard]] inline std::array<std::array<double, 4>, 4> genericQuad()
+    {
+        std::array<std::array<double, 4>, 4> q
+        {{
+            {  0.61,  0.35, -0.52,  0.48 },
+            { -0.29,  0.67,  0.44,  0.52 },
+            {  0.70, -0.20,  0.60, -0.33 },
+            {  0.25,  0.55, -0.15, -0.80 }
+        }};
+
+        for (size_t r = 0; r < 4; ++r)
+        {
+            for (size_t p = 0; p < r; ++p)
+            {
+                double dot = 0.0;
+
+                for (size_t c = 0; c < 4; ++c)
+                    dot += q[r][c] * q[p][c];
+
+                for (size_t c = 0; c < 4; ++c)
+                    q[r][c] -= dot * q[p][c];
+            }
+
+            double norm = 0.0;
+
+            for (double v : q[r])
+                norm += v * v;
+
+            for (auto& v : q[r])
+                v /= std::sqrt (norm);
+        }
+
+        return q;
+    }
+
     // Where the multi-tap readout looks inside a line, as fractions of it.
     inline constexpr double tapFraction[2] { 0.37, 0.71 };
     inline constexpr double tapWeight      = 0.8;
@@ -608,6 +652,13 @@ public:
         }
 
         // --- E, I: vectors ---------------------------------------------------
+        const auto generic = patterns::genericQuad();
+
+        const double* quadA = s.genericVectors ? generic[0].data() : patterns::quadA;
+        const double* quadB = s.genericVectors ? generic[1].data() : patterns::quadB;
+        const double* quadC = s.genericVectors ? generic[2].data() : patterns::quadC;
+        const double* quadD = s.genericVectors ? generic[3].data() : patterns::quadD;
+
         for (int i = 0; i < N; ++i)
         {
             injectionL[i] = fdn::injectionLeft [i] * fdn::signVectorNorm;
@@ -628,18 +679,18 @@ public:
         {
             for (int i = 0; i < 4; ++i)
             {
-                injectionL[i]     = patterns::quadA[i];
+                injectionL[i]     = quadA[i];
                 injectionR[i]     = 0.0;
                 injectionL[i + 4] = 0.0;
-                injectionR[i + 4] = patterns::quadB[i];
+                injectionR[i + 4] = quadB[i];
             }
         }
         else if (s.injection == InjectionKind::blockA)
         {
             for (int i = 0; i < 4; ++i)
             {
-                injectionL[i]     = patterns::quadA[i];
-                injectionR[i]     = patterns::quadB[i];
+                injectionL[i]     = quadA[i];
+                injectionR[i]     = quadB[i];
                 injectionL[i + 4] = 0.0;
                 injectionR[i + 4] = 0.0;
             }
@@ -659,10 +710,10 @@ public:
         {
             for (int i = 0; i < 4; ++i)
             {
-                readoutL[i]     = patterns::quadC[i];
+                readoutL[i]     = quadC[i];
                 readoutR[i]     = 0.0;
                 readoutL[i + 4] = 0.0;
-                readoutR[i + 4] = patterns::quadD[i];
+                readoutR[i + 4] = quadD[i];
             }
         }
         else if (s.readout == ReadoutKind::blockB)
@@ -671,8 +722,8 @@ public:
             {
                 readoutL[i]     = 0.0;
                 readoutR[i]     = 0.0;
-                readoutL[i + 4] = patterns::quadC[i];
-                readoutR[i + 4] = patterns::quadD[i];
+                readoutL[i + 4] = quadC[i];
+                readoutR[i + 4] = quadD[i];
             }
         }
         else if (s.readout == ReadoutKind::multiTap)
