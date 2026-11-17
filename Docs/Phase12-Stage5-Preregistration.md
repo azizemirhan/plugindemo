@@ -243,3 +243,54 @@ survives under 1.75 × and the next stage needs the other answer too:
   reports the cheapest chain that is still Plate A.
 
 No threshold, family, scale or search setting is changed.
+
+---
+
+## Addendum 2 — after Parts A and B were read, before Room is run again
+
+Appended; nothing above is edited.
+
+**Part A, as re-run:** no chain under 1.75 × Hall preserves the reference; the
+three closest are REJECTED outright (lowest runs 0.65–0.95). The three
+cheapest chains that *are* PRESERVED (120–128 sections, about 3 × Hall) are
+not reference-equivalent either (medians 1.8–2.7). Plate reduction has
+failed within this mechanism. That result stands and is not revisited here.
+
+**Part B, as run:** all five Room hypotheses are rejected.
+
+| | medium | small | large | lowest run | |
+|---|---|---|---|---|---|
+| R1a local block 0.25 | 3.08 | 5.11 | **1.68** | 1.58 | REJECTED |
+| R1b local block 0.40 | 1.81 | 4.73 | 1.34 | 1.34 | REJECTED at G1 |
+| R1c local, hear both | 1.30 | 2.26 | 1.17 | 1.17 | REJECTED at G1 |
+| R2 multi-region | 2.65 | 5.66 | 1.32 | 1.32 | REJECTED at G1 |
+| R3 wall pairs | 2.50 | 3.83 | 2.75 | 2.42 | REJECTED (medium median 2.498 against 2.5) |
+
+R3 misses NOT REFUTED by two thousandths. It stays rejected; and it carries
+the repetition and ringing flags it was put on the list to demonstrate.
+
+**What was learned.** A small block that is driven *and is the only thing
+heard* is far outside Hall's reach at small and medium settings (3.1–5.1).
+Heard together with the field (R1c) it is reproduced at once: Hall's early
+layer does that. It fails at large / long, and it rings (modal prominence 35
+against Hall's 14) and shifts a short Decay (0.84 ×).
+
+**New hypothesis, R4 — a different mechanism, not R1a re-tuned to pass.** In
+R1a the exchange between block and field is a fixed angle, so its duration
+grows with Size while the Decay it is judged against grows faster. R4 sets
+it from a time, as Part D does: sin²θ = (mean loop time of the block) /
+(k × Decay). Its RT60 is calibrated explicitly (`decayScale`).
+
+| | block | k |
+|---|---|---|
+| **R4a** | 4 shortest lines × 0.25 | 0.06 |
+| **R4b** | 4 shortest lines × 0.40 | 0.06 |
+| **R4c** | 4 shortest lines × 0.25 | 0.12 |
+
+Gates unchanged. **Expected failure, stated now:** the ringing flag is a
+property of hearing four short lines and the timing rule does nothing about
+it. If R4 passes G1–G3 it passes with that flag on it, and the flag goes to a
+human, not into a footnote.
+
+The gate tables now also print the family and Hall's knobs of the lowest run
+at each point. That is reporting only.
