@@ -294,3 +294,52 @@ human, not into a footnote.
 
 The gate tables now also print the family and Hall's knobs of the lowest run
 at each point. That is reporting only.
+
+---
+
+## Addendum 3 — after Parts B, C and D were read, before Chamber is run again
+
+Appended; nothing above is edited.
+
+**Part B, with R4:** R4c (local block × 0.25, k 0.12) SURVIVES G2 on a centred
+source (medians 5.69 / 6.38 / 4.06, lowest run 3.66) and **fails G3**: Size
+barely moves it and not monotonically, its channels are 1.3 dB out of balance,
+its worst mono tone is 8 dB deeper than Hall's. It also carries the ringing
+flag predicted in addendum 2. R4a is NOT REFUTED and fails G3 the same way.
+Room has a structural mechanism and no survivor.
+
+**Part C:** all four Chamber hypotheses are REJECTED at G1 (lowest runs
+1.14–1.46). Reflections inside the recursion (C1) is now the third
+reflection-into-tank form to be reproduced. Coupled volumes at a fixed angle
+(C2) are reproduced too.
+
+**Part D:** A1b and A3 SURVIVE G2 (lowest medians 4.00 and 4.12); Decay is
+within 0.1 % of Hall's by calibration. Both **fail G3 on tone** (octave bands
+1.82 and 1.36 dB from Hall; limit 1), and A3 also on mono fold-down. Ambient
+has a structural mechanism and no survivor.
+
+**What Parts B and D have in common** is the timing rule: the two mechanisms
+that got past G2 are the two whose energy exchange is set from Decay. The two
+families of fixed-angle exchanges (R1, C2) did not.
+
+**New Chamber hypothesis, C3 — coupled volumes with a timed exchange.** C2's
+construction (a lossy block that is driven and heard, coupled to a long-lived
+one) with sin²θ = (mean loop time of the block) / (k × Decay), RT60
+calibrated.
+
+| | heard block | its RT | k |
+|---|---|---|---|
+| **C3a** | 4 lines × 0.6 | 0.45 × | 0.12 |
+| **C3b** | 4 lines × 0.6 | 0.30 × | 0.12 |
+| **C3c** | 4 lines × 1.0 | 0.45 × | 0.12 |
+
+**The risk stated now:** C3 is R4's construction plus loss. If it passes G2,
+the adversarial gate against Room (R4c) is the test of whether it is a second
+family or the same one with a knob moved; a collapse there rejects it. The
+impostor in that gate is R4c as built at the default knobs, because the
+search takes one fixed structure — so R4c's own timing does not follow its
+Decay knob during the search. That makes the gate somewhat *easier* for
+Chamber to pass than a full test would be, and a pass must be read with that
+in mind.
+
+Gates unchanged.
