@@ -409,8 +409,8 @@ so a filtered run can measure the floor without printing section 12.3.2
 then stopped by me when the Stage 5 brief arrived, because Stage 5 needs the
 machine and ends with its own regression, which covers this code. At the
 point it was stopped it had reached the Phase 7 suites with 2241 checks
-passed and the 4 failures that are preserved from Phase 8 onward at that
-point in the run; nothing new.
+passed and 4 failures, all four among the 18 preserved ones (Phase 7
+decay-law checks); nothing new.
 
 What did run to completion:
 

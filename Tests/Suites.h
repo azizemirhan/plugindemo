@@ -117,6 +117,8 @@ void runPhase11Stage4Tests();
 void runPhase12ModeFamilyTests();
 void runPhase12StructuralTests();
 void runPhase12Stage4Tests();
+void runPhase12Stage5FastTests();
+void runPhase12Stage5Tests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

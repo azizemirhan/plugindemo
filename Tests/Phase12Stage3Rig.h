@@ -59,7 +59,8 @@ enum class MatrixKind
     randomDense,       // seeded dense orthogonal
     hadamardPermuted,  // Hadamard with rows signed and columns permuted
     sparseChain,       // two non-zeros per row, all lines connected in a chain
-    coupledBlocks      // two 4-line Hadamard blocks joined by an angle
+    coupledBlocks,     // two 4-line Hadamard blocks joined by an angle
+    custom             // STAGE 5: Structure::customMatrix, as given
 };
 
 enum class DiffuserKind
@@ -77,7 +78,8 @@ enum class InjectionKind
     pair,       // L into line 0 only, R into line 1 only
     staggered,  // shipping vectors, each line fed through its own delay
     split,      // L into lines 0-3, R into lines 4-7
-    blockA      // both channels into lines 0-3
+    blockA,     // both channels into lines 0-3
+    custom      // STAGE 5: Structure::customInL / customInR, as given
 };
 
 enum class ReadoutKind
@@ -85,10 +87,23 @@ enum class ReadoutKind
     ends,       // shipping sign vectors on the eight line outputs
     multiTap,   // ... plus two taps taken inside every line
     split,      // L from lines 0-3, R from lines 4-7
-    blockB      // both channels from lines 4-7
+    blockB,     // both channels from lines 4-7
+    custom      // STAGE 5: Structure::customOutL / customOutR, as given
+};
+
+/** STAGE 5. One section of a dispersion chain: a first-order allpass in
+    z^-stretch,  H = (a + z^-M) / (1 + a z^-M).  stretch 1 is the section
+    Stage 3's pre-dispersion is made of. A stretched section costs the same
+    arithmetic and carries M times the phase, at the price of a group delay
+    that repeats every rate / M. */
+struct ChainSection
+{
+    double a = -0.7;
+    int stretch = 1;
 };
 
 struct Structure
+
 {
     std::string name = "Hall";
 
@@ -150,7 +165,31 @@ struct Structure
         integrated wet energy equals Hall's at the product defaults. Loudness
         is thereby removed as a way to differ; 1 for Hall, exactly. */
     double lateCorrection = 1.0;
+
+    // ----- STAGE 5. Every field below is inert at its default, and
+    //       PHASE 12.5.0 holds the rig to that bit for bit. -----------------
+
+    /** MatrixKind::custom: the static matrix, row-major. The caller is
+        responsible for its orthogonality. */
+    std::array<double, 64> customMatrix {};
+
+    /** InjectionKind::custom and ReadoutKind::custom. */
+    std::array<double, 8> customInL {}, customInR {}, customOutL {}, customOutR {};
+
+    /** MatrixKind::custom only. Each line's RT60 as a fraction of the
+        requested one; below 1 the line loses more per pass. */
+    std::array<double, 8> lineDecayRatio { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+
+    /** A dispersion chain ahead of the tank, section by section. Used
+        INSTEAD of preDispersion when it is not empty. */
+    std::vector<ChainSection> preChain;
+
+    /** Multiplies the RT60 the tank is asked for. An explicit, visible decay
+        calibration for a topology whose measured decay would otherwise
+        drift from the control; the level law still sees the user's Decay. */
+    double decayScale = 1.0;
 };
+
 
 /** The user's controls. Width is added to Stage 2's six, because Stage 3
     measures a lateral family and Width is the user's lateral control. */
@@ -266,6 +305,12 @@ inline bool buildMatrix (const Structure& s, double* m)
             return true;
         }
 
+        case MatrixKind::custom:
+            for (int i = 0; i < N * N; ++i)
+                m[i] = s.customMatrix[static_cast<size_t> (i)];
+
+            return true;
+
         case MatrixKind::coupledBlocks:
         {
             constexpr double h4[4][4] { { 1, 1, 1, 1 }, { 1, -1, 1, -1 },
@@ -346,7 +391,61 @@ private:
     double a = 0.0;
 };
 
+/** STAGE 5. A cascade of ChainSections. With every stretch at 1 it computes
+    exactly what Dispersion computes. Written as production would write it:
+    one scalar pass, no tables, state in one flat buffer. */
+class StretchChain
+{
+public:
+    void prepare (const std::vector<ChainSection>& sections)
+    {
+        coefficient.clear();
+        length.clear();
+        offset.clear();
+
+        size_t total = 0;
+
+        for (const auto& section : sections)
+        {
+            coefficient.push_back (section.a);
+            length.push_back (static_cast<size_t> (std::max (1, section.stretch)));
+            offset.push_back (total);
+            total += length.back();
+        }
+
+        position.assign (sections.size(), 0);
+        state.assign (total, 0.0);
+    }
+
+    [[nodiscard]] double process (double x) noexcept
+    {
+        const size_t count = coefficient.size();
+
+        for (size_t k = 0; k < count; ++k)
+        {
+            double& s = state[offset[k] + position[k]];     // written `stretch` samples ago
+
+            const double y = coefficient[k] * x + s;
+            s = x - coefficient[k] * y;
+
+            if (++position[k] >= length[k])
+                position[k] = 0;
+
+            x = y;
+        }
+
+        return x;
+    }
+
+    [[nodiscard]] size_t stateSize() const noexcept { return state.size(); }
+
+private:
+    std::vector<double> coefficient, state;
+    std::vector<size_t> length, offset, position;
+};
+
 /** A plain ring buffer with a tap at any past sample. */
+
 class TapLine
 {
 public:
@@ -538,7 +637,7 @@ public:
         configured = configured && succeeded (core.prepare (sampleRate, capacityMs, 0.02));
         configured = configured && succeeded (core.setDelaysMilliseconds (s.delaysMs.data(), scale));
 
-        core.setRt60Seconds (rt60, true);
+        core.setRt60Seconds (rt60 * s.decayScale, true);
 
         core.reset();
         core.resetModulation();
@@ -628,7 +727,29 @@ public:
             }
         }
 
+        // --- STAGE 5: per-line loss on a custom matrix -----------------------
+        if (s.matrix == MatrixKind::custom)
+        {
+            const double rtCore = rt60 * s.decayScale;
+
+            for (int r = 0; r < N; ++r)
+            {
+                const double ratio = s.lineDecayRatio[static_cast<size_t> (r)];
+
+                if (ratio >= 1.0)
+                    continue;
+
+                const double rtLine  = rtCore * std::max (0.02, ratio);
+                const double seconds = core.getEffectiveLoopDelaySamples (r) / sampleRate;
+                const double extra   = std::pow (10.0, -3.0 * seconds * (1.0 / rtLine - 1.0 / rtCore));
+
+                for (int c = 0; c < N; ++c)
+                    core.hooks.matrix[r * N + c] *= extra;
+            }
+        }
+
         // --- B, C, D, H: the diffuser ---------------------------------------
+
         if (s.diffuser == DiffuserKind::velvet)
         {
             velvetL.prepare (sampleRate, 0x51ED270Bu, 30.0 * s.diffuserScale, 16, u.earlyDiff);
@@ -743,8 +864,30 @@ public:
             tapNorm = 1.0 / std::sqrt (1.0 + 2.0 * patterns::tapWeight * patterns::tapWeight);
         }
 
+        // --- STAGE 5: vectors given outright ---------------------------------
+        if (s.injection == InjectionKind::custom)
+            for (int i = 0; i < N; ++i)
+            {
+                injectionL[i] = s.customInL[static_cast<size_t> (i)];
+                injectionR[i] = s.customInR[static_cast<size_t> (i)];
+            }
+
+        if (s.readout == ReadoutKind::custom)
+            for (int i = 0; i < N; ++i)
+            {
+                readoutL[i] = s.customOutL[static_cast<size_t> (i)];
+                readoutR[i] = s.customOutR[static_cast<size_t> (i)];
+            }
+
         // --- J ---------------------------------------------------------------
-        if (s.preDispersion > 0)
+        if (! s.preChain.empty())
+        {
+            chainL.prepare (s.preChain);
+            chainR.prepare (s.preChain);
+            useChain = true;
+        }
+        else if (s.preDispersion > 0)
+
         {
             preL.prepare (s.preDispersion, s.preDispersionCoeff);
             preR.prepare (s.preDispersion, s.preDispersionCoeff);
@@ -815,7 +958,12 @@ public:
             diffuser.processSample (l, r);
         }
 
-        if (structure.preDispersion > 0)
+        if (useChain)
+        {
+            l = chainL.process (l);
+            r = chainR.process (r);
+        }
+        else if (structure.preDispersion > 0)
         {
             l = preL.process (l);
             r = preR.process (r);
@@ -938,6 +1086,8 @@ private:
 
     VelvetDiffuser velvetL, velvetR;
     Dispersion preL, preR;
+    StretchChain chainL, chainR;
+    bool useChain = false;
     TapLine staggerLine[N], tapLine[N];
     size_t  staggerDelay[N] {}, tapDelay[N][2] {};
 

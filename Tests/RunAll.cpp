@@ -20,11 +20,27 @@
     do by default, so the gate is unchanged. The filter matches against the
     suite function's name, and a run that selects nothing says so rather than
     reporting a vacuous pass.
+    FAST AND HEAVY.
+
+    Since PHASE 12 the harness also holds research suites that are mostly
+    stochastic impostor searches: an hour and a half of them. They are marked
+    AV_RUN_HEAVY below. Nothing about them is optional for a gate:
+
+        AuroraVerbTests.exe            everything, as before. THE GATE.
+        AuroraVerbTests.exe --fast     everything except the heavy suites
+
+    --fast is for ordinary development. It names every suite it skipped and
+    says so again on the last line, so a fast run cannot be read as a full
+    one. The heavy suites are deterministic (fixed seeds) and are required for
+    final Mode acceptance, any major topology change, PHASE 12 closure and
+    release validation. --fast combines with substring filters.
 */
 
 namespace
 {
     std::vector<std::string> suiteFilters;
+    std::vector<std::string> heavySkipped;
+    bool fastOnly = false;
     int suitesRun = 0;
 
     [[nodiscard]] bool wanted (const char* name)
@@ -44,9 +60,24 @@ namespace
 
         return false;
     }
+    [[nodiscard]] bool matches (const char* name)
+    {
+        if (suiteFilters.empty())
+            return true;
+
+        for (const auto& filter : suiteFilters)
+            if (std::strstr (name, filter.c_str()) != nullptr)
+                return true;
+
+        return false;
+    }
 }
 
 #define AV_RUN(fn) do { if (wanted (#fn)) fn(); } while (false)
+
+// A heavy suite: skipped, by name, under --fast.
+#define AV_RUN_HEAVY(fn) do { if (fastOnly) { if (matches (#fn)) heavySkipped.emplace_back (#fn); } \
+                              else if (wanted (#fn)) fn(); } while (false)
 
 namespace avtest
 {
@@ -54,10 +85,16 @@ namespace avtest
 void setSuiteFilters (int count, const char* const* values)
 {
     suiteFilters.clear();
+    fastOnly = false;
 
     for (int i = 0; i < count; ++i)
         if (values[i] != nullptr && values[i][0] != '\0')
-            suiteFilters.emplace_back (values[i]);
+        {
+            if (std::strcmp (values[i], "--fast") == 0)
+                fastOnly = true;
+            else
+                suiteFilters.emplace_back (values[i]);
+        }
 }
 
 int runAllSuites()
@@ -75,6 +112,9 @@ int runAllSuites()
 
         std::cout << "\n\n";
     }
+
+    if (fastOnly)
+        std::cout << "FAST RUN: heavy research suites are skipped. This is not the gate.\n\n";
 
     AV_RUN (runInterpolationTests);
     AV_RUN (runDelayLineTests);
@@ -177,9 +217,11 @@ int runAllSuites()
     AV_RUN (runPhase11ReadoutTests);
     AV_RUN (runPhase11DelaySetTests);
     AV_RUN (runPhase11Stage4Tests);
-    AV_RUN (runPhase12ModeFamilyTests);
-    AV_RUN (runPhase12StructuralTests);
-    AV_RUN (runPhase12Stage4Tests);
+    AV_RUN_HEAVY (runPhase12ModeFamilyTests);
+    AV_RUN_HEAVY (runPhase12StructuralTests);
+    AV_RUN_HEAVY (runPhase12Stage4Tests);
+    AV_RUN (runPhase12Stage5FastTests);
+    AV_RUN_HEAVY (runPhase12Stage5Tests);
 
 
     if (suitesRun == 0)
@@ -188,7 +230,19 @@ int runAllSuites()
         return 2;
     }
 
-    return finish();
+    const int result = finish();
+
+    if (fastOnly)
+    {
+        std::cout << "\nFAST RUN. " << heavySkipped.size() << " heavy suite(s) NOT run:";
+
+        for (const auto& name : heavySkipped)
+            std::cout << "\n    " << name;
+
+        std::cout << "\nThis result is not a full gate. Run without --fast for one." << std::endl;
+    }
+
+    return result;
 }
 
 } // namespace avtest
