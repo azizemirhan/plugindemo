@@ -425,4 +425,4 @@ floor computation with section 12.3.2 and gives the same numbers.
 
 ## 20. Commit
 
-Recorded in the commit that follows this one.
+Committed at `27eff87`.
