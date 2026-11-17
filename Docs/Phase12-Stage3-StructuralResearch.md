@@ -395,4 +395,4 @@ No previously passing check fails. State suite: 26 / 26.
 
 ## 34. Commit
 
-Recorded in the commit that follows this one.
+Results committed at `dfd1a95`.
