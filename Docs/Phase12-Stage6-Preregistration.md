@@ -382,3 +382,98 @@ Stage 6 succeeds only with: a Room that passes 2.4; an Ambient that passes
 that is the reference or is honestly a different Plate; and either a
 Chamber through every gate or a clear statement that there is none. Anything
 less is reported as what it is.
+
+---
+
+## Addendum 1 — after Part 1 (Room) was read once, before Room is run again
+
+Appended; nothing above is edited.
+
+**What the first run found.**
+
+- **The search copy** (1.5) returns the frozen search's result knob for knob.
+- **Size:** no law passes 1.1. RS2 and RS3 make t10 rise (× 1.37 and × 1.45,
+  not falling) and fail on the centroid, which does not rise. RS4 was not
+  built: my rule required each lever to pass on its own.
+- **Ringing:** nothing reaches *materially reduced* (≤ 27.8 dB). R4c 42.4;
+  RR1 35.1; RR2 41.8; RR3 44.2; RR4 40.8; RR5 42.6; RR6 (sixteen lines) 31.0.
+  My prediction that RR1 and RR2 would reduce it most was half right: RR2 does
+  nothing.
+- **Stereo and mono:** solved. RM3 (in L ++−+ R +−++, out L +++− R −+++):
+  worst mono tone −3.6 dB (R4c −23.3, Hall −15.0), balance −0.1 dB, mirror
+  0.0 dB, and inside the limits at all three operating points. G2 SURVIVES
+  (5.79 / 6.41 / 3.73, lowest run 3.42).
+- **The composite R5** (= R4c + RM3) fails 2.4 on Size, on ringing, and on
+  **tone: 1.23 dB**, where R4c had 0.77. The vectors that fix mono move the
+  octave balance. R5 is not rescued; it stays failed.
+
+**Something the first run makes plain and I had not written down.** In all
+fifteen of R5's runs but one, the family Hall stops on is *modal structure*.
+The measure that says "this is not Hall" and the measure that says "this
+rings" are largely the same measure. A repair that removes the ringing may
+remove the identity with it. That is now the main risk of this part, and it
+is why every ringing candidate below goes through G1 and G2 before anything
+is said about it.
+
+### New Size hypothesis
+
+A two-rate model, written before measuring. Energy leaves the heard block at
+rate 1/τ and comes back from the field at rate 1/(τ·R), R being the ratio of
+the field's loop time to the block's. With total decay T, the heard centroid
+is lowest (≈ 1/(1/τ + 1/T)) when escape is fast and return is slow, and
+highest (≈ T) when the block keeps its energy. In R4c neither τ nor R depends
+on Size, which is the defect. RS1/RS2 change τ only, so at small Size both
+escape *and* return speed up and the centroid goes back up: not monotone, as
+measured. RS3 changes R only.
+
+For a centroid that rises with Size, small Size must mean *fast escape and
+slow return* and large Size *slow escape*: τ ∝ sᵖ **and** block scale ∝ s^q
+together, which is the combination my rule declined to build.
+
+| | exchange time | local block scale |
+|---|---|---|
+| **RS5** | × (s/s₀) | × (s/s₀) |
+| **RS6** | × (s/s₀)² | × (s/s₀) |
+| **RS7** | × (s/s₀) | × (s/s₀)² |
+
+Criteria 1.1 and 1.3 unchanged. **Risk stated now:** at large Size the block
+holds its energy and becomes a four-line comb — more ringing, not less — and
+at small Size the response is a short burst that Hall with a short Decay may
+reproduce.
+
+### New ringing hypotheses
+
+RR1 and RR6 are the two levers that moved the measure (−7.3 and −11.4 dB).
+Both add state to the heard block; nothing else did anything.
+
+| | |
+|---|---|
+| **RR7** | RR6 (eight local lines, eight field, open tank) with RR1's two allpasses in every local line |
+| **RR8** | sixteen local lines with the allpasses, eight field: 24 lines |
+
+Lines unchanged: *materially reduced* ≤ Hall + 14, *clean* ≤ Hall + 3.
+RR8's cost is expected to break 1.5 × Hall; it is built to learn how much
+state the measure needs, and is reported with its cost.
+
+### Vectors, again, with tone in the rule
+
+RM3's rule looked at balance, mirror and mono tone, and the structure it
+chose fails the octave limit. Tone is a safety measure of the same kind, not
+the distinctness metric, so it joins the rule:
+
+**RM4** — over the same 2304 combinations: among those with balance and
+mirror within 0.5 dB **and octave bands within 0.75 dB of Hall at the
+defaults**, the one whose worst mono tone is shallowest.
+
+For an open-tank block (RR6–RR8) the same 2304 four-line patterns are tiled
+across the block's groups of four, the right channel's sign alternating from
+group to group (Stage 5's rule for eight lines), and chosen by the same RM4
+rule: **RM5**.
+
+### The composite
+
+**R6** = the Size law, ringing repair and vector set chosen by this
+addendum's runs, by the same selection rules as 2.1–2.3, and judged by 2.4
+with nothing changed. If the chosen ringing repair is an open-tank one, the
+Size law is applied to it as the same two exponents and re-measured there,
+because it was chosen on the eight-line engine.
