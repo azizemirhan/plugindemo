@@ -477,3 +477,89 @@ addendum's runs, by the same selection rules as 2.1–2.3, and judged by 2.4
 with nothing changed. If the chosen ringing repair is an open-tank one, the
 Size law is applied to it as the same two exponents and re-measured there,
 because it was chosen on the eight-line engine.
+
+---
+
+## Addendum 2 — after Room's second run and Ambient's first, before either is run again
+
+Appended; nothing above is edited.
+
+### Room, second run
+
+- **Size.** One law of six passes 1.1: **RS7** (exchange × s, block × s²):
+  t10 × 2.26, centroid rising, not Hall at any of five Sizes (lowest 2.27).
+  Its G1 at large / long is 1.72.
+- **Ringing.** RR7 reaches 23.1 dB and RR8 17.4 dB — both *materially
+  reduced* — and **both are REJECTED at G1** (lowest runs 1.41 and 1.06). The
+  risk named in addendum 1 is the result: with the ringing gone, Hall
+  reproduces the structure.
+- **Vectors.** RM4 (in L +−++ R −−+−, out L +++− R −+++): worst mono tone
+  −4.2 dB, balance −0.2 dB, mirror 0.0 dB, octave bands 0.52 dB, G1 lowest
+  run 3.71. Inside every limit.
+- **The composite R6** (R4c + RS7 + RM4) passes Size, Decay, stereo, tone and
+  CPU and is **REJECTED** by Hall's search at large / long (median 1.90,
+  lowest run 1.80). The risk named for the Size laws — the block growing
+  until it is no longer a small block — is what happened. Its ringing is
+  R4c's (42.1 dB).
+
+**What is and is not attempted next for Room.**
+
+1. *One* more Size law, between the one that failed the centroid (RS5, block
+   × s) and the one that failed Hall's search at large Size (RS7, block ×
+   s²): **RS8**, exchange × s, block × s^1.5. This is a point on a line
+   between two measured points, not a new mechanism, and it is the last such
+   point I will take: if it fails either way, the result is that this
+   construction has no Size law that is both meaningful and distinct.
+2. **Ringing: no further candidate.** Seven constructions were measured. The
+   two that reduce the measure lose the identity; the five that keep the
+   identity do not reduce it. For the record, and not as candidates (they
+   cannot be chosen: they are not materially reduced), RR1 (35.1 dB) and RR6
+   (30.6 dB) are put through G1, to show where along the way from 42 dB to
+   23 dB the identity goes.
+3. **The composite is built both ways**: R5b = R4c + RM4 (vectors only), and
+   R6 = R5b with a Size law, if one is chosen. Each is judged by 2.4. The
+   Room that goes on to Parts 3 and 6 is R6 if Hall's search does not reject
+   it, otherwise R5b.
+
+### Ambient, first run
+
+**My hypothesis was wrong.** With the damping off the deviation is *larger*
+(2.04 dB against 1.82), not smaller. What the diagnosis shows instead:
+
+- the deviation is one band: 125 Hz is 1.8 dB low; every other octave is
+  within 1 dB;
+- it does not depend on the damping, on the diffuser (1.43–1.55), on the
+  modulation (1.39–1.72) or on which lines form which stage (1.82–2.07, always
+  the same sign);
+- it grows through the tail: after 1.2 s, 125, 250 and 500 Hz are all low
+  (−1.8, −1.9, −1.0);
+- only 0.6–0.8 % of the energy held in the tank is in the heard stage.
+
+**New hypothesis.** The timing rule treats the transfer between stages as a
+transfer of *power*, a fraction sin²θ per pass. That is right where a
+stage's modes are dense. A stage here is two lines, and in the 125 Hz octave
+it has a handful of narrow modes; two weakly coupled resonators that are not
+tuned to each other exchange only part of their energy. Low frequencies
+migrate less completely than the rule assumes, so less of them reaches the
+stage that is heard. It is the delay-time distribution and the state-energy
+distribution together: *too few modes per stage at low frequency*.
+
+**A test of that, D7, before any repair:** the 125 Hz deviation with the
+damping off at Size 10 / 30 / 50 / 70 / 90. If the hypothesis is right it
+shrinks as Size grows (longer lines, denser modes).
+
+**Repairs.** AT3 (25 % of the input straight into the last stage) fixes the
+tone — 0.18 dB at the defaults, 0.73 over the grid — and is REJECTED by
+Hall's search at small / short (median 1.98; A1b has 4.00): too much is
+heard at once. AT2 (every stage heard) reaches 0.66 at the defaults and 1.51
+over the grid.
+
+| | change to A1b |
+|---|---|
+| **AT5a / b / c** | 8 %, 12 %, 16 % of the input into the last stage |
+| **AT6** | only the last two stages heard, weights 0.5 and 1 |
+| **AT7** | stages of 2, 2 and 4 lines with k 0.40: the heard stage has four lines and twice the modes (A3's layout, which measured 1.36 dB in Stage 5 at k 0.30) |
+
+Pass condition unchanged (3.2). AT5 is a sweep of one number between a
+measured failure on tone (0 %) and a measured failure on identity (25 %); it
+is reported as that.
