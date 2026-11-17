@@ -178,6 +178,7 @@ int runAllSuites()
     AV_RUN (runPhase11DelaySetTests);
     AV_RUN (runPhase11Stage4Tests);
     AV_RUN (runPhase12ModeFamilyTests);
+    AV_RUN (runPhase12StructuralTests);
 
 
     if (suitesRun == 0)
