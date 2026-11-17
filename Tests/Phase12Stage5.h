@@ -140,4 +140,12 @@ namespace avtest::stage5
 
     [[nodiscard]] Outcome standingRoom();
     [[nodiscard]] Outcome standingPlate();
+
+    // --- for Stage 6 ----------------------------------------------------------
+    /** A1b as Part D left it. */
+    [[nodiscard]] Outcome standingAmbient();
+
+    /** Stage 5's quality-risk and centred-source tables, for any list. */
+    void qualityRisks (const std::vector<Candidate>& list);
+    void centredSources (const std::vector<Candidate>& list);
 }

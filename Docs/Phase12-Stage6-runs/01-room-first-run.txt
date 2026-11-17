@@ -1,0 +1,205 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage6Tests
+
+
+PHASE 12.6.1 - the search with a knob-dependent impostor is the frozen search
+-----------------------------------------------------------------------------
+          R4c at the medium point, Hall as the impostor, one seed:
+            frozen search   5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+            the copy        5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+  PASS  the copy returns the frozen search's result, knob for knob
+
+PHASE 12.6.2 - Room: Size
+-------------------------
+          R4c's exchange time is 0.12 x Decay and has no Size in it. Three laws
+          that put Size in, and R4c itself. A law repairs Size if t10 does not
+          fall, t10 at Size 90 is >= 1.25 x t10 at Size 10 (Hall's is 1.79),
+          and the temporal centroid rises at every step.
+        
+          RS4 is not built: no exchange law repairs Size on its own; the local block's scale does not repair Size on its own.
+        
+            Size 10 / 30 / 50 / 70 / 90.  t10 and t50: ms to 10 % and 50 % of the energy.
+            centroid: ms.  early: share of the energy in the first 80 ms, %.
+        
+            structure                 t10                             t50                               centroid                          early
+            Hall                      36.2  39.6  44.9  52.8  64.9    115   121   126   134   147       160   164   169   178   192       36   33   30   27   19   
+            R4c                       28.2  28.0  28.5  29.0  30.4    100   97    95    94    93        146   143   141   139   135       41   43   43   43   44   
+            RS1 exchange x s          26.3  26.8  28.1  29.3  31.7    100   93    93    96    102       147   142   140   141   144       42   44   44   42   40   
+            RS2 exchange x s^2        24.0  25.7  27.7  29.7  32.9    103   91    91    99    110       147   142   139   143   153       42   45   44   41   37   
+            RS3 local block x s       26.1  27.4  28.8  30.0  37.7    94    97    94    94    97        140   144   140   140   140       44   42   44   43   42   
+        
+            Hall                      t10 x 1.79   not falling   >= 1.25   centroid rises
+            R4c                       t10 x 1.08   FALLS   UNDER 1.25   CENTROID DOES NOT RISE
+            RS1 exchange x s          t10 x 1.21   not falling   UNDER 1.25   CENTROID DOES NOT RISE
+            RS2 exchange x s^2        t10 x 1.37   not falling   >= 1.25   CENTROID DOES NOT RISE
+            RS3 local block x s       t10 x 1.45   not falling   >= 1.25   CENTROID DOES NOT RISE
+  PASS  Hall itself meets the Size criterion (a check on the criterion, not on a candidate)
+        
+          0 of 3 laws repair Size. Hall's search against each at the five Sizes (Decay 2.5 s,
+          one search each, centred); <= 1.5 anywhere is Hall again:
+        
+        
+          NO SIZE LAW repairs Size and stays distinct from Hall.
+  FAIL  FINDING: a Size law makes Size meaningful and is not Hall at any Size
+
+PHASE 12.6.3 - Room: ringing
+----------------------------
+          Modal prominence, worst of the three points, dB. Clean: <= Hall + 3.
+          Materially reduced: <= Hall + 14 (half of R4c's excess). Tone and damping
+          are untouched in every candidate.
+        
+            Hall                      13.8    
+            R4c                       42.4    NOT reduced enough
+            RR1 allpasses in block    35.1    NOT reduced enough
+            RR2 delays respaced       41.8    NOT reduced enough
+            RR3 two clusters          44.2    NOT reduced enough
+            RR4 Householder block     40.8    NOT reduced enough
+            RR5 unequal exchange      42.6    NOT reduced enough
+        
+          None of RR1-RR5 is materially reduced. RR6, the conditional one: sixteen
+          lines, eight local and eight field, in the open tank.
+        
+            Hall                      13.8    
+            R4c                       42.4    NOT reduced enough
+            RR6 sixteen lines         31.0    NOT reduced enough
+        
+          NO RINGING REPAIR is materially reduced and passes G1.
+  FAIL  FINDING: a ringing repair is materially reduced and is not reproduced by Hall
+
+PHASE 12.6.4 - Room: mono and stereo
+------------------------------------
+          Only the block's injection and readout vectors change. Limits are Stage 3's,
+          against Hall: worst mono tone <= 3 dB deeper, balance and mirror within 1 dB,
+          fold-down within 1.5 dB.
+        
+          RM3: 2304 combinations of 48 orthogonal pairs; 1264 have balance and mirror within 0.5 dB.
+          Chosen (shallowest worst mono tone among those): in L ++-+ R +-++, out L +++- R -+++
+        
+            structure                 corr   fold   L/R    mirror  mono tone worst / median, dB
+            Hall                      -0.03  -3.0   0.4    0.3     -15.0 / -3.0    
+            R4c                       -0.00  -3.0   1.3    -1.3    -23.3 / -3.5      WORSE THAN HALL
+            RM1 mid +/- side          0.16   -2.5   0.0    0.3     -12.9 / -2.2    
+            RM2 generic vectors       -0.16  -3.7   -0.0   1.0     -19.0 / -4.3      WORSE THAN HALL
+            RM3 chosen for safety     0.00   -3.0   -0.1   0.0     -3.6 / -3.1     
+        
+          G1 for those inside the limits:
+        
+            target                        medium   small    large    lowest run  verdict
+            RM1 mid +/- side              4.94     6.48     3.65     3.65        passes G1
+            RM3 chosen for safety         5.05     6.45     3.55     3.55        passes G1
+        
+          VECTORS CHOSEN: RM3 chosen for safety
+  PASS  FINDING: a vector set is inside the stereo and mono limits and is not reproduced by Hall
+
+PHASE 12.6.5 - Room: the repaired structure
+-------------------------------------------
+          R5 = R4c with: RM3 chosen for safety
+        
+            Size 10 / 30 / 50 / 70 / 90.  t10 and t50: ms to 10 % and 50 % of the energy.
+            centroid: ms.  early: share of the energy in the first 80 ms, %.
+        
+            structure                 t10                             t50                               centroid                          early
+            Hall                      36.2  39.6  44.9  52.8  64.9    115   121   126   134   147       160   164   169   178   192       36   33   30   27   19   
+            R4c                       28.2  28.0  28.5  29.0  30.4    100   97    95    94    93        146   143   141   139   135       41   43   43   43   44   
+            Room R5                   27.7  26.9  26.9  27.6  29.7    99    95    92    90    86        145   141   138   136   131       42   44   45   45   47   
+        
+            Hall                      t10 x 1.79   not falling   >= 1.25   centroid rises
+            R4c                       t10 x 1.08   FALLS   UNDER 1.25   CENTROID DOES NOT RISE
+            Room R5                   t10 x 1.07   FALLS   UNDER 1.25   CENTROID DOES NOT RISE
+        
+          Hall's search at the five Sizes:
+        
+            Room R5                   11.02  7.62   5.87   3.63   2.35     not Hall at any Size
+        
+          G2 - five seeds per point, centred view:
+        
+            target                        medium   small    large    lowest run  verdict
+            R4c                           5.69     6.38     4.06     3.66        SURVIVES
+                medium / medium   5.08   5.59   5.92   5.69   6.12     modal structure   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+                small / short     6.33   6.60   6.38   6.43   6.03     echo density      Size 0 Decay 1.24 E/L 79 EDiff 2 Atk 33 Mod 0 Width 121
+                large / long      3.66   4.06   4.21   4.21   4.03     recurrence        Size 0 Decay 5.26 E/L 5 EDiff 51 Atk 52 Mod 0 Width 71
+            Room R5                       5.79     6.41     3.73     3.42        SURVIVES
+                medium / medium   5.05   5.61   5.79   5.97   6.13     modal structure   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+                small / short     6.45   6.58   6.37   6.41   6.24     modal structure   Size 0 Decay 1.32 E/L 79 EDiff 0 Atk 20 Mod 100 Width 129
+                large / long      3.55   3.73   3.97   3.92   3.42     modal structure   Size 0 Decay 5.80 E/L 0 EDiff 4 Atk 24 Mod 63 Width 119
+        
+          Modal prominence:
+            Hall                      13.8
+            R4c                       42.4
+            Room R5                   42.2
+        
+            QUALITY RISKS, against Hall. Descriptive flags; the numeric lines were chosen
+            here, not in the pre-registration, and are two metric units in each case.
+              repetition  peak autocorrelation of the flattened tail, 3-150 ms and 150-1000 ms
+                          (flutter, metallic repetition); flagged above Hall + 0.10
+              modal       prominence of single modes, dB (ringing); flagged above Hall + 3
+              colour      largest of 24 band deviations from Hall, 100 Hz - 10 kHz, dB; flagged above 1.5
+              short       RT60 at Decay 0.3 s, Size 25, against Hall's; flagged outside +/- 10 %
+        
+              structure                     repetition      modal    colour   short decay   flags
+              Hall                          0.32 / 0.19     13.8     0.00     1.000         
+              R4c                           0.38 / 0.37     42.4     0.80     0.999          REPETITION RINGING
+              Room R5                       0.48 / 0.41     42.2     1.29     0.999          REPETITION RINGING
+        
+            CENTRED MUSICAL SOURCES, same knobs, medium point, level-matched: RMS difference
+            of the 20 ms level envelope against Hall, dB. The first row is Hall against a
+            sibling of itself: what 'the same reverb' looks like on this measure.
+              structure                     vocal       snare       piano       percussion  
+              Hall, sibling delay set       0.98        0.32        1.80        0.26        
+              R4c                           1.57        2.85        3.03        3.03        
+              Room R5                       1.65        3.01        2.80        3.12        
+        
+          G3, CPU limit 1.5 x Hall:
+        
+            SIZE (time to 10 % of the energy, ms, Size 10 / 30 / 50 / 70 / 90) and DECAY
+            (measured RT60 / Hall's over nine settings, min .. max; limit +/- 10 %):
+              Hall                          36.2    39.6    44.9    52.8    64.9                  1.000 .. 1.000
+              R4c                           28.2    28.0    28.5    29.0    30.4    NOT MONOTONE  1.000 .. 1.006
+              Room R5                       27.7    26.9    26.9    27.6    29.7    NOT MONOTONE  0.999 .. 1.003
+        
+            STEREO AND MONO at the defaults (limits as in Stage 3, section 12.3.9), TONE (largest
+            octave-band deviation from Hall, dB; limit 1) and CPU (wet path, x Hall):
+              structure                     corr   fold   L/R    mirror  hard   tone worst/med  width 50/100/150  octave  CPU
+              Hall                          -0.03  -3.0   0.4    0.3     0.033  -15.0 / -3.0    -6.0 0.1 3.6      0.00    1.00
+              R4c                           -0.00  -3.0   1.3    -1.3    0.053  -23.3 / -3.5    -6.0 0.0 3.6      0.77    0.86   STEREO WORSE THAN HALL
+              Room R5                       0.00   -3.0   -0.1   0.0     0.034  -3.6 / -3.1     -6.0 -0.0 3.5     1.23    0.96
+        
+              R4c                           G3 FAIL: Size; stereo/mono;
+              Room R5                       G3 FAIL: Size; tone;
+        
+          Stereo and mono at the three operating points (G3 reads the defaults only):
+        
+            structure                 corr   fold   L/R    mirror  mono tone worst / median, dB
+            Hall, medium / medium     -0.03  -3.0   0.4    0.3     -15.0 / -3.0    
+            R5, medium / medium       0.00   -3.0   -0.1   0.0     -3.6 / -3.1     
+            Hall, small / short       -0.01  -2.9   0.3    0.3     -10.9 / -1.8    
+            R5, small / short         -0.00  -3.0   -0.4   -0.0    -4.6 / -2.9     
+            Hall, large / long        -0.04  -3.1   0.4    0.3     -9.3 / -3.1     
+            R5, large / long          0.00   -3.0   -0.1   0.0     -3.6 / -3.0     
+        
+          THE PASS CONDITION (pre-registration 2.4):
+            centred distinct at every point, and not Hall at any Size   yes   (SURVIVES, lowest median 3.73)
+            Size monotonic and meaningful                               NO
+            Decay within 10 %                                           yes
+            modal prominence materially reduced                         NO   (42.2 dB; R4c 42.4; Hall 13.8; not clean)
+            stereo and mono inside Stage 3's limits                     yes
+            octave bands within 1 dB                                    NO   (1.23)
+            CPU <= 1.5 x Hall                                           yes   (0.96)
+        
+          ROOM: BLOCKED - Room R5 [RM3 chosen for safety] SURVIVES, lowest median 3.73, x 0.96 Hall
+  FAIL  FINDING: the repaired Room passes every condition of 2.4
+        
+          Stage 6 suite wall time: 1659 s
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.6.1 - the search with a knob-dependent impostor is the frozen search     1 /    1   ok
+  PHASE 12.6.2 - Room: Size                                                         1 /    2   FAILED
+  PHASE 12.6.3 - Room: ringing                                                      0 /    1   FAILED
+  PHASE 12.6.4 - Room: mono and stereo                                              1 /    1   ok
+  PHASE 12.6.5 - Room: the repaired structure                                       0 /    1   FAILED
+-----------------------------------------------------------------
+  3 / 6 checks passed.  3 FAILURE(S).

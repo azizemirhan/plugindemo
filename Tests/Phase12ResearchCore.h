@@ -102,6 +102,10 @@ struct ResearchHooks
     };
 
     int loopAllpassCount = 0;
+
+    /** STAGE 6. When set, each line has its own number of allpasses. */
+    bool perLine = false;
+    int  lineCount[N] {};
     LoopAllpass loopAllpass[N][maxLoopAllpasses];
 
     /** First-order allpasses, y = a x + s, s = x - a y. Flat magnitude; group
@@ -119,7 +123,9 @@ struct ResearchHooks
             x = y;
         }
 
-        for (int k = 0; k < loopAllpassCount; ++k)
+        const int count = perLine ? lineCount[line] : loopAllpassCount;
+
+        for (int k = 0; k < count; ++k)
             x = loopAllpass[line][k].process (x);
 
         return x;

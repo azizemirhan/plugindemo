@@ -222,6 +222,8 @@ int runAllSuites()
     AV_RUN_HEAVY (runPhase12Stage4Tests);
     AV_RUN (runPhase12Stage5FastTests);
     AV_RUN_HEAVY (runPhase12Stage5Tests);
+    AV_RUN (runPhase12Stage6FastTests);
+    AV_RUN_HEAVY (runPhase12Stage6Tests);
 
 
     if (suitesRun == 0)

@@ -1,0 +1,328 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage6Tests
+
+
+PHASE 12.6.1 - the search with a knob-dependent impostor is the frozen search
+-----------------------------------------------------------------------------
+          R4c at the medium point, Hall as the impostor, one seed:
+            frozen search   5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+            the copy        5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+  PASS  the copy returns the frozen search's result, knob for knob
+
+PHASE 12.6.2 - Room: Size
+-------------------------
+          R4c's exchange time is 0.12 x Decay and has no Size in it. Three laws
+          that put Size in, and R4c itself. A law repairs Size if t10 does not
+          fall, t10 at Size 90 is >= 1.25 x t10 at Size 10 (Hall's is 1.79),
+          and the temporal centroid rises at every step.
+        
+          RS1-RS3 are the first run's laws; none passed. RS5-RS7 are addendum 1's:
+          exchange time and block scale together.
+        
+            Size 10 / 30 / 50 / 70 / 90.  t10 and t50: ms to 10 % and 50 % of the energy.
+            centroid: ms.  early: share of the energy in the first 80 ms, %.
+        
+            structure                 t10                             t50                               centroid                          early
+            Hall                      36.2  39.6  44.9  52.8  64.9    115   121   126   134   147       160   164   169   178   192       36   33   30   27   19   
+            R4c                       28.2  28.0  28.5  29.0  30.4    100   97    95    94    93        146   143   141   139   135       41   43   43   43   44   
+            RS1 exchange x s          26.3  26.8  28.1  29.3  31.7    100   93    93    96    102       147   142   140   141   144       42   44   44   42   40   
+            RS2 exchange x s^2        24.0  25.7  27.7  29.7  32.9    103   91    91    99    110       147   142   139   143   153       42   45   44   41   37   
+            RS3 local block x s       26.1  27.4  28.8  30.0  37.7    94    97    94    94    97        140   144   140   140   140       44   42   44   43   42   
+            RS5 exch s, block s       25.2  26.4  28.4  30.4  38.8    94    95    92    97    108       142   143   138   142   150       45   44   45   42   38   
+            RS6 exch s^2, block s     23.5  25.2  27.8  30.8  39.7    100   94    89    100   116       143   144   137   143   158       44   45   46   41   35   
+            RS7 exch s, block s^2     24.1  24.8  27.4  31.0  54.4    84    90    93    98    112       127   137   139   141   158       48   46   44   42   38   
+        
+            Hall                      t10 x 1.79   not falling   >= 1.25   centroid rises
+            R4c                       t10 x 1.08   FALLS   UNDER 1.25   CENTROID DOES NOT RISE
+            RS1 exchange x s          t10 x 1.21   not falling   UNDER 1.25   CENTROID DOES NOT RISE
+            RS2 exchange x s^2        t10 x 1.37   not falling   >= 1.25   CENTROID DOES NOT RISE
+            RS3 local block x s       t10 x 1.45   not falling   >= 1.25   CENTROID DOES NOT RISE
+            RS5 exch s, block s       t10 x 1.54   not falling   >= 1.25   CENTROID DOES NOT RISE
+            RS6 exch s^2, block s     t10 x 1.69   not falling   >= 1.25   CENTROID DOES NOT RISE
+            RS7 exch s, block s^2     t10 x 2.26   not falling   >= 1.25   centroid rises
+  PASS  Hall itself meets the Size criterion (a check on the criterion, not on a candidate)
+        
+          1 of 6 laws repair Size. Hall's search against each at the five Sizes (Decay 2.5 s,
+          one search each, centred); <= 1.5 anywhere is Hall again:
+        
+            RS7 exch s, block s^2     8.55   10.58  8.29   2.27   2.35     not Hall at any Size
+        
+          G1 at the three operating points:
+        
+            target                        medium   small    large    lowest run  verdict
+            RS7 exch s, block s^2         5.08     8.99     1.72     1.72        passes G1
+        
+          SIZE LAW CHOSEN: RS7 exch s, block s^2  (lowest run anywhere 1.72)
+  PASS  FINDING: a Size law makes Size meaningful and is not Hall at any Size
+
+PHASE 12.6.3 - Room: ringing
+----------------------------
+          Modal prominence, worst of the three points, dB. Clean: <= Hall + 3.
+          Materially reduced: <= Hall + 14 (half of R4c's excess). Tone and damping
+          are untouched in every candidate.
+        
+            Hall                      13.8    
+            R4c                       42.4    NOT reduced enough
+            RR1 allpasses in block    35.1    NOT reduced enough
+            RR2 delays respaced       41.8    NOT reduced enough
+            RR3 two clusters          44.2    NOT reduced enough
+            RR4 Householder block     40.8    NOT reduced enough
+            RR5 unequal exchange      42.6    NOT reduced enough
+            RR6 8 local, open tank    30.6    NOT reduced enough
+            RR7 8 local + allpasses   23.1    materially reduced
+            RR8 16 local + allpasses  17.4    materially reduced
+        
+          G1 for those materially reduced:
+        
+            target                        medium   small    large    lowest run  verdict
+            RR7 8 local + allpasses       1.41     1.56     2.00     1.41        REJECTED at G1
+            RR8 16 local + allpasses      1.74     1.06     2.24     1.06        REJECTED at G1
+        
+          NO RINGING REPAIR is materially reduced and passes G1.
+  FAIL  FINDING: a ringing repair is materially reduced and is not reproduced by Hall
+
+PHASE 12.6.4 - Room: mono and stereo
+------------------------------------
+          Only the block's injection and readout vectors change. Limits are Stage 3's,
+          against Hall: worst mono tone <= 3 dB deeper, balance and mirror within 1 dB,
+          fold-down within 1.5 dB.
+        
+          RM3 safety only: 2304 combinations; 1264 have balance and mirror within 0.5 dB.
+            chosen (shallowest worst mono tone among those): in L ++-+ R +-++, out L +++- R -+++
+        
+          RM4 safety and tone: 2304 combinations; 588 have balance and mirror within 0.5 dB and octave bands within 0.75 dB.
+            chosen (shallowest worst mono tone among those): in L +-++ R --+-, out L +++- R -+++, octave 0.52 dB uncalibrated
+        
+            structure                 corr   fold   L/R    mirror  mono tone worst / median, dB
+            Hall                      -0.03  -3.0   0.4    0.3     -15.0 / -3.0    
+                                      octave bands 0.00 dB
+            R4c                       -0.00  -3.0   1.3    -1.3    -23.3 / -3.5      WORSE THAN HALL
+                                      octave bands 0.77 dB
+            RM1 mid +/- side          0.16   -2.5   0.0    0.3     -12.9 / -2.2    
+                                      octave bands 0.54 dB
+            RM2 generic vectors       -0.16  -3.7   -0.0   1.0     -19.0 / -4.3      WORSE THAN HALL
+                                      octave bands 0.63 dB
+            RM3 safety only           0.00   -3.0   -0.1   0.0     -3.6 / -3.1     
+                                      octave bands 1.23 dB  OVER 1.0
+            RM4 safety and tone       0.00   -3.0   -0.2   -0.0    -4.2 / -2.9     
+                                      octave bands 0.52 dB
+        
+          G1 for those inside the stereo and mono limits:
+        
+            target                        medium   small    large    lowest run  verdict
+            RM1 mid +/- side              4.94     6.48     3.65     3.65        passes G1
+            RM3 safety only               5.05     6.45     3.55     3.55        passes G1
+            RM4 safety and tone           5.04     6.78     3.71     3.71        passes G1
+        
+          VECTORS CHOSEN (four-line block): RM4 safety and tone
+  PASS  FINDING: a vector set is inside the stereo, mono and octave limits and is not reproduced by Hall
+
+PHASE 12.6.5 - Room: the repaired structure
+-------------------------------------------
+          R6 = R4c with: RS7 exch s, block s^2; RM4 safety and tone
+        
+            Size 10 / 30 / 50 / 70 / 90.  t10 and t50: ms to 10 % and 50 % of the energy.
+            centroid: ms.  early: share of the energy in the first 80 ms, %.
+        
+            structure                 t10                             t50                               centroid                          early
+            Hall                      36.2  39.6  44.9  52.8  64.9    115   121   126   134   147       160   164   169   178   192       36   33   30   27   19   
+            R4c                       28.2  28.0  28.5  29.0  30.4    100   97    95    94    93        146   143   141   139   135       41   43   43   43   44   
+            Room R6                   23.6  26.2  26.5  30.3  54.2    83    92    92    93    108       127   138   138   139   154       49   45   45   44   38   
+        
+            Hall                      t10 x 1.79   not falling   >= 1.25   centroid rises
+            R4c                       t10 x 1.08   FALLS   UNDER 1.25   CENTROID DOES NOT RISE
+            Room R6                   t10 x 2.29   not falling   >= 1.25   centroid rises
+        
+          Hall's search at the five Sizes:
+        
+            Room R6                   9.45   6.32   7.67   2.29   1.66     not Hall at any Size
+        
+          G2 - five seeds per point, centred view:
+        
+            target                        medium   small    large    lowest run  verdict
+            R4c                           5.69     6.38     4.06     3.66        SURVIVES
+                medium / medium   5.08   5.59   5.92   5.69   6.12     modal structure   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+                small / short     6.33   6.60   6.38   6.43   6.03     echo density      Size 0 Decay 1.24 E/L 79 EDiff 2 Atk 33 Mod 0 Width 121
+                large / long      3.66   4.06   4.21   4.21   4.03     recurrence        Size 0 Decay 5.26 E/L 5 EDiff 51 Atk 52 Mod 0 Width 71
+            Room R6                       5.78     8.00     1.90     1.80        REJECTED
+                medium / medium   5.04   5.66   5.78   5.90   6.12     modal structure   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+                small / short     8.11   8.12   7.84   8.00   7.92     modal structure   Size 0 Decay 1.72 E/L 93 EDiff 0 Atk 31 Mod 0 Width 157
+                large / long      1.90   2.08   2.25   1.88   1.80     echo density      Size 16 Decay 4.92 E/L 0 EDiff 34 Atk 0 Mod 87 Width 96
+        
+          Modal prominence:
+            Hall                      13.8
+            R4c                       42.4
+            Room R6                   42.1
+        
+            QUALITY RISKS, against Hall. Descriptive flags; the numeric lines were chosen
+            here, not in the pre-registration, and are two metric units in each case.
+              repetition  peak autocorrelation of the flattened tail, 3-150 ms and 150-1000 ms
+                          (flutter, metallic repetition); flagged above Hall + 0.10
+              modal       prominence of single modes, dB (ringing); flagged above Hall + 3
+              colour      largest of 24 band deviations from Hall, 100 Hz - 10 kHz, dB; flagged above 1.5
+              short       RT60 at Decay 0.3 s, Size 25, against Hall's; flagged outside +/- 10 %
+        
+              structure                     repetition      modal    colour   short decay   flags
+              Hall                          0.32 / 0.19     13.8     0.00     1.000         
+              R4c                           0.38 / 0.37     42.4     0.80     0.999          REPETITION RINGING
+              Room R6                       0.72 / 0.53     42.1     0.67     1.002          REPETITION RINGING
+        
+            CENTRED MUSICAL SOURCES, same knobs, medium point, level-matched: RMS difference
+            of the 20 ms level envelope against Hall, dB. The first row is Hall against a
+            sibling of itself: what 'the same reverb' looks like on this measure.
+              structure                     vocal       snare       piano       percussion  
+              Hall, sibling delay set       0.98        0.32        1.80        0.26        
+              R4c                           1.57        2.85        3.03        3.03        
+              Room R6                       1.59        2.93        3.07        3.16        
+        
+          G3, CPU limit 1.5 x Hall:
+        
+            SIZE (time to 10 % of the energy, ms, Size 10 / 30 / 50 / 70 / 90) and DECAY
+            (measured RT60 / Hall's over nine settings, min .. max; limit +/- 10 %):
+              Hall                          36.2    39.6    44.9    52.8    64.9                  1.000 .. 1.000
+              R4c                           28.2    28.0    28.5    29.0    30.4    NOT MONOTONE  1.000 .. 1.006
+              Room R6                       23.6    26.2    26.5    30.3    54.2                  1.000 .. 1.000
+        
+            STEREO AND MONO at the defaults (limits as in Stage 3, section 12.3.9), TONE (largest
+            octave-band deviation from Hall, dB; limit 1) and CPU (wet path, x Hall):
+              structure                     corr   fold   L/R    mirror  hard   tone worst/med  width 50/100/150  octave  CPU
+              Hall                          -0.03  -3.0   0.4    0.3     0.033  -15.0 / -3.0    -6.0 0.1 3.6      0.00    1.00
+              R4c                           -0.00  -3.0   1.3    -1.3    0.053  -23.3 / -3.5    -6.0 0.0 3.6      0.77    0.86   STEREO WORSE THAN HALL
+              Room R6                       0.00   -3.0   -0.2   -0.0    0.028  -4.2 / -2.9     -6.0 -0.0 3.5     0.52    1.01
+        
+              R4c                           G3 FAIL: Size; stereo/mono;
+              Room R6                       G3 PASS
+        
+          Stereo and mono at the three operating points (G3 reads the defaults only):
+        
+            structure                 corr   fold   L/R    mirror  mono tone worst / median, dB
+            Hall, medium / medium     -0.03  -3.0   0.4    0.3     -15.0 / -3.0    
+            R6, medium / medium       0.00   -3.0   -0.2   -0.0    -4.2 / -2.9     
+            Hall, small / short       -0.01  -2.9   0.3    0.3     -10.9 / -1.8    
+            R6, small / short         0.01   -3.0   0.2    -0.1    -3.2 / -3.0     
+            Hall, large / long        -0.04  -3.1   0.4    0.3     -9.3 / -3.1     
+            R6, large / long          0.00   -3.0   0.2    -0.0    -4.6 / -2.8     
+        
+          THE PASS CONDITION (pre-registration 2.4):
+            centred distinct at every point, and not Hall at any Size   NO   (REJECTED, lowest median 1.90)
+            Size monotonic and meaningful                               yes
+            Decay within 10 %                                           yes
+            modal prominence materially reduced                         NO   (42.1 dB; R4c 42.4; Hall 13.8; not clean)
+            stereo and mono inside Stage 3's limits                     yes
+            octave bands within 1 dB                                    yes   (0.52)
+            CPU <= 1.5 x Hall                                           yes   (1.01)
+        
+          The composite is REJECTED by Hall's search. R4c remains the structural reference.
+        
+          ROOM: R4c stands structurally (SURVIVES); the repaired composite was REJECTED
+  FAIL  FINDING: the repaired Room passes every condition of 2.4
+
+PHASE 12.6.6 - Ambient: why A1b is off in tone
+----------------------------------------------
+          Octave shares of A1b against Hall's, dB, with one thing changed at a time in
+          BOTH. The hypothesis written first: loss accumulation - the damping acts on
+          energy that is still migrating and has not been heard yet.
+        
+                                              worst   125    250    500    1k     2k     4k     8k
+            A1b as it is                      1.82    -1.82  -0.10  +0.12  +0.78  +0.99  +0.12  -0.83  
+            D1  damping off                   2.04    -2.04  -0.37  -0.30  +0.34  +0.62  +0.07  -0.27  
+            D2  first 0.3 s                   1.25    -1.25  +0.30  +0.07  +0.50  +0.74  +0.06  -0.52  
+            D2  0.3 - 1.2 s                   2.63    -2.63  -0.78  -0.34  +0.50  +0.77  +0.03  -0.61  
+            D2  after 1.2 s                   1.85    -1.80  -1.85  -1.01  +0.07  +0.81  -0.07  -0.77  
+            D3  diffuser off                  1.43    -1.43  +0.58  -0.02  +0.58  +0.76  +0.12  -0.66  
+            D3  diffuser off, damping off     1.55    -1.55  +0.31  -0.45  +0.11  +0.39  +0.07  -0.15  
+            D5  stages ascending              2.07    -2.07  -1.20  -0.42  +0.52  +0.80  +0.41  -0.75  
+            D5  ascending, damping off        2.26    -2.26  -1.52  -0.94  -0.02  +0.37  +0.30  -0.14  
+            D5  stages folded                 1.82    -1.82  -0.65  -0.59  -0.21  +0.13  +0.61  -0.35  
+            D5  folded, damping off           2.14    -2.14  -0.99  -1.08  -0.69  -0.23  +0.49  +0.05  
+            D6  modulation off                1.39    -1.39  +0.11  +0.25  +0.50  +0.47  +0.11  -0.47  
+            D6  modulation off, damping off   1.72    -1.72  -0.20  -0.26  -0.05  +0.04  -0.00  +0.07  
+        
+            D2  RT60 per octave, A1b / Hall           0.997  0.932  0.925  0.940  0.952  0.956  0.959  
+        
+            D4  energy held in each stage's lines over the whole response, % of the band:
+                          stage 1   stage 2   stage 3   stage 4 (heard)
+                250 Hz    83.5      13.1      2.7       0.7       
+                1000 Hz   84.9      11.7      2.6       0.8       
+                8000 Hz   86.4      10.9      2.2       0.6       
+        
+          READING.
+            damping off removes -12 % of the deviation (1.82 -> 2.04 dB): loss accumulation is NOT the larger part.
+            diffuser off: 1.43 dB (damping off too: 1.55)
+            stage assignment: ascending 2.07 (undamped 2.26), folded 1.82 (undamped 2.14): little effect.
+            modulation off: 1.39 dB (damping off too: 1.72)
+  FAIL  FINDING: the hypothesis holds - damping off removes at least half of the deviation
+
+PHASE 12.6.7 - Ambient: repairs
+-------------------------------
+          Pass: octave bands within 1.0 dB of Hall (0.75 preferred) at the defaults and
+          over Size 25 / 60 / 85 x Decay 0.8 / 2.5 / 5.0 x three damping settings;
+          G2 SURVIVES; RT60 within 5 %; G3 otherwise. No output equaliser is a candidate.
+        
+          AT1 is not built: the diagnosis does not point to loss accumulation.
+        
+          AT4 is not built: reassigning the stages does not lower the deviation by 0.3 dB.
+        
+            structure                 defaults  worst of 27  
+            A1b                       1.82      3.02         OVER 1.0
+            AT2 every stage heard     0.66      1.51         OVER 1.0
+            AT3 25 % direct           0.18      0.73         within 0.75
+        
+          G1, then G2, for those within 1.0 dB:
+        
+            target                        medium   small    large    lowest run  verdict
+            AT3 25 % direct               3.88     1.98     5.90     1.98        passes G1
+        
+            target                        medium   small    large    lowest run  verdict
+            AT3 25 % direct               4.03     1.98     5.97     1.98        REJECTED
+                medium / medium   3.88   4.80   4.03   4.12   3.84     loop repetition   Size 79 Decay 2.05 E/L 0 EDiff 7 Atk 14 Mod 9 Width 200
+                small / short     1.98   2.01   1.98   1.98   1.98     echo density      Size 9 Decay 0.84 E/L 0 EDiff 46 Atk 16 Mod 98 Width 116
+                large / long      5.90   5.82   5.98   5.97   6.47     recurrence        Size 100 Decay 6.16 E/L 0 EDiff 22 Atk 1 Mod 100 Width 200
+        
+            QUALITY RISKS, against Hall. Descriptive flags; the numeric lines were chosen
+            here, not in the pre-registration, and are two metric units in each case.
+              repetition  peak autocorrelation of the flattened tail, 3-150 ms and 150-1000 ms
+                          (flutter, metallic repetition); flagged above Hall + 0.10
+              modal       prominence of single modes, dB (ringing); flagged above Hall + 3
+              colour      largest of 24 band deviations from Hall, 100 Hz - 10 kHz, dB; flagged above 1.5
+              short       RT60 at Decay 0.3 s, Size 25, against Hall's; flagged outside +/- 10 %
+        
+              structure                     repetition      modal    colour   short decay   flags
+              Hall                          0.32 / 0.19     13.8     0.00     1.000         
+              AT3 25 % direct               0.56 / 0.41     18.6     0.23     1.000          REPETITION RINGING
+        
+          G3, Decay limit 5 %, CPU limit 1.5 x Hall:
+        
+            SIZE (time to 10 % of the energy, ms, Size 10 / 30 / 50 / 70 / 90) and DECAY
+            (measured RT60 / Hall's over nine settings, min .. max; limit +/- 5 %):
+              Hall                          36.2    39.6    44.9    52.8    64.9                  1.000 .. 1.000
+              AT3 25 % direct               37.5    40.9    45.8    58.6    80.8                  0.998 .. 1.007
+        
+            STEREO AND MONO at the defaults (limits as in Stage 3, section 12.3.9), TONE (largest
+            octave-band deviation from Hall, dB; limit 1) and CPU (wet path, x Hall):
+              structure                     corr   fold   L/R    mirror  hard   tone worst/med  width 50/100/150  octave  CPU
+              Hall                          -0.03  -3.0   0.4    0.3     0.033  -15.0 / -3.0    -6.0 0.1 3.6      0.00    1.00
+              AT3 25 % direct               -0.10  -3.7   0.5    -0.4    0.033  -11.7 / -3.0    -4.7 1.3 4.8      0.18    1.08
+        
+              AT3 25 % direct               G3 PASS
+            AT3 25 % direct           REJECTED, G3 pass
+        
+          AMBIENT: BLOCKED - A1b SURVIVES (Stage 5) and no repair brings its tone within 1 dB
+  FAIL  FINDING: an Ambient repair is within 1 dB over the grid and passes G2 and G3
+        
+          Stage 6 suite wall time: 3378 s
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.6.1 - the search with a knob-dependent impostor is the frozen search     1 /    1   ok
+  PHASE 12.6.2 - Room: Size                                                         2 /    2   ok
+  PHASE 12.6.3 - Room: ringing                                                      0 /    1   FAILED
+  PHASE 12.6.4 - Room: mono and stereo                                              1 /    1   ok
+  PHASE 12.6.5 - Room: the repaired structure                                       0 /    1   FAILED
+  PHASE 12.6.6 - Ambient: why A1b is off in tone                                    0 /    1   FAILED
+  PHASE 12.6.7 - Ambient: repairs                                                   0 /    1   FAILED
+-----------------------------------------------------------------
+  4 / 8 checks passed.  4 FAILURE(S).

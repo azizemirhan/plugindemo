@@ -1240,6 +1240,20 @@ Outcome runAmbient()
     return outcome;
 }
 
+// ===========================================================================
+//  For Stage 6: the same tables and the same A1b, by name.
+// ===========================================================================
+Outcome standingAmbient()
+{
+    Outcome o;
+    o.best = ambientChain ("A1b four stages k 0.40", { { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } }, 0.40);
+    o.status = "(not re-run: A1b as defined)";
+    return o;
+}
+
+void qualityRisks (const std::vector<Candidate>& list)   { qualityTable (list); }
+void centredSources (const std::vector<Candidate>& list) { centredSourceTable (list); }
+
 } // namespace stage5
 
 } // namespace avtest

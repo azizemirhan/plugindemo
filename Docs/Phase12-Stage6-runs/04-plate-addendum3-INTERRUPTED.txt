@@ -1,0 +1,67 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage6Tests
+
+
+PHASE 12.6.1 - the search with a knob-dependent impostor is the frozen search
+-----------------------------------------------------------------------------
+          R4c at the medium point, Hall as the impostor, one seed:
+            frozen search   5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+            the copy        5.077088  after 806 evaluations   Size 0 Decay 3.27 E/L 26 EDiff 71 Atk 63 Mod 0 Width 125
+  PASS  the copy returns the frozen search's result, knob for knob
+
+PHASE 12.6.9 - Plate: the dispersion chain on its own
+-----------------------------------------------------
+          The reference is 240 first-order sections at -0.7 per channel. The
+          hypothesis: it is bound by latency (each section waits for the one before),
+          not by arithmetic. Timed alternately with the reference, stereo, best of nine.
+        
+            chain                             ns / sample  reference  reference / chain
+            PV1 scalar, 1 sub-chains          1511.3       1187.1     0.79 x
+            PV1 scalar, 4 sub-chains          601.3        1217.3     2.02 x
+            PV1 scalar, 8 sub-chains          491.6        1238.2     2.52 x
+            PV1 scalar, 16 sub-chains         440.9        1217.8     2.76 x
+            PV2 two-wide, 1 sub-chains        1526.9       1193.1     0.78 x
+            PV2 two-wide, 4 sub-chains        498.3        1209.6     2.43 x
+            PV2 two-wide, 8 sub-chains        471.8        1248.1     2.65 x
+            PV2 two-wide, 16 sub-chains       421.4        1184.0     2.81 x
+            PV3 in registers, 4 sub-chains    253.9        1115.0     4.39 x
+            PV3 in registers, 8 sub-chains    169.2        1143.2     6.76 x
+            PV3 in registers, 16 sub-chains   271.7        1146.2     4.22 x
+            PM1 multirate, two bands          1553.2       1107.3     0.71 x
+            PM2 multirate, three bands        1913.6       1153.0     0.60 x
+        
+          Fastest: PV3 in registers, 8 sub-chains, 6.76 x the reference chain.
+  PASS  the prediction: rearranged, the same arithmetic is at least 3 x cheaper
+  PASS  addendum 3's prediction: kept in registers, at least 6 x cheaper
+        
+          The same transfer function? Largest difference from the reference on noise,
+          the pipelined output read (sub-chains - 1) samples later:
+            PV1 scalar, 1           0.000 e-12
+            PV1 scalar, 4           0.000 e-12
+            PV1 scalar, 8           0.000 e-12
+            PV1 scalar, 16          0.000 e-12
+            PV2 two-wide, 1         0.000 e-12
+            PV2 two-wide, 4         0.000 e-12
+            PV2 two-wide, 8         0.000 e-12
+            PV2 two-wide, 16        0.000 e-12
+            PV3 in registers, 1     0.000 e-12
+            PV3 in registers, 4     0.000 e-12
+            PV3 in registers, 8     0.000 e-12
+            PV3 in registers, 16    0.000 e-12
+  PASS  the pipelined chain is the reference chain, delayed
+        
+          MULTIRATE. Each band's sections run at the band's rate and are fitted to the
+          reference's delay curve there. 'equivalents' weighs a section by its rate.
+        
+            PM1:
+              below 3 kHz               242 sections @ -0.25    rate / 4    fit error 0.22 ms rms
+              above 3 kHz               230 sections @ -0.64    rate / 1    fit error 0.15 ms rms
+              section equivalents 290.5 (reference 240), filter multiplies 66.8 per sample, latency beyond the curve 6.83 ms
+              reconstruction with the chains out: -331 dB, at 88 samples of delay
+              magnitude ripple with the chains in: 0.44 dB over 24 bands  (the reference: 0.04)
+              alias and image level on a sine, dB:  1.0k -99  2.5k -94  4.0k -86  5.5k -110  7.0k -111  10.0k -106
+        
+            PM2:
+              below 1.5 kHz           

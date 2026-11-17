@@ -2,6 +2,7 @@
 
 #include "Phase12ModeRig.h"
 #include "Phase12ResearchCore.h"
+#include "Phase12Stage6Rig.h"
 
 #include "DSP/FeedbackMatrix.h"
 
@@ -188,6 +189,30 @@ struct Structure
         calibration for a topology whose measured decay would otherwise
         drift from the control; the level law still sees the user's Decay. */
     double decayScale = 1.0;
+
+    // ----- STAGE 6. Every field below is inert at its default. --------------
+
+    /** Static allpasses inside single lines (at most three per line), each a
+        fraction of its line. The decay gain sees the longer loop. */
+    struct LineAllpass { double fraction = 0.3, g = 0.5; };
+    std::array<std::vector<LineAllpass>, 8> lineAllpass;
+
+    /** The damping ratios the tank is asked for are raised to these powers.
+        Below 1 a shelf damps less than the control says. A calibration of
+        the damping law, for a topology whose octave balance drifts. */
+    double dampLowPower = 1.0, dampHighPower = 1.0;
+
+    /** preChain run as a PipelinedChain with this many sub-chains (every
+        stretch must be 1). 0: the plain chain. */
+    int  preChainSplit  = 0;
+    bool preChainVector = false;
+    bool preChainRegisters = false;     // two-wide, the running values kept in registers
+
+    /** A multirate dispersion ahead of the tank, instead of preChain. */
+    std::shared_ptr<const stage6::MultirateSpec> multirate;
+
+    /** The tank is an OpenTank built from this, instead of the eight-line core. */
+    std::shared_ptr<const stage6::OpenSpec> open;
 };
 
 
@@ -642,9 +667,13 @@ public:
         core.reset();
         core.resetModulation();
 
-        core.setDamping (mapping::lowDampRatioFor  (u.lowDamp),
-                         mapping::highDampRatioFor (u.highDamp),
-                         u.lowDampHz, u.highDampHz, true);
+        double lowRatio  = mapping::lowDampRatioFor  (u.lowDamp);
+        double highRatio = mapping::highDampRatioFor (u.highDamp);
+
+        if (s.dampLowPower  != 1.0) lowRatio  = std::pow (lowRatio,  s.dampLowPower);
+        if (s.dampHighPower != 1.0) highRatio = std::pow (highRatio, s.dampHighPower);
+
+        core.setDamping (lowRatio, highRatio, u.lowDampHz, u.highDampHz, true);
 
         const double depth = mapping::modDepthFor (u.modDepth) * s.modDepthFactor;
         const double rate  = mapping::modRateScaleFor (u.modRate);
@@ -703,6 +732,35 @@ public:
                     // A Schroeder allpass of length M delays by M on average.
                     core.hooks.extraLoopDelay[i] += static_cast<double> (length);
                 }
+
+            loopChanged = true;
+        }
+
+        // --- STAGE 6: allpasses in single lines ------------------------------
+        for (int i = 0; i < N; ++i)
+        {
+            const auto& list = s.lineAllpass[static_cast<size_t> (i)];
+
+            if (list.empty())
+                continue;
+
+            core.hooks.perLine = true;
+            core.hooks.lineCount[i] = std::min (static_cast<int> (list.size()),
+                                                ResearchHooks<N>::maxLoopAllpasses);
+
+            for (int k = 0; k < core.hooks.lineCount[i]; ++k)
+            {
+                const auto length = static_cast<size_t> (std::max (2.0, std::round (
+                    core.getDelaySamples (i) * list[static_cast<size_t> (k)].fraction)));
+
+                auto& a = core.hooks.loopAllpass[i][k];
+
+                a.buffer.assign (length, 0.0);
+                a.position = 0;
+                a.g = list[static_cast<size_t> (k)].g;
+
+                core.hooks.extraLoopDelay[i] += static_cast<double> (length);
+            }
 
             loopChanged = true;
         }
@@ -880,7 +938,23 @@ public:
             }
 
         // --- J ---------------------------------------------------------------
-        if (! s.preChain.empty())
+        if (s.multirate != nullptr)
+        {
+            multirateL.prepare (*s.multirate);
+            multirateR.prepare (*s.multirate);
+            useMultirate = true;
+        }
+        else if (! s.preChain.empty() && s.preChainSplit > 0)
+        {
+            std::vector<double> coefficients;
+
+            for (const auto& section : s.preChain)
+                coefficients.push_back (section.a);
+
+            configured = configured && pipeline.prepare (coefficients, s.preChainSplit, s.preChainVector, s.preChainRegisters);
+            usePipeline = true;
+        }
+        else if (! s.preChain.empty())
         {
             chainL.prepare (s.preChain);
             chainR.prepare (s.preChain);
@@ -921,7 +995,29 @@ public:
         earlyActive = u.earlyLate > 0.0;
 
         width = u.width;
+
+        // --- STAGE 6: the open tank ------------------------------------------
+        if (s.open != nullptr)
+        {
+            stage6::OpenTank::Settings c;
+
+            c.sampleRate = sampleRate;
+            c.scale = scale;
+            c.rt60 = rt60 * s.decayScale;
+            c.lowRatio = lowRatio;
+            c.highRatio = highRatio;
+            c.lowHz = u.lowDampHz;
+            c.highHz = u.highDampHz;
+            c.modDepth = depth;
+            c.modRateScale = rate;
+            c.allpassSections = s.allpassSections;
+
+            open = std::make_unique<stage6::OpenTank> (*s.open, c);
+        }
     }
+
+    [[nodiscard]] const stage6::OpenTank* getOpenTank() const noexcept { return open.get(); }
+    [[nodiscard]] const stage6::PipelinedChain& getPipeline() const noexcept { return pipeline; }
 
     [[nodiscard]] bool isConfigured() const noexcept { return configured; }
     [[nodiscard]] double getCapacityMs() const noexcept { return capacityMs; }
@@ -958,7 +1054,16 @@ public:
             diffuser.processSample (l, r);
         }
 
-        if (useChain)
+        if (useMultirate)
+        {
+            l = multirateL.process (l);
+            r = multirateR.process (r);
+        }
+        else if (usePipeline)
+        {
+            pipeline.process (l, r);
+        }
+        else if (useChain)
         {
             l = chainL.process (l);
             r = chainR.process (r);
@@ -969,6 +1074,14 @@ public:
             r = preR.process (r);
         }
 
+        double outL = 0.0, outR = 0.0;
+
+        if (open != nullptr)
+        {
+            open->process (l, r, outL, outR);
+        }
+        else
+        {
         double injection[N];
 
         for (int i = 0; i < N; ++i)
@@ -982,8 +1095,6 @@ public:
             }
 
         core.processSample (injection, lastState);
-
-        double outL = 0.0, outR = 0.0;
 
         for (int i = 0; i < N; ++i)
         {
@@ -1010,6 +1121,7 @@ public:
 
             outL *= tapNorm;
             outR *= tapNorm;
+        }
         }
 
         l = outL;
@@ -1088,6 +1200,11 @@ private:
     Dispersion preL, preR;
     StretchChain chainL, chainR;
     bool useChain = false;
+
+    stage6::PipelinedChain pipeline;
+    stage6::Multirate multirateL, multirateR;
+    std::unique_ptr<stage6::OpenTank> open;
+    bool usePipeline = false, useMultirate = false;
     TapLine staggerLine[N], tapLine[N];
     size_t  staggerDelay[N] {}, tapDelay[N][2] {};
 
