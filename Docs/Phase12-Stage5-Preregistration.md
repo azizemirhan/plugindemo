@@ -209,3 +209,37 @@ No shimmer, pitch, granular, freeze or delay-effect mechanism.
 The gates say whether a mechanism is *structurally* outside Hall's reach on a
 centred source. They do not say that it sounds like a room, a chamber or an
 ambience. That is a listening question and is not answered in Stage 5.
+
+---
+
+## Addendum 1 — after Part A's first run, before its second
+
+Appended; nothing above is edited.
+
+**A measurement of mine was wrong.** The grid's cost column was a
+best-of-five per chain, taken minutes apart from Hall's own. Several chains
+came out *cheaper than Hall* (0.82–0.97 ×), which is impossible for a
+structure that only adds work: the machine's clock speed had moved between
+the two measurements. The shortlist rule filters on cost, so it was applied
+to noise and picked 96- and 64-section chains that are not under 1.75 ×.
+Cost is now measured as a ratio, Hall and the chain alternating, nine rounds,
+minimum against minimum. Part A is re-run in full. The first run's output is
+not used for anything.
+
+**A prediction of mine was half wrong.** "A stretched section carries M times
+the phase for the same arithmetic" is true and does not help: the extra phase
+goes into the images at rate / M, not into the band below 5 kHz where the
+identity is. In the first run a stretch-2 chain needed as many sections as an
+ordinary one to stay PRESERVED (120 against 128). This is recorded here
+because the re-run will show the same thing and it should not read as if it
+had been expected.
+
+**One section is added to Part A,** because the shortlist rule only asks what
+survives under 1.75 × and the next stage needs the other answer too:
+
+- *The floor, whatever it costs.* The three PRESERVED chains with the fewest
+  sections go through the same G2 and the same reference-equivalence test.
+  This cannot produce a Plate recommendation — the cost limit stands — it
+  reports the cheapest chain that is still Plate A.
+
+No threshold, family, scale or search setting is changed.
