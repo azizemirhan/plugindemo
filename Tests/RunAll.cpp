@@ -179,6 +179,7 @@ int runAllSuites()
     AV_RUN (runPhase11Stage4Tests);
     AV_RUN (runPhase12ModeFamilyTests);
     AV_RUN (runPhase12StructuralTests);
+    AV_RUN (runPhase12Stage4Tests);
 
 
     if (suitesRun == 0)

@@ -83,6 +83,10 @@ namespace structural
     /** The floor measured by section 12.3.2. */
     [[nodiscard]] const stage3::Floor& floorOf();
 
+    /** Measures the floor if 12.3.2 has not run in this process (a filtered
+        run of a later stage). Same pairs, same result, nothing printed. */
+    void ensureFloor();
+
     void runTrials (std::vector<Trial>& trials);
     void printTrials (const std::vector<Trial>& trials);
     void printFamilyHeader();

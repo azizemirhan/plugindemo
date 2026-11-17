@@ -121,6 +121,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase12ModeFamilies.cpp
     Phase12Structural.cpp
     Phase12StructuralCandidates.cpp
+    Phase12Stage4.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp

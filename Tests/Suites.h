@@ -116,6 +116,7 @@ void runPhase11DelaySetTests();
 void runPhase11Stage4Tests();
 void runPhase12ModeFamilyTests();
 void runPhase12StructuralTests();
+void runPhase12Stage4Tests();
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

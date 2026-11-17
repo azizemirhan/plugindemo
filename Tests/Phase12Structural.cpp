@@ -337,6 +337,7 @@ namespace structural
     }
 
     Floor gFloor;
+    bool  gFloorMeasured = false;
 
     /** The largest residual any negative control left. Set by 12.3.3. */
     double strongestNegative = 0.0;
@@ -577,26 +578,17 @@ namespace
         checkAtMost (worstError, 1.0e-12, "every research matrix is orthogonal to rounding");
     }
 
-    void runFloor()
+    struct FloorPair { std::string label; Distance d; };
+
+    /** The twelve same-family pairs the floor is the maximum of. Shared by
+        12.3.2, which prints them, and ensureFloor(), which does not. */
+    [[nodiscard]] std::vector<FloorPair> measureFloorPairs()
     {
-        // ===================================================================
-        beginSuite ("PHASE 12.3.2 - the same-family floor");
-        // ===================================================================
-
-        info ("  What 'the same reverb, another realisation' looks like through each");
-        info ("  family: Hall against two sibling delay sets searched to its own sum");
-        info ("  and spread, and against itself with Size nudged by two points, at");
-        info ("  three operating points. Each family is later divided by the LARGEST");
-        info ("  figure it shows here, or by 1 if that is larger.");
-        info ("");
-
         const auto siblingA = withDelays ("sibling A", mode12::hallSibling().delaysMs);
         const auto siblingB = withDelays ("sibling B", mode12::searchDelaySet (
             388.50, fdn::delaysMs[7] / fdn::delaysMs[0], 0x7B22u));
 
-        struct Pair { std::string label; Distance d; };
-
-        std::vector<Pair> pairs (static_cast<size_t> (kPointCount) * 4);
+        std::vector<FloorPair> pairs (static_cast<size_t> (kPointCount) * 4);
 
         runParallel (pairs.size(), [&] (size_t i)
         {
@@ -619,7 +611,26 @@ namespace
             pairs[i] = { std::string (p.label) + ", " + what, distance (reference, other) };
         });
 
+        return pairs;
+    }
+
+    void runFloor()
+    {
+        // ===================================================================
+        beginSuite ("PHASE 12.3.2 - the same-family floor");
+        // ===================================================================
+
+        info ("  What 'the same reverb, another realisation' looks like through each");
+        info ("  family: Hall against two sibling delay sets searched to its own sum");
+        info ("  and spread, and against itself with Size nudged by two points, at");
+        info ("  three operating points. Each family is later divided by the LARGEST");
+        info ("  figure it shows here, or by 1 if that is larger.");
+        info ("");
+
+        const auto pairs = measureFloorPairs();
+
         gFloor = Floor {};
+        gFloorMeasured = true;
 
         printFamilyHeader();
 
@@ -973,6 +984,22 @@ namespace
         check (weakestNetwork >= kDistinct,
                "FINDING: every topology-different network is DISTINCT from Hall at EVERY point (weakest "
                + fx (weakestNetwork, 2) + ")");
+    }
+}
+
+namespace structural
+{
+    void ensureFloor()
+    {
+        if (gFloorMeasured)
+            return;
+
+        gFloor = Floor {};
+
+        for (const auto& p : measureFloorPairs())
+            gFloor.absorb (p.d);
+
+        gFloorMeasured = true;
     }
 }
 
