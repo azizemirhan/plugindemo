@@ -563,3 +563,60 @@ over the grid.
 Pass condition unchanged (3.2). AT5 is a sweep of one number between a
 measured failure on tone (0 %) and a measured failure on identity (25 %); it
 is reported as that.
+
+---
+
+## Addendum 3 — after Part 4 (Plate) was read once, before Plate is run again
+
+Appended; nothing above is edited.
+
+**What the first run found.**
+
+- **PV, the hypothesis.** Confirmed. Cut into 8 sub-chains, the same 240
+  sections run 3.83 × faster (scalar; 4 sub-chains 3.78 ×, 16 sub-chains
+  2.88 ×). The output is the reference's, sample for sample, 7 samples later:
+  the largest difference on noise is zero to twelve decimal places.
+- **PV as a Plate.** PRESERVED (0.34 / 0.16 / 0.16 from the reference at the
+  same knobs — the 7 samples). Through Hall's G2: 3.43 / 3.03 / 3.11, lowest
+  run 2.72: **REFERENCE-EQUIVALENT**. Decay, tone, stereo and mono are the
+  reference's, digit for digit.
+- **PV's cost.** 1.87 × Hall in one table and 1.77 × in the G3 table of the
+  same run (the reference: 4.52 and 3.05). Against the limit of 1.75 it
+  **fails G3 by two hundredths**, and it stays failed. It is inside the 2.0
+  tier.
+- **My two-wide version (PV2) is slower than the scalar one** (2.4 × against
+  3.8 ×). I wrote it so that every sub-chain's running value goes through
+  memory between sections; that puts a store and a load on the path the
+  rearrangement was meant to shorten. The scalar version has the same flaw
+  to a smaller degree.
+- **PT, a different dispersion.** All six REJECTED at G1 (lowest runs
+  0.51–1.11). Dispersion inside the loop, alone or with a short chain ahead,
+  is reproduced by Hall. It is not a Plate.
+- **PM, multirate: my design was bad, and the result says nothing yet.** The
+  fit asked only for the smallest error, and so the full-rate band came back
+  as the whole reference chain (240 sections at −0.7, error zero) with the
+  low band *added* to it: 310 section-equivalents for PM1, more than the
+  reference. PM2's low band came back degenerate (1943 sections at −0.01,
+  306 ms of latency), and its alias figures were then read before the output
+  had arrived. The filter bank itself is sound (reconstruction −331 dB;
+  PM1's images are at −90 dB or lower).
+
+**PV3 — the same chain, the same eight sub-chains, written so that the
+running values stay in registers** (two-wide, fixed sub-chain count, no
+store between sections). Same transfer function; the fast suite holds it to
+the plain chain as it does PV1 and PV2. *Prediction:* at least 6 × the
+reference chain, and Plate at or under 1.5 × Hall. If it is not, PV1 stands
+as measured: reference-equivalent, in the 2.0 tier, over the 1.75 limit.
+
+**PM, designed properly, once.** The fit now asks for the *fewest sections*
+whose delay curve is within 0.25 ms rms of the reference's over the band,
+with the coefficient kept between −0.95 and −0.05. Bands and filters
+unchanged. *Prediction, unchanged and now with numbers:* 54 % of the
+reference's phase lies below 3 kHz and 46 % above; a band sampled at twice
+its width spends about half its sections' phase outside itself; so PM1
+cannot go far below (130 / 4 + 110) ≈ 140 section-equivalents plus about 67
+filter multiplies a sample, and those sections are still in series. I expect
+PM1 near 3 × Hall and PM2 near 2.5 ×, both behind PV. If the fitted designs
+come out above those figures, that is my fit again and is reported as such.
+
+**Not rebuilt:** PT. Six of six were reproduced by Hall.
