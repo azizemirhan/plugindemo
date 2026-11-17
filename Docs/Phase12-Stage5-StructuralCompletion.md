@@ -492,4 +492,4 @@ moved is cost, and with it the Plate shortlist; see section 6.
 
 ### 35. Commit
 
-Recorded in the commit that follows this one.
+Stage 5 is commit `77f32fe`; this line was added by the commit after it.
