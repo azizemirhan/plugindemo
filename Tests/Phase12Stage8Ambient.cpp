@@ -848,4 +848,318 @@ void runPhase12Stage8AmbientDiagnosis()
     }
 }
 
+// ===========================================================================
+//  Addendum 1: DA7 - DA10
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        constexpr size_t kBin = 240;        // 5 ms at 48 kHz, the metric's bin
+
+        [[nodiscard]] std::vector<double> envelopeOf (const Stereo& x)
+        {
+            const size_t bins = x.l.size() / kBin;
+
+            std::vector<double> env (bins, 0.0);
+
+            for (size_t b = 0; b < bins; ++b)
+                for (size_t i = 0; i < kBin; ++i)
+                    env[b] += x.l[b * kBin + i] * x.l[b * kBin + i] + x.r[b * kBin + i] * x.r[b * kBin + i];
+
+            return env;
+        }
+
+        /** White noise added to both channels, `levelDb` below the loudest
+            5 ms bin's RMS. The same seed gives the same noise whatever the
+            response. levelDb <= 0: nothing is added. */
+        [[nodiscard]] Stereo withFloor (Stereo x, double levelDb, unsigned int seed)
+        {
+            if (levelDb <= 0.0)
+                return x;
+
+            const auto env = envelopeOf (x);
+            const double peak = std::sqrt (*std::max_element (env.begin(), env.end()) / static_cast<double> (2 * kBin));
+
+            auto add = [&] (std::vector<double>& channel, unsigned int s)
+            {
+                const auto noise = whiteNoise (channel.size(), s);
+
+                double sq = 0.0;
+
+                for (double v : noise)
+                    sq += v * v;
+
+                const double gain = peak * std::pow (10.0, -levelDb / 20.0)
+                                  / std::sqrt (std::max (1.0e-300, sq / static_cast<double> (noise.size())));
+
+                for (size_t n = 0; n < channel.size(); ++n)
+                    channel[n] += gain * noise[n];
+            };
+
+            add (x.l, seed);
+            add (x.r, seed + 0x51EDu);
+
+            return x;
+        }
+
+        [[nodiscard]] Features flooredFeatures (const Structure& s, const User& u, double levelDb, unsigned int seed)
+        {
+            return analyse (withFloor (impulseResponse (s, u, irSecondsFor (u.decay)), levelDb, seed),
+                            withFloor (impulseResponse (s, u, kLeftOnlySeconds, true, false), levelDb, seed + 7u));
+        }
+    }
+}
+
+void runPhase12Stage8AmbientDiagnosis2()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Candidate a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target;
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.6 - DA7: are the late-texture bins in numerical dust?");
+    // =====================================================================
+
+    info ("  The 5 ms energy envelope against each response's loudest bin: the time, ms, at which");
+    info ("  it first passes -200, -120 and -60 dB. The late-texture family reads bins from 30 ms.");
+    info ("  Then the family's two figures (dB of spread, 50-200 ms and 200-500 ms).");
+    info ("");
+    info ("    " + pad ("", 26) + pad ("first", 8) + pad ("-200 dB", 10) + pad ("-120 dB", 10) + pad ("-60 dB", 10)
+          + pad ("loudest at", 12) + pad ("fluct 50-200", 14) + "fluct 200-500");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+
+        struct Row { std::string name; Stereo centre, left; };
+
+        std::vector<Row> rows;
+
+        rows.push_back ({ std::string (pointName[p]) + "  Hall", impulseResponse (Structure {}, u, irSecondsFor (u.decay)),
+                          impulseResponse (Structure {}, u, kLeftOnlySeconds, true, false) });
+
+        const Structure s = a1b.make (u);
+
+        rows.push_back ({ "        A1b", impulseResponse (s, u, irSecondsFor (u.decay)),
+                          impulseResponse (s, u, kLeftOnlySeconds, true, false) });
+
+        const auto unity = designFilter (Bands {});
+
+        rows.push_back ({ "        A1b, flat filter", filtered (rows[1].centre, unity), filtered (rows[1].left, unity) });
+
+        for (const auto& row : rows)
+        {
+            const auto env = envelopeOf (row.centre);
+            const double peak = *std::max_element (env.begin(), env.end());
+            const auto loudest = static_cast<size_t> (std::max_element (env.begin(), env.end()) - env.begin());
+
+            auto firstAbove = [&] (double db)
+            {
+                for (size_t b = 0; b < env.size(); ++b)
+                    if (env[b] > peak * std::pow (10.0, db / 10.0))
+                        return fx (5.0 * static_cast<double> (b), 0);
+
+                return std::string ("-");
+            };
+
+            size_t first = row.centre.l.size();
+
+            for (size_t n = 0; n < row.centre.l.size(); ++n)
+                if (row.centre.l[n] != 0.0 || row.centre.r[n] != 0.0)
+                {
+                    first = n;
+                    break;
+                }
+
+            const Features f = analyse (row.centre, row.left);
+
+            info ("    " + pad (row.name, 26) + pad (fx (1000.0 * static_cast<double> (first) / kRate, 1), 8)
+                  + pad (firstAbove (-200.0), 10) + pad (firstAbove (-120.0), 10) + pad (firstAbove (-60.0), 10)
+                  + pad (fx (5.0 * static_cast<double> (loudest), 0), 12) + pad (fx (f.fluctuation[0], 2), 14)
+                  + fx (f.fluctuation[1], 2));
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.7 - DA8: the separation with everything below a level masked");
+    // =====================================================================
+
+    info ("  A1b against Hall at the same knobs, frozen metric, with the same white noise added to");
+    info ("  both responses L dB below each one's loudest 5 ms bin. Worst centred family, its name,");
+    info ("  and the late-texture figure. -120 dB is 24 dB under the floor of 16-bit audio.");
+    info ("");
+
+    constexpr double levels[5] { 0.0, 200.0, 160.0, 120.0, 100.0 };
+
+    double lateAt[3][5] {};
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const Structure s = a1b.make (u);
+
+        info ("    " + std::string (pointName[p]));
+
+        for (int k = 0; k < 5; ++k)
+        {
+            const Features fh = flooredFeatures (Structure {}, u, levels[k], 0xF100Du);
+            const Features fa = flooredFeatures (s, u, levels[k], 0xF100Du);
+
+            const auto sc = stage5::sameKnobs (fh, fa);
+
+            int family = 0;
+            const double worst = stage5::centredWorst (sc, &family);
+
+            lateAt[p][k] = sc.scaled[6];
+
+            std::string others;
+
+            for (int f = 0; f < kFamilies; ++f)
+                if (f != 6 && f != stage5::kLateralFamily && sc.scaled[f] >= 1.5)
+                    others += std::string (kFamilyNames[f]) + " " + fx (sc.scaled[f]) + "; ";
+
+            info ("      " + pad (levels[k] <= 0.0 ? std::string ("no floor") : "floor -" + fx (levels[k], 0) + " dB", 18)
+                  + pad ("worst " + fx (worst) + " (" + kFamilyNames[family] + ")", 34)
+                  + pad ("late texture " + fx (sc.scaled[6]), 24) + "others >= 1.5: " + (others.empty() ? "none" : others));
+        }
+
+        // Controls: the floor is not itself seen.
+        const double hallFloor = stage5::centredWorst (stage5::sameKnobs (featuresOf (Structure {}, u),
+                                                                          flooredFeatures (Structure {}, u, 120.0, 0xF100Du)));
+        const double seedFloor = stage5::centredWorst (stage5::sameKnobs (flooredFeatures (s, u, 120.0, 0xF100Du),
+                                                                          flooredFeatures (s, u, 120.0, 0xBEEFu)));
+
+        info ("      controls at -120 dB: Hall against Hall + floor " + fx (hallFloor)
+              + "; A1b + floor against A1b + a different floor " + fx (seedFloor));
+        info ("");
+    }
+
+    {
+        bool below = true;
+
+        for (int p = 0; p < 3; ++p)
+            if (lateAt[p][0] >= 3.0 && ! (lateAt[p][3] < 0.5 * lateAt[p][0]))
+                below = false;
+
+        info (std::string ("  READING: A1b's unfloored late-texture distance from Hall is ")
+              + (below ? "PREDOMINANTLY BELOW -120 dB wherever it exceeds 3.0." : "NOT predominantly below -120 dB."));
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.8 - DA10: is the low-frequency deficit missing phase scrambling?");
+    // =====================================================================
+
+    info ("  DA1's mean deviation, damping off, at three modulation depths. If modulation is what");
+    info ("  lets the high bands migrate, then with it off every band migrates alike and the gap");
+    info ("  between 125 Hz and 1-4 kHz closes. Holds if the gap at depth 0 is under half the");
+    info ("  gap at the default.");
+    info ("");
+    info ("    " + pad ("", 22) + kBandHead + "125 minus 1-4k");
+
+    {
+        constexpr double depths[3] { 0.0, 0.30, 0.60 };
+
+        double gap[2][3] {};
+
+        for (int p = 0; p < 2; ++p)
+            for (int d = 0; d < 3; ++d)
+            {
+                User u = userAt (kPoints[p]);
+                u.lowDamp = 0.0;
+                u.highDamp = 0.0;
+                u.modDepth = depths[d];
+
+                const auto m = perturbedMoments (a1b.make, u);
+
+                gap[p][d] = m.mean[0] - (m.mean[3] + m.mean[4] + m.mean[5]) / 3.0;
+
+                info ("    " + pad (std::string (pointName[p]) + ", depth " + fx (depths[d], 2), 22) + bandRow (m.mean)
+                      + signedText (gap[p][d]));
+            }
+
+        const bool holds = std::abs (gap[0][0]) < 0.5 * std::abs (gap[0][1]) && std::abs (gap[1][0]) < 0.5 * std::abs (gap[1][1]);
+
+        info ("");
+        info (std::string ("  READING: the hypothesis ") + (holds ? "HOLDS." : "DOES NOT HOLD."));
+        check (holds, "FINDING: with modulation off the low-frequency deficit closes by at least half");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.9 - DA9: Hall's search against A1b read with a -120 dB floor");
+    // =====================================================================
+
+    info ("  The frozen search, five seeds, three points. ONLY THE TARGET IS FLOORED: the search");
+    info ("  reads Hall without a floor, as the frozen code does. A diagnostic reading, not G2; it");
+    info ("  changes no recorded verdict. Unfloored, Stage 5 and 6: 9.77 / 4.00 / 15.33, lowest 3.56.");
+    info ("");
+
+    {
+        std::vector<stage5::Search> searches;
+
+        for (int p = 0; p < kPointCount; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+            const Features target = flooredFeatures (a1b.make (u), u, 120.0, 0xF100Du);
+
+            for (int k = 0; k < stage5::kSeeds; ++k)
+            {
+                stage5::Search s;
+                s.label = "A1b, floor -120 dB";
+                s.point = p;
+                s.target = target;
+                s.impostor = Structure {};
+                s.start = u;
+                s.seed = stage5::seedFor (k);
+                searches.push_back (s);
+            }
+        }
+
+        stage5::runSearches (searches);
+
+        bool survives = true, reproduced = false;
+        double lowest = 1.0e30;
+
+        for (int p = 0; p < kPointCount; ++p)
+        {
+            std::vector<double> v;
+            std::string runs;
+            const stage5::Search* best = nullptr;
+
+            for (int k = 0; k < stage5::kSeeds; ++k)
+            {
+                const auto& s = searches[static_cast<size_t> (p * stage5::kSeeds + k)];
+
+                v.push_back (s.residual);
+                runs += fx (s.residual) + " ";
+
+                if (best == nullptr || s.residual < best->residual)
+                    best = &s;
+            }
+
+            std::sort (v.begin(), v.end());
+
+            const double median = v[v.size() / 2];
+
+            lowest = std::min (lowest, v.front());
+
+            if (median < kDistinct)
+                survives = false;
+
+            if (v.front() <= kReproduced)
+                reproduced = true;
+
+            info ("    " + pad (pointName[p], 9) + "median " + pad (fx (median), 8) + "runs " + pad (runs, 34)
+                  + "stops on " + kFamilyNames[best->family]);
+            info ("    " + pad ("", 9) + "Hall's knobs in the lowest run: " + best->knobs);
+        }
+
+        info ("");
+        info ("  A1b, floor -120 dB: " + std::string (reproduced ? "REJECTED" : survives ? "SURVIVES" : "NOT REFUTED / WEAK")
+              + ", lowest run " + fx (lowest));
+    }
+}
+
 } // namespace avtest

@@ -126,6 +126,7 @@ void runPhase12Stage7PlateCpu();        // on request only: see RunAll.cpp
 void runPhase12Stage7PlateStress();     // on request only
 void runPhase12Stage7PlateRates();      // on request only
 void runPhase12Stage8AmbientDiagnosis();    // on request only
+void runPhase12Stage8AmbientDiagnosis2();   // on request only
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();
