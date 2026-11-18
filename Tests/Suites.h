@@ -130,6 +130,10 @@ void runPhase12Stage8AmbientDiagnosis2();   // on request only
 void runPhase12Stage8AmbientDiagnosis3();   // on request only
 void runPhase12Stage8AmbientScan();         // on request only
 void runPhase12Stage8AmbientRootCause();    // on request only
+void runPhase12Stage8AmbientWide();         // on request only
+void runPhase12Stage8AmbientSibling();          // on request only
+void runPhase12Stage8AmbientSiblingSearch();    // on request only
+void runPhase12Stage8PreDelayVerification();    // on request only
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

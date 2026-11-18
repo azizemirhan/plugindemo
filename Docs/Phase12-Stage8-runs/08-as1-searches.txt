@@ -1,0 +1,74 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8AmbientSiblingSearch
+
+
+PHASE 12.8.28 - nine-point Mode identity against Hall, onset-normalised (gate 4.2)
+----------------------------------------------------------------------------------
+          AS1 with k = 3.0000. The target is the response zeroed before its onset and moved to
+          Hall's onset at the same knobs; Hall's frozen seven-control search, five seeds.
+          DECLARED CONVERGENCE REGION against Hall: the short-Decay edge (Decay 0.8 s). The six
+          core points, the default among them, must be DISTINCT: no run <= 1.5, median >= 3.0.
+          The run on A1b is for comparison and changes no recorded verdict.
+        
+            A1b (frozen)
+              Size 25, Decay 0.8    convergence  median 1.77    lowest 1.75    BETWEEN     stops on stereo             Size 14 Decay 0.80 E/L 0 EDiff 69 Atk 52 Mod 0 Width 120
+              Size 25, Decay 2.5    CORE         median 2.43    lowest 2.26    BETWEEN     stops on modal structure    Size 0 Decay 2.69 E/L 0 EDiff 47 Atk 72 Mod 17 Width 140
+              Size 25, Decay 5.0    CORE         median 3.82    lowest 3.47    DISTINCT    stops on modal structure    Size 0 Decay 4.75 E/L 0 EDiff 45 Atk 90 Mod 0 Width 189
+              Size 60, Decay 0.8    convergence  median 4.76    lowest 4.58    DISTINCT    stops on stereo             Size 81 Decay 0.59 E/L 0 EDiff 46 Atk 6 Mod 100 Width 157
+              Size 60, Decay 2.5    CORE         median 5.13    lowest 4.85    DISTINCT    stops on stereo             Size 77 Decay 2.12 E/L 0 EDiff 34 Atk 20 Mod 1 Width 196
+              Size 60, Decay 5.0    CORE         median 4.14    lowest 4.06    DISTINCT    stops on stereo             Size 28 Decay 5.94 E/L 0 EDiff 29 Atk 80 Mod 97 Width 188
+              Size 85, Decay 0.8    convergence  median 3.07    lowest 2.89    DISTINCT    stops on energy profile     Size 91 Decay 0.93 E/L 0 EDiff 90 Atk 0 Mod 92 Width 192
+              Size 85, Decay 2.5    CORE         median 2.71    lowest 2.50    BETWEEN     stops on modal structure    Size 94 Decay 2.26 E/L 0 EDiff 76 Atk 72 Mod 51 Width 192
+              Size 85, Decay 5.0    CORE         median 3.75    lowest 3.67    DISTINCT    stops on modal structure    Size 85 Decay 4.16 E/L 0 EDiff 40 Atk 48 Mod 58 Width 190
+              -> 6 of 9 DISTINCT, 0 REPRODUCED.  NOT DISTINCT (a core point fails)
+        
+            AS1 4 -> 4
+              Size 25, Decay 0.8    convergence  median 1.31    lowest 1.25    REPRODUCED  stops on decay shape        Size 24 Decay 0.75 E/L 0 EDiff 98 Atk 45 Mod 52 Width 105
+              Size 25, Decay 2.5    CORE         median 1.59    lowest 1.26    REPRODUCED  stops on decay              Size 8 Decay 2.29 E/L 0 EDiff 56 Atk 85 Mod 1 Width 121
+              Size 25, Decay 5.0    CORE         median 2.14    lowest 1.95    BETWEEN     stops on stereo             Size 16 Decay 4.79 E/L 0 EDiff 88 Atk 72 Mod 0 Width 139
+              Size 60, Decay 0.8    convergence  median 1.41    lowest 1.15    REPRODUCED  stops on decay shape        Size 54 Decay 0.77 E/L 0 EDiff 100 Atk 42 Mod 87 Width 113
+              Size 60, Decay 2.5    CORE         median 1.67    lowest 1.54    BETWEEN     stops on echo density       Size 34 Decay 2.39 E/L 0 EDiff 45 Atk 86 Mod 93 Width 102
+              Size 60, Decay 5.0    CORE         median 2.24    lowest 1.94    BETWEEN     stops on decay              Size 40 Decay 5.55 E/L 0 EDiff 55 Atk 69 Mod 0 Width 99
+              Size 85, Decay 0.8    convergence  median 2.62    lowest 2.54    BETWEEN     stops on stereo             Size 65 Decay 0.97 E/L 0 EDiff 55 Atk 46 Mod 0 Width 88
+              Size 85, Decay 2.5    CORE         median 3.43    lowest 2.77    DISTINCT    stops on stereo             Size 67 Decay 2.66 E/L 0 EDiff 0 Atk 38 Mod 67 Width 88
+              Size 85, Decay 5.0    CORE         median 3.09    lowest 2.99    DISTINCT    stops on stereo             Size 72 Decay 5.06 E/L 0 EDiff 35 Atk 64 Mod 66 Width 72
+              -> 2 of 9 DISTINCT, 3 REPRODUCED.  NOT DISTINCT (a core point fails)
+        
+  FAIL  FINDING: AS1 is DISTINCT from Hall at the six core points, onset-normalised
+
+PHASE 12.8.29 - the one-time Hall + Pre-Delay verification (4.3)
+----------------------------------------------------------------
+          Three operating points, five seeds. A: absolute time (only the sub -200 dB dust zeroed).
+          B: the target moved earlier by D = D* - 20 .. D* + 20 ms, D* = its onset minus Hall's;
+          each D is Hall with that Pre-Delay; the reading is the LOWEST median over D.
+          A run <= 1.5 at any D: Hall + Pre-Delay + visible controls reproduce the buildup - a
+          mimic. Median >= 3.0 at every D: not a mimic. Small / short lies in the declared
+          convergence region and is reported, not gated.
+        
+            A1b (frozen)
+              medium  D* 43 ms   A absolute: median 5.81   lowest 5.21   | B medians at D*-20..+20: 4.94 5.02 5.22 3.45 1.93 | lowest median 1.93 (run 1.88) at D* +20: WEAK
+                there: stops on stereo; Hall's knobs Size 3 Decay 2.37 E/L 1 EDiff 72 Atk 59 Mod 21 Width 145
+              short   D* 21 ms   A absolute: median 3.86   lowest 3.73   | B medians at D*-20..+20: 3.93 2.37 1.72 1.64 1.46 | lowest median 1.46 (run 1.38) at D* +20: MIMIC [convergence region]
+                there: stops on modal structure; Hall's knobs Size 17 Decay 0.83 E/L 3 EDiff 100 Atk 18 Mod 100 Width 109
+              long    D* 70 ms   A absolute: median 11.89  lowest 10.94  | B medians at D*-20..+20: 4.11 3.65 3.89 4.88 5.23 | lowest median 3.65 (run 3.47) at D* -10: not a mimic
+                there: stops on modal structure; Hall's knobs Size 85 Decay 4.31 E/L 0 EDiff 40 Atk 52 Mod 60 Width 200
+        
+            AS1 4 -> 4
+              medium  D* 33 ms   A absolute: median 4.19   lowest 4.01   | B medians at D*-20..+20: 3.39 2.34 1.69 1.47 2.05 | lowest median 1.47 (run 1.34) at D* +10: MIMIC
+                there: stops on decay shape; Hall's knobs Size 28 Decay 2.28 E/L 0 EDiff 77 Atk 80 Mod 79 Width 127
+              short   D* 17 ms   A absolute: median 2.05   lowest 1.60   | B medians at D*-20..+20: 2.05 1.62 1.27 1.41 1.48 | lowest median 1.27 (run 1.17) at D* +0: MIMIC [convergence region]
+                there: stops on decay shape; Hall's knobs Size 25 Decay 0.75 E/L 0 EDiff 100 Atk 43 Mod 54 Width 110
+              long    D* 51 ms   A absolute: median 9.19   lowest 9.15   | B medians at D*-20..+20: 4.06 2.82 2.18 1.59 1.64 | lowest median 1.59 (run 1.57) at D* +10: WEAK
+                there: stops on decay shape; Hall's knobs Size 62 Decay 4.59 E/L 0 EDiff 57 Atk 100 Mod 100 Width 113
+        
+  FAIL  FINDING: Hall + Pre-Delay does not reach AS1 at medium or long
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.28 - nine-point Mode identity against Hall, onset-normalised (gate 4.2)     0 /    1   FAILED
+  PHASE 12.8.29 - the one-time Hall + Pre-Delay verification (4.3)                       0 /    1   FAILED
+-----------------------------------------------------------------
+  0 / 2 checks passed.  2 FAILURE(S).

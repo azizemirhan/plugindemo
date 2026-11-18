@@ -2191,4 +2191,1059 @@ void runPhase12Stage8AmbientRootCause()
     }
 }
 
+// ===========================================================================
+//  Addendum 4: DA12 (wide perturbation) and DA13 (A1b's own spread)
+// ===========================================================================
+void runPhase12Stage8AmbientWide()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Maker a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target.make;
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.20 - DA12: is the low-frequency deficit systematic once the low modes move?");
+    // =====================================================================
+
+    info ("  Each delay multiplied by a factor drawn log-uniformly from 1/1.3 to 1.3, 24 seeds.");
+    info ("  Tone statistics only: these responses are not A1b. Systematic at a point if the 125 Hz");
+    info ("  mean is >= 0.5 dB, >= 2 standard errors, and >= twice perturbed Hall's mean.");
+    info ("");
+
+    constexpr size_t seeds = 24;
+
+    auto wide = [] (Structure s, unsigned int seed)
+    {
+        unsigned int state = 0x2545F491u * seed + 0x1B873593u;
+
+        for (auto& ms : s.delaysMs)
+        {
+            state = state * 1664525u + 1013904223u;
+
+            const double u = static_cast<double> (state >> 8) / static_cast<double> (1u << 24) * 2.0 - 1.0;
+
+            ms *= std::pow (1.3, u);
+        }
+
+        return s;
+    };
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const auto hall = stage6::octaveShares (Structure {}, u);
+
+        std::vector<Bands> own (seeds), floor (seeds);
+
+        runParallel (seeds, [&] (size_t k)
+        {
+            (void) stage6::octaveDeviation (stage6::octaveShares (wide (a1b (u), static_cast<unsigned int> (k + 1)), u), hall, &own[k]);
+            (void) stage6::octaveDeviation (stage6::octaveShares (wide (Structure {}, static_cast<unsigned int> (k + 1)), u), hall, &floor[k]);
+        });
+
+        const auto a = momentsOf (own), h = momentsOf (floor);
+        const auto narrow = perturbedMoments (a1b, u);
+
+        info ("    " + pad (pointName[p], 34) + kBandHead);
+        info ("    " + pad ("  A1b mean, +/- 30 %", 34) + bandRow (a.mean));
+        info ("    " + pad ("  A1b SD, +/- 30 %", 34) + bandRow (a.sd));
+        info ("    " + pad ("  Hall mean, +/- 30 %", 34) + bandRow (h.mean));
+        info ("    " + pad ("  Hall SD, +/- 30 %", 34) + bandRow (h.sd));
+        info ("    " + pad ("  (A1b mean, +/- 4 %, for reference)", 34) + bandRow (narrow.mean));
+
+        const double se = a.sd[0] / std::sqrt (static_cast<double> (seeds));
+        const bool systematic = std::abs (a.mean[0]) >= 0.5 && std::abs (a.mean[0]) >= 2.0 * se
+                             && std::abs (a.mean[0]) >= 2.0 * std::abs (h.mean[0]);
+
+        info ("    READING, 125 Hz: mean " + signedText (a.mean[0]) + " +/- " + fx (se) + " (standard error); "
+              + (systematic ? "SYSTEMATIC." : "NOT SEPARABLE FROM VARIANCE."));
+        info ("");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.21 - DA13: how much A1b's own buildup moves");
+    // =====================================================================
+
+    info ("  Onset-normalised landmarks over the twelve +/- 4 % perturbations: mean and standard");
+    info ("  deviation. Hall at the same knobs beside them. The unit for 'preserved'.");
+    info ("");
+    info ("    " + pad ("", 18) + pad ("t10 ms", 16) + pad ("t50 ms", 16) + pad ("centroid ms", 16) + pad ("early fraction", 18)
+          + "t10 / t50");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const double seconds = irSecondsFor (u.decay);
+
+        std::vector<Shape> shapes (12);
+
+        runParallel (shapes.size(), [&] (size_t k)
+        {
+            shapes[k] = shapeOf (impulseResponse (perturbed (a1b (u), static_cast<unsigned int> (k + 1)), u, seconds));
+        });
+
+        const Shape hall = shapeOf (impulseResponse (Structure {}, u, seconds));
+
+        auto stat = [&] (const std::function<double (const Shape&)>& of, int digits)
+        {
+            double sum = 0.0, sq = 0.0;
+
+            for (const auto& s : shapes)
+                sum += of (s);
+
+            const double mean = sum / static_cast<double> (shapes.size());
+
+            for (const auto& s : shapes)
+                sq += (of (s) - mean) * (of (s) - mean);
+
+            return fx (mean, digits) + " +/- " + fx (std::sqrt (sq / static_cast<double> (shapes.size() - 1)), digits);
+        };
+
+        info ("    " + pad (std::string (pointName[p]) + "  A1b", 18) + pad (stat ([] (const Shape& s) { return s.t10; }, 1), 16)
+              + pad (stat ([] (const Shape& s) { return s.t50; }, 1), 16) + pad (stat ([] (const Shape& s) { return s.centroid; }, 1), 16)
+              + pad (stat ([] (const Shape& s) { return s.early; }, 3), 18) + stat ([] (const Shape& s) { return s.ratio; }, 3));
+        info ("    " + pad ("        Hall", 18) + pad (fx (hall.t10, 1), 16) + pad (fx (hall.t50, 1), 16) + pad (fx (hall.centroid, 1), 16)
+              + pad (fx (hall.early, 3), 18) + fx (hall.ratio, 3));
+    }
+}
+
+// ===========================================================================
+//  Addendum 5: AS1, the timed and Decay-calibrated 4 -> 4 sibling
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        /** AS1 before level and decay calibration. Addendum 5, section 3. */
+        [[nodiscard]] Maker siblingRaw (double k)
+        {
+            return [k] (const User& u)
+            {
+                using stage5::Blocks;
+                using stage5::Mix;
+
+                auto base = Structure {}.delaysMs;
+                std::sort (base.begin(), base.end());
+
+                const double scale = mapping::sizeScaleFor (u.size);
+                const double tau = k * mapping::rt60For (u.decay);
+
+                Blocks b;
+
+                b.blocks.push_back ({ { 0, 2, 4, 6 }, 1.0, Mix::hadamard, 1.0 });
+                b.blocks.push_back ({ { 1, 3, 5, 7 }, 1.0, Mix::hadamard, 1.0 });
+
+                const double mean = 0.25 * (base[0] + base[2] + base[4] + base[6]) * scale * 0.001;
+
+                b.theta.push_back (std::asin (std::sqrt (std::min (0.5, mean / tau))));
+                b.in = { 0 };
+                b.out = { 1 };
+
+                Structure out = stage5::build ("AS1 4 -> 4", b);
+
+                // Vectors aligned with nothing: rows 0, 1 in; rows 2, 3 out.
+                const auto q = patterns::genericQuad();
+
+                out.customInL.fill (0.0);  out.customInR.fill (0.0);
+                out.customOutL.fill (0.0); out.customOutR.fill (0.0);
+
+                for (size_t i = 0; i < 4; ++i)
+                {
+                    out.customInL[i]      = q[0][i];
+                    out.customInR[i]      = q[1][i];
+                    out.customOutL[4 + i] = q[2][i];
+                    out.customOutR[4 + i] = q[3][i];
+                }
+
+                return out;
+            };
+        }
+
+        [[nodiscard]] Maker siblingAt (double k)
+        {
+            return stage6::familyOf ("Ambient AS1", siblingRaw (k), true).target.make;
+        }
+
+        [[nodiscard]] Maker frozenA1b()
+        {
+            return stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target.make;
+        }
+
+        [[nodiscard]] Shape shapeAt (const Maker& make, const User& u)
+        {
+            return shapeOf (impulseResponse (make (u), u, irSecondsFor (u.decay)));
+        }
+
+        /** The one calibration: k at which AS1's onset-normalised t50 at the
+            medium point is A1b's. Deterministic. `trace` receives what was tried. */
+        [[nodiscard]] double calibratedK (double targetT50, std::string* trace = nullptr)
+        {
+            const User u = userAt (kPoints[0]);
+
+            auto t50 = [&] (double k) { return shapeAt (siblingAt (k), u).t50; };
+
+            double low = 0.05, high = 3.0;
+            const double atLow = t50 (low), atHigh = t50 (high);
+
+            if (trace != nullptr)
+                *trace = "t50 at k 0.05: " + fx (atLow, 1) + " ms; at k 3: " + fx (atHigh, 1) + " ms; target " + fx (targetT50, 1) + " ms";
+
+            if (targetT50 <= atLow)
+                return low;
+
+            if (targetT50 >= atHigh)
+                return high;
+
+            for (int i = 0; i < 24; ++i)
+            {
+                const double mid = std::sqrt (low * high);
+                const double value = t50 (mid);
+
+                if (std::abs (value / targetT50 - 1.0) < 0.002)
+                    return mid;
+
+                (value < targetT50 ? low : high) = mid;
+            }
+
+            return std::sqrt (low * high);
+        }
+
+        [[nodiscard]] Structure widePerturbed (Structure s, unsigned int seed)
+        {
+            unsigned int state = 0x2545F491u * seed + 0x1B873593u;
+
+            for (auto& ms : s.delaysMs)
+            {
+                state = state * 1664525u + 1013904223u;
+
+                const double u = static_cast<double> (state >> 8) / static_cast<double> (1u << 24) * 2.0 - 1.0;
+
+                ms *= std::pow (1.3, u);
+            }
+
+            return s;
+        }
+
+        [[nodiscard]] Moments wideMoments (const Maker& make, const User& u)
+        {
+            const auto hall = stage6::octaveShares (Structure {}, u);
+
+            std::vector<Bands> rows (24);
+
+            runParallel (rows.size(), [&] (size_t k)
+            {
+                (void) stage6::octaveDeviation (stage6::octaveShares (widePerturbed (make (u), static_cast<unsigned int> (k + 1)), u),
+                                                hall, &rows[k]);
+            });
+
+            return momentsOf (rows);
+        }
+
+        /** Stage 6's tone gate: worst octave deviation over three Sizes x
+            three Decays x three damping settings; the defaults separately. */
+        [[nodiscard]] double toneOverGrid (const Maker& make, double* atDefaults)
+        {
+            constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+            std::vector<double> deviation (27, 0.0);
+
+            runParallel (27, [&] (size_t i)
+            {
+                User u;
+                u.size  = sizes[(i / 3) % 3];
+                u.decay = decays[i % 3];
+
+                switch (i / 9)
+                {
+                    case 1:  u.lowDamp = 0.0; u.highDamp = 0.0; break;
+                    case 2:  u.highDamp = 0.80; break;
+                    default: break;
+                }
+
+                deviation[i] = stage6::octaveDeviation (stage6::octaveShares (make (u), u), stage6::octaveShares (Structure {}, u));
+            });
+
+            if (atDefaults != nullptr)
+                *atDefaults = deviation[4];
+
+            return *std::max_element (deviation.begin(), deviation.end());
+        }
+
+        /** The response prepared for the onset-normalised search: zero
+            before its onset, moved to Hall's onset at the same knobs. */
+        [[nodiscard]] Features onsetNormalised (const Structure& s, const User& u)
+        {
+            const double seconds = irSecondsFor (u.decay);
+
+            const auto centre = impulseResponse (s, u, seconds);
+            const auto left   = impulseResponse (s, u, kLeftOnlySeconds, true, false);
+
+            const size_t hallCentre = shapeOf (impulseResponse (Structure {}, u, seconds)).onsetSample;
+            const size_t hallLeft   = shapeOf (impulseResponse (Structure {}, u, kLeftOnlySeconds, true, false)).onsetSample;
+
+            return analyse (onsetAligned (centre, shapeOf (centre).onsetSample, hallCentre),
+                            onsetAligned (left, shapeOf (left).onsetSample, hallLeft));
+        }
+
+        struct Found
+        {
+            double median = 0, lowest = 0;
+            int family = 0;
+            std::string runs, knobs;
+        };
+
+        /** Hall's frozen search, five seeds per target. */
+        [[nodiscard]] std::vector<Found> hallSearchAll (const std::vector<Features>& targets, const std::vector<User>& starts)
+        {
+            std::vector<stage5::Search> searches;
+
+            for (size_t t = 0; t < targets.size(); ++t)
+                for (int k = 0; k < stage5::kSeeds; ++k)
+                {
+                    stage5::Search s;
+                    s.label = "target";
+                    s.point = static_cast<int> (t);
+                    s.target = targets[t];
+                    s.impostor = Structure {};
+                    s.start = starts[t];
+                    s.seed = stage5::seedFor (k);
+                    searches.push_back (s);
+                }
+
+            stage5::runSearches (searches);
+
+            std::vector<Found> found (targets.size());
+
+            for (size_t t = 0; t < targets.size(); ++t)
+            {
+                std::vector<double> v;
+                const stage5::Search* best = nullptr;
+
+                for (int k = 0; k < stage5::kSeeds; ++k)
+                {
+                    const auto& s = searches[t * static_cast<size_t> (stage5::kSeeds) + static_cast<size_t> (k)];
+
+                    v.push_back (s.residual);
+                    found[t].runs += fx (s.residual) + " ";
+
+                    if (best == nullptr || s.residual < best->residual)
+                        best = &s;
+                }
+
+                std::sort (v.begin(), v.end());
+
+                found[t].median = v[v.size() / 2];
+                found[t].lowest = v.front();
+                found[t].family = best->family;
+                found[t].knobs = best->knobs;
+            }
+
+            return found;
+        }
+
+        [[nodiscard]] const char* classOf (const Found& f)
+        {
+            return f.lowest <= kReproduced ? "REPRODUCED" : f.median >= kDistinct ? "DISTINCT" : "BETWEEN";
+        }
+    }
+}
+
+void runPhase12Stage8AmbientSibling()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Maker a1b = frozenA1b();
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.22 - source-dependent level: the Hall baseline");
+    // =====================================================================
+
+    info ("  Measured BEFORE AS1. The spread over vocal, snare and percussion of Hall's sibling");
+    info ("  delay set and of Hall under each of the twelve +/- 4 % perturbations. The baseline at");
+    info ("  a point is the LARGEST of the thirteen. Registered pass: excess <= 0.5 dB at every");
+    info ("  point, and at most half of A1b's excess where that is above 1.0 dB.");
+    info ("");
+
+    double baseline[3] {};
+
+    {
+        const Structure sibling = withDelays ("sibling", mode12::hallSibling().delaysMs);
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+
+            std::vector<double> spreads;
+            spreads.push_back (spreadOf (sourceGains (sibling, u)));
+
+            for (unsigned int k = 1; k <= 12; ++k)
+                spreads.push_back (spreadOf (sourceGains (perturbed (Structure {}, k), u)));
+
+            double sum = 0.0;
+
+            for (double v : spreads)
+            {
+                sum += v;
+                baseline[p] = std::max (baseline[p], v);
+            }
+
+            info ("    " + pad (pointName[p], 9) + "sibling " + pad (fx (spreads[0]), 8) + "perturbed Hall: mean "
+                  + pad (fx ((sum - spreads[0]) / 12.0), 8) + "largest " + pad (fx (*std::max_element (spreads.begin() + 1, spreads.end())), 8)
+                  + "BASELINE " + fx (baseline[p]));
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.23 - AS1: the one calibration");
+    // =====================================================================
+
+    const Shape a1bMedium = shapeAt (a1b, userAt (kPoints[0]));
+
+    std::string trace;
+    const double k = calibratedK (a1bMedium.t50, &trace);
+
+    const Maker as1 = siblingAt (k);
+
+    info ("  k is the value at which AS1's onset-normalised t50 at the medium point is A1b's.");
+    info ("  " + trace);
+    info ("  k = " + fx (k, 4) + "   (tau = k x RT60: " + fx (1000.0 * k * mapping::rt60For (2.5), 0) + " ms at Decay 2.5 s)");
+
+    {
+        auto base = Structure {}.delaysMs;
+        std::sort (base.begin(), base.end());
+
+        std::string row = "  sin^2(theta) at medium / short / long: ";
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+            const double mean = 0.25 * (base[0] + base[2] + base[4] + base[6]) * mapping::sizeScaleFor (u.size) * 0.001;
+
+            row += fx (std::min (0.5, mean / (k * mapping::rt60For (u.decay))), 3) + "  ";
+        }
+
+        info (row);
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.24 - AS1: does it preserve A1b? (gate 4.1)");
+    // =====================================================================
+
+    info ("  Onset-normalised, same knobs. Pass: t10 and t50 within 10 % of A1b's, t10 / t50 within");
+    info ("  0.03, and the buildup and energy-profile families against A1b (onsets aligned) <= 1.5,");
+    info ("  at all three operating points. t50 at medium is the calibration and passes by");
+    info ("  construction. The other six grid settings are reported and do not gate.");
+    info ("");
+    info ("    " + pad ("", 22) + pad ("t10 A1b / AS1", 22) + pad ("t50 A1b / AS1", 22) + pad ("shape A1b / AS1", 22)
+          + pad ("buildup", 9) + pad ("profile", 9) + "result");
+
+    bool preserved = true;
+
+    {
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        struct Setting { std::string name; User u; bool gates; };
+        std::vector<Setting> settings;
+
+        for (int p = 0; p < 3; ++p)
+            settings.push_back ({ std::string (pointName[p]) + " (gate)", userAt (kPoints[p]), true });
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+
+                bool legacy = false;
+
+                for (const auto& point : kPoints)
+                    if (std::abs (point.size - size) < 1.0e-9 && std::abs (point.decay - decay) < 1.0e-9)
+                        legacy = true;
+
+                if (! legacy)
+                    settings.push_back ({ "Size " + fx (100.0 * size, 0) + ", Decay " + fx (decay, 1), u, false });
+            }
+
+        for (const auto& setting : settings)
+        {
+            const User& u = setting.u;
+            const double seconds = irSecondsFor (u.decay);
+
+            const auto refCentre = impulseResponse (a1b (u), u, seconds);
+            const auto refLeft   = impulseResponse (a1b (u), u, kLeftOnlySeconds, true, false);
+            const auto ownCentre = impulseResponse (as1 (u), u, seconds);
+            const auto ownLeft   = impulseResponse (as1 (u), u, kLeftOnlySeconds, true, false);
+
+            const Shape ref = shapeOf (refCentre), own = shapeOf (ownCentre);
+            const size_t refLeftOnset = shapeOf (refLeft).onsetSample;
+
+            const Features fr = analyse (onsetAligned (refCentre, ref.onsetSample, ref.onsetSample),
+                                         onsetAligned (refLeft, refLeftOnset, refLeftOnset));
+            const Features fo = analyse (onsetAligned (ownCentre, own.onsetSample, ref.onsetSample),
+                                         onsetAligned (ownLeft, shapeOf (ownLeft).onsetSample, refLeftOnset));
+
+            const auto sc = stage5::sameKnobs (fr, fo);
+
+            const bool pass = std::abs (own.t10 / ref.t10 - 1.0) <= 0.10 && std::abs (own.t50 / ref.t50 - 1.0) <= 0.10
+                           && std::abs (own.ratio - ref.ratio) <= 0.03 && sc.scaled[0] <= 1.5 && sc.scaled[1] <= 1.5;
+
+            if (setting.gates && ! pass)
+                preserved = false;
+
+            info ("    " + pad (setting.name, 22)
+                  + pad (fx (ref.t10, 1) + " / " + fx (own.t10, 1) + " (" + signedText (100.0 * (own.t10 / ref.t10 - 1.0), 0) + " %)", 22)
+                  + pad (fx (ref.t50, 1) + " / " + fx (own.t50, 1) + " (" + signedText (100.0 * (own.t50 / ref.t50 - 1.0), 0) + " %)", 22)
+                  + pad (fx (ref.ratio, 3) + " / " + fx (own.ratio, 3) + " (" + signedText (own.ratio - ref.ratio, 3) + ")", 22)
+                  + pad (fx (sc.scaled[0]), 9) + pad (fx (sc.scaled[1]), 9) + (pass ? "within" : "OUTSIDE"));
+        }
+    }
+
+    info ("");
+    info (std::string ("  GATE 4.1: AS1 ") + (preserved ? "PRESERVES A1b's buildup." : "DOES NOT PRESERVE A1b's buildup."));
+    check (preserved, "FINDING: AS1 preserves A1b's onset-normalised buildup at the three operating points");
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.25 - AS1: tone and its variance (gate 4.4)");
+    // =====================================================================
+
+    info ("  Octave deviation from Hall, dB. Gate: <= 1.0 at the defaults and over Stage 6's 27");
+    info ("  settings. Then the mean and standard deviation over delay perturbations.");
+    info ("");
+
+    {
+        double defaultsA = 0, defaultsS = 0;
+        const double gridA = toneOverGrid (a1b, &defaultsA), gridS = toneOverGrid (as1, &defaultsS);
+
+        info ("    " + pad ("", 12) + pad ("defaults", 10) + "worst of 27");
+        info ("    " + pad ("A1b", 12) + pad (fx (defaultsA), 10) + fx (gridA));
+        info ("    " + pad ("AS1", 12) + pad (fx (defaultsS), 10) + fx (gridS) + (gridS <= 1.0 && defaultsS <= 1.0 ? "   within 1.0" : "   OVER 1.0"));
+        info ("");
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+
+            const auto na = perturbedMoments (a1b, u), ns = perturbedMoments (as1, u);
+            const auto wa = wideMoments (a1b, u), ws = wideMoments (as1, u);
+
+            info ("    " + pad (pointName[p], 30) + kBandHead);
+            info ("    " + pad ("  A1b mean, +/- 4 %", 30) + bandRow (na.mean));
+            info ("    " + pad ("  AS1 mean, +/- 4 %", 30) + bandRow (ns.mean));
+            info ("    " + pad ("  A1b SD, +/- 4 %", 30) + bandRow (na.sd));
+            info ("    " + pad ("  AS1 SD, +/- 4 %", 30) + bandRow (ns.sd));
+            info ("    " + pad ("  A1b mean, +/- 30 %", 30) + bandRow (wa.mean));
+            info ("    " + pad ("  AS1 mean, +/- 30 %", 30) + bandRow (ws.mean));
+            info ("    " + pad ("  A1b SD, +/- 30 %", 30) + bandRow (wa.sd));
+            info ("    " + pad ("  AS1 SD, +/- 30 %", 30) + bandRow (ws.sd));
+            info ("");
+        }
+
+        check (gridS <= 1.0 && defaultsS <= 1.0, "FINDING: AS1 is within 1.0 dB of Hall's tone at the defaults and over the grid");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.26 - AS1: source-dependent level (gate 4.5)");
+    // =====================================================================
+
+    info ("  Spread over vocal, snare and percussion; excess over the Hall baseline above; and the");
+    info ("  level match at the setting ('law'). Third-octave roughness beside it.");
+    info ("");
+    info ("    " + pad ("", 9) + pad ("baseline", 10) + pad ("A1b spread", 12) + pad ("A1b excess", 12) + pad ("AS1 spread", 12)
+          + pad ("AS1 excess", 12) + pad ("rough A1b / AS1", 18) + pad ("law A1b / AS1", 16) + "result");
+
+    {
+        bool pass = true;
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+            const double seconds = irSecondsFor (u.decay);
+
+            double lawA = 0, lawS = 0;
+
+            const double spreadA = spreadOf (sourceGains (a1b (u), u, &lawA));
+            const double spreadS = spreadOf (sourceGains (as1 (u), u, &lawS));
+
+            const double excessA = std::max (0.0, spreadA - baseline[p]), excessS = std::max (0.0, spreadS - baseline[p]);
+
+            const bool here = excessS <= 0.5 && (excessA <= 1.0 || excessS <= 0.5 * excessA);
+
+            if (! here)
+                pass = false;
+
+            const auto hallThird = thirdOctaveShares (impulseResponse (Structure {}, u, seconds));
+
+            info ("    " + pad (pointName[p], 9) + pad (fx (baseline[p]), 10) + pad (fx (spreadA), 12) + pad (fx (excessA), 12)
+                  + pad (fx (spreadS), 12) + pad (fx (excessS), 12)
+                  + pad (fx (roughness (thirdOctaveShares (impulseResponse (a1b (u), u, seconds)), hallThird)) + " / "
+                         + fx (roughness (thirdOctaveShares (impulseResponse (as1 (u), u, seconds)), hallThird)), 18)
+                  + pad (signedText (lawA) + " / " + signedText (lawS), 16) + (here ? "within" : "OUTSIDE"));
+        }
+
+        info ("");
+        check (pass, "FINDING: AS1's excess source-dependent level is within the registered limit");
+
+        info ("    The level law each would need, dB, Size 25 / 60 / 85 (rows) x Decay 0.8 / 2.5 / 5.0, A1b | AS1:");
+
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        double law[2][9] {};
+
+        runParallel (18, [&] (size_t i)
+        {
+            User u;
+            u.size = sizes[(i % 9) / 3];
+            u.decay = decays[i % 3];
+
+            const double seconds = irSecondsFor (u.decay);
+
+            law[i / 9][i % 9] = 10.0 * std::log10 (energyOf (impulseResponse (Structure {}, u, seconds))
+                                                   / energyOf (impulseResponse ((i / 9 == 0 ? a1b : as1) (u), u, seconds)));
+        });
+
+        for (int r = 0; r < 3; ++r)
+            info ("      " + pad (signedText (law[0][r * 3]), 8) + pad (signedText (law[0][r * 3 + 1]), 8) + pad (signedText (law[0][r * 3 + 2]), 10)
+                  + "|   " + pad (signedText (law[1][r * 3]), 8) + pad (signedText (law[1][r * 3 + 1]), 8) + signedText (law[1][r * 3 + 2]));
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.27 - AS1: Size, Decay, stereo and mono, CPU (gate 4.6)");
+    // =====================================================================
+
+    info ("  Stage 5's G3, Decay limit 5 %, CPU limit 1.5 x Hall. A1b beside it. CPU is measured on");
+    info ("  a machine in use and is indicative only.");
+
+    {
+        const std::vector<Candidate> list { { "AS1 4 -> 4", as1 }, { "A1b (reference)", a1b } };
+        const auto g3 = stage5::semantics (list, 0.05, 1.5);
+
+        info ("");
+        info (std::string ("  G3: AS1 ") + (g3[0].pass ? "PASSES" : "FAILS") + "; A1b " + (g3[1].pass ? "passes" : "fails")
+              + " (A1b's recorded failure is tone).");
+    }
+}
+
+void runPhase12Stage8AmbientSiblingSearch()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Maker a1b = frozenA1b();
+    const double k = calibratedK (shapeAt (a1b, userAt (kPoints[0])).t50);
+    const Maker as1 = siblingAt (k);
+
+    struct Subject { const char* name; Maker make; };
+    const Subject subjects[2] { { "A1b (frozen)", a1b }, { "AS1 4 -> 4", as1 } };
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.28 - nine-point Mode identity against Hall, onset-normalised (gate 4.2)");
+    // =====================================================================
+
+    info ("  AS1 with k = " + fx (k, 4) + ". The target is the response zeroed before its onset and moved to");
+    info ("  Hall's onset at the same knobs; Hall's frozen seven-control search, five seeds.");
+    info ("  DECLARED CONVERGENCE REGION against Hall: the short-Decay edge (Decay 0.8 s). The six");
+    info ("  core points, the default among them, must be DISTINCT: no run <= 1.5, median >= 3.0.");
+    info ("  The run on A1b is for comparison and changes no recorded verdict.");
+    info ("");
+
+    {
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        std::vector<User> users;
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+                users.push_back (u);
+            }
+
+        std::vector<Features> targets (18);
+        std::vector<User> starts (18);
+
+        runParallel (18, [&] (size_t i)
+        {
+            targets[i] = onsetNormalised (subjects[i / 9].make (users[i % 9]), users[i % 9]);
+            starts[i] = users[i % 9];
+        });
+
+        const auto found = hallSearchAll (targets, starts);
+
+        for (size_t s = 0; s < 2; ++s)
+        {
+            info ("    " + std::string (subjects[s].name));
+
+            bool coreDistinct = true, anyDefaultReproduced = false;
+            int distinct = 0, reproduced = 0;
+
+            for (size_t i = 0; i < 9; ++i)
+            {
+                const auto& f = found[s * 9 + i];
+                const bool periphery = users[i].decay < 1.0;
+                const std::string cls = classOf (f);
+
+                if (cls == "DISTINCT")   ++distinct;
+                if (cls == "REPRODUCED") ++reproduced;
+
+                if (! periphery && cls != "DISTINCT")
+                    coreDistinct = false;
+
+                if (std::abs (users[i].size - 0.60) < 1.0e-9 && std::abs (users[i].decay - 2.5) < 1.0e-9 && cls == "REPRODUCED")
+                    anyDefaultReproduced = true;
+
+                info ("      " + pad ("Size " + fx (100.0 * users[i].size, 0) + ", Decay " + fx (users[i].decay, 1), 22)
+                      + pad (periphery ? "convergence" : "CORE", 13) + "median " + pad (fx (f.median), 8) + "lowest " + pad (fx (f.lowest), 8)
+                      + pad (cls, 12) + pad (std::string ("stops on ") + kFamilyNames[f.family], 28) + f.knobs);
+            }
+
+            const std::string verdict = anyDefaultReproduced || reproduced >= 4 ? "PRESET-EQUIVALENT"
+                                      : ! coreDistinct                          ? "NOT DISTINCT (a core point fails)"
+                                      : distinct == 9                           ? "MI-2 / MI-3 hold: every point DISTINCT"
+                                                                                : "MI-2 / MI-3 hold: core DISTINCT, convergence only inside the declared edge";
+
+            info ("      -> " + std::to_string (distinct) + " of 9 DISTINCT, " + std::to_string (reproduced) + " REPRODUCED.  " + verdict);
+            info ("");
+
+            if (s == 1)
+                check (coreDistinct && ! anyDefaultReproduced && reproduced < 4,
+                       "FINDING: AS1 is DISTINCT from Hall at the six core points, onset-normalised");
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.29 - the one-time Hall + Pre-Delay verification (4.3)");
+    // =====================================================================
+
+    info ("  Three operating points, five seeds. A: absolute time (only the sub -200 dB dust zeroed).");
+    info ("  B: the target moved earlier by D = D* - 20 .. D* + 20 ms, D* = its onset minus Hall's;");
+    info ("  each D is Hall with that Pre-Delay; the reading is the LOWEST median over D.");
+    info ("  A run <= 1.5 at any D: Hall + Pre-Delay + visible controls reproduce the buildup - a");
+    info ("  mimic. Median >= 3.0 at every D: not a mimic. Small / short lies in the declared");
+    info ("  convergence region and is reported, not gated.");
+    info ("");
+
+    {
+        constexpr double offsets[5] { -20.0, -10.0, 0.0, 10.0, 20.0 };
+
+        // [subject][point][0 = absolute, 1..5 = D]
+        std::vector<Features> targets (2 * 3 * 6);
+        std::vector<User> starts (targets.size());
+        double dStar[2][3] {};
+
+        for (size_t s = 0; s < 2; ++s)
+            for (int p = 0; p < 3; ++p)
+            {
+                const User u = userAt (kPoints[p]);
+
+                dStar[s][p] = shapeAt (subjects[s].make, u).onset - shapeOf (impulseResponse (Structure {}, u, irSecondsFor (u.decay))).onset;
+            }
+
+        runParallel (targets.size(), [&] (size_t i)
+        {
+            const size_t s = i / 18, p = (i / 6) % 3, d = i % 6;
+            const User u = userAt (kPoints[p]);
+
+            targets[i] = arrivalRemovedFeatures (subjects[s].make (u), u,
+                                                 d == 0 ? 0.0 : std::max (0.0, dStar[s][p] + offsets[d - 1]));
+            starts[i] = u;
+        });
+
+        const auto found = hallSearchAll (targets, starts);
+
+        bool as1Mimic = false, as1Weak = false;
+
+        for (size_t s = 0; s < 2; ++s)
+        {
+            info ("    " + std::string (subjects[s].name));
+
+            for (size_t p = 0; p < 3; ++p)
+            {
+                const auto& absolute = found[s * 18 + p * 6];
+
+                std::string row = "      " + pad (pointName[p], 8) + "D* " + pad (fx (dStar[s][p], 0) + " ms", 8) + "A absolute: median "
+                                + pad (fx (absolute.median), 7) + "lowest " + pad (fx (absolute.lowest), 7) + "| B medians at D*-20..+20: ";
+
+                double lowestMedian = 1.0e30, lowestRun = 1.0e30;
+                size_t at = 1;
+
+                for (size_t d = 1; d < 6; ++d)
+                {
+                    const auto& f = found[s * 18 + p * 6 + d];
+
+                    row += fx (f.median) + " ";
+
+                    lowestRun = std::min (lowestRun, f.lowest);
+
+                    if (f.median < lowestMedian)
+                    {
+                        lowestMedian = f.median;
+                        at = d;
+                    }
+                }
+
+                const std::string reading = lowestRun <= kReproduced ? "MIMIC" : lowestMedian >= kDistinct ? "not a mimic" : "WEAK";
+
+                info (row + "| lowest median " + fx (lowestMedian) + " (run " + fx (lowestRun) + ") at D* "
+                      + signedText (offsets[at - 1], 0) + ": " + reading + (p == 1 ? " [convergence region]" : ""));
+                info ("        there: stops on " + std::string (kFamilyNames[found[s * 18 + p * 6 + at].family]) + "; Hall's knobs "
+                      + found[s * 18 + p * 6 + at].knobs);
+
+                if (s == 1 && p != 1)
+                {
+                    if (reading == "MIMIC") as1Mimic = true;
+                    if (reading == "WEAK")  as1Weak = true;
+                }
+            }
+
+            info ("");
+        }
+
+        check (! as1Mimic && ! as1Weak, "FINDING: Hall + Pre-Delay does not reach AS1 at medium or long");
+    }
+}
+
+// ===========================================================================
+//  The Pre-Delay confound, resolved once: full-support alignment
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        /** Hall's seven controls and a Pre-Delay, each in 0 .. 1, mapped as
+            the frozen search maps its seven (Decay on a log scale, 0.1 - 20 s;
+            Width 0 - 200 %), Pre-Delay 0 - 150 ms. */
+        struct Eight { double v[8] {}; };
+
+        [[nodiscard]] User userOf (const Eight& e)
+        {
+            User u;
+
+            u.size      = std::clamp (e.v[0], 0.0, 1.0);
+            u.decay     = 0.1 * std::pow (200.0, std::clamp (e.v[1], 0.0, 1.0));
+            u.earlyLate = std::clamp (e.v[2], 0.0, 1.0);
+            u.earlyDiff = std::clamp (e.v[3], 0.0, 1.0);
+            u.attack    = std::clamp (e.v[4], 0.0, 1.0);
+            u.modDepth  = std::clamp (e.v[5], 0.0, 1.0);
+            u.width     = 2.0 * std::clamp (e.v[6], 0.0, 1.0);
+
+            return u;
+        }
+
+        [[nodiscard]] double preDelayMs (const Eight& e) { return 150.0 * std::clamp (e.v[7], 0.0, 1.0); }
+
+        [[nodiscard]] std::string describeEight (const Eight& e)
+        {
+            const User u = userOf (e);
+
+            return "Size " + fx (u.size * 100.0, 0) + " Decay " + fx (u.decay, 2) + " E/L " + fx (u.earlyLate * 100.0, 0)
+                 + " EDiff " + fx (u.earlyDiff * 100.0, 0) + " Atk " + fx (u.attack * 100.0, 0) + " Mod " + fx (u.modDepth * 100.0, 0)
+                 + " Width " + fx (u.width * 100.0, 0) + " Pre-Delay " + fx (preDelayMs (e), 1) + " ms";
+        }
+
+        /** Zeros in front, the length kept: the response as it would be heard
+            with that much Pre-Delay, over the same observation time. */
+        [[nodiscard]] Stereo preDelayed (Stereo x, double ms)
+        {
+            const size_t shift = std::min (x.l.size(), static_cast<size_t> (std::lround (ms * 0.001 * kRate)));
+
+            for (auto* channel : { &x.l, &x.r })
+            {
+                const size_t length = channel->size();
+
+                channel->insert (channel->begin(), shift, 0.0);
+                channel->resize (length);
+            }
+
+            return x;
+        }
+
+        /** FULL SUPPORT: the target is not touched; Hall is delayed. */
+        [[nodiscard]] stage3::Score paddedScore (const Features& target, const Eight& e)
+        {
+            const User u = userOf (e);
+            const double d = preDelayMs (e);
+
+            return stage5::sameKnobs (target, analyse (preDelayed (impulseResponse (Structure {}, u, irSecondsFor (u.decay)), d),
+                                                       preDelayed (impulseResponse (Structure {}, u, kLeftOnlySeconds, true, false), d)));
+        }
+
+        [[nodiscard]] double objectiveOf (const stage3::Score& s)
+        {
+            return stage5::centredWorst (s) + 0.05 * s.rms;
+        }
+
+        /** A pattern search from one start: every dimension, both ways; the
+            step halves from 0.08 to 0.005. Deterministic. */
+        [[nodiscard]] Eight refine (Eight current, const std::function<stage3::Score (const Eight&)>& evaluate, int budget = 420)
+        {
+            double best = objectiveOf (evaluate (current));
+            double step = 0.08;
+
+            while (step >= 0.0049 && budget > 0)
+            {
+                bool improved = false;
+
+                for (int k = 0; k < 8 && budget > 0; ++k)
+                    for (double direction : { 1.0, -1.0 })
+                    {
+                        Eight trial = current;
+                        trial.v[k] = std::clamp (trial.v[k] + direction * step, 0.0, 1.0);
+
+                        if (trial.v[k] == current.v[k])
+                            continue;
+
+                        const double value = objectiveOf (evaluate (trial));
+                        --budget;
+
+                        if (value < best)
+                        {
+                            best = value;
+                            current = trial;
+                            improved = true;
+                        }
+                    }
+
+                if (! improved)
+                    step *= 0.5;
+            }
+
+            return current;
+        }
+
+        [[nodiscard]] std::string familiesOf (const stage3::Score& s, double from)
+        {
+            std::string all;
+
+            for (int f = 0; f < kFamilies; ++f)
+                if (f != stage5::kLateralFamily && s.scaled[f] >= from)
+                    all += std::string (kFamilyNames[f]) + " " + fx (s.scaled[f]) + "; ";
+
+            return all.empty() ? std::string ("none") : all;
+        }
+    }
+}
+
+void runPhase12Stage8PreDelayVerification()
+{
+    using namespace stage8;
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.30 - the Pre-Delay confound: A1b at the default, full-support alignment");
+    // =====================================================================
+
+    info ("  The earlier reading (1.93, run 1.88) moved A1b EARLIER by 63 ms and so discarded about");
+    info ("  8 ms after its first arrival. Here nothing of the target is discarded: Hall is delayed");
+    info ("  by zero padding instead. Start: the Hall solution found then. A methodological");
+    info ("  verification; it restores nothing and changes no verdict.");
+    info ("");
+
+    const Maker a1b = frozenA1b();
+    const User u = userAt (kPoints[0]);
+    const Structure s = a1b (u);
+    const double seconds = irSecondsFor (u.decay);
+
+    const auto centre = impulseResponse (s, u, seconds);
+    const auto left   = impulseResponse (s, u, kLeftOnlySeconds, true, false);
+
+    // Two readings of the whole target: as it is, and with only the sub
+    // -200 dB pre-arrival dust set to exact zero (no sample above -200 dB
+    // changed, none removed). The second is the one free of the late-texture
+    // artefact.
+    const Features whole  = analyse (centre, left);
+    const Features zeroed = analyse (arrivalRemoved (centre, 0.0), arrivalRemoved (left, 0.0));
+
+    const double dStar = shapeOf (centre).onset - shapeOf (impulseResponse (Structure {}, u, seconds)).onset;
+
+    // "Size 3 Decay 2.37 E/L 1 EDiff 72 Atk 59 Mod 21 Width 145", at D* + 20.
+    Eight start;
+    start.v[0] = 0.03;
+    start.v[1] = std::log (2.37 / 0.1) / std::log (200.0);
+    start.v[2] = 0.01;
+    start.v[3] = 0.72;
+    start.v[4] = 0.59;
+    start.v[5] = 0.21;
+    start.v[6] = 0.5 * 1.45;
+    start.v[7] = (dStar + 20.0) / 150.0;
+
+    info ("  D* = " + fx (dStar, 1) + " ms. Start: " + describeEight (start));
+    info ("");
+
+    // The earlier method, at the same start: target advanced, Hall not delayed.
+    auto truncatedScore = [&] (const Eight& e)
+    {
+        const User h = userOf (e);
+
+        return stage5::sameKnobs (analyse (arrivalRemoved (centre, preDelayMs (e)), arrivalRemoved (left, preDelayMs (e))),
+                                  featuresOf (Structure {}, h));
+    };
+
+    auto padded = [&] (const Eight& e) { return paddedScore (zeroed, e); };
+
+    {
+        const auto t = truncatedScore (start), p = padded (start), w = paddedScore (whole, start);
+
+        info ("    AT THE START, three ways:");
+        info ("      target advanced (the earlier method)        worst " + pad (fx (stage5::centredWorst (t)), 8) + familiesOf (t, 1.0));
+        info ("      FULL SUPPORT, dust zeroed                    worst " + pad (fx (stage5::centredWorst (p)), 8) + familiesOf (p, 1.0));
+        info ("      FULL SUPPORT, target exactly as it is        worst " + pad (fx (stage5::centredWorst (w)), 8) + familiesOf (w, 1.0));
+        info ("");
+    }
+
+    // Refinement from the start, and from the start with other Pre-Delays.
+    constexpr double offsets[5] { 0.0, 10.0, 20.0, 30.0, 40.0 };
+
+    std::vector<Eight> foundPadded (5), foundTruncated (5);
+
+    runParallel (10, [&] (size_t i)
+    {
+        Eight from = start;
+        from.v[7] = (dStar + offsets[i % 5]) / 150.0;
+
+        if (i < 5)
+            foundPadded[i] = refine (from, padded);
+        else
+            foundTruncated[i - 5] = refine (from, truncatedScore);
+    });
+
+    info ("    REFINED from that solution (a pattern search over the seven controls and Pre-Delay),");
+    info ("    started at Pre-Delay D* + 0 / 10 / 20 / 30 / 40 ms:");
+    info ("");
+
+    double bestPadded = 1.0e30, bestTruncated = 1.0e30;
+
+    for (int method = 0; method < 2; ++method)
+    {
+        info (method == 0 ? "      FULL SUPPORT (target whole, dust zeroed; Hall delayed):"
+                          : "      target advanced (the earlier method), for comparison:");
+
+        for (size_t i = 0; i < 5; ++i)
+        {
+            const Eight& e = method == 0 ? foundPadded[i] : foundTruncated[i];
+            const auto sc = method == 0 ? padded (e) : truncatedScore (e);
+            const double worst = stage5::centredWorst (sc);
+
+            (method == 0 ? bestPadded : bestTruncated) = std::min (method == 0 ? bestPadded : bestTruncated, worst);
+
+            info ("        from D* +" + pad (fx (offsets[i], 0), 4) + "worst " + pad (fx (worst), 7) + pad (familiesOf (sc, 1.0), 70).substr (0, 70)
+                  + " " + describeEight (e));
+        }
+
+        info ("");
+    }
+
+    info ("  READING. Lowest found with full support: " + fx (bestPadded) + ". With the target advanced: " + fx (bestTruncated) + ".");
+    info (std::string ("  At the default point Hall + Pre-Delay + visible controls is ")
+          + (bestPadded <= kReproduced ? "a MIMIC of A1b (<= 1.5)."
+             : bestPadded < kDistinct  ? "WEAK against A1b (between 1.5 and 3.0): the earlier reading is not an artefact of the discarded samples."
+                                       : "NOT a mimic of A1b (>= 3.0): the earlier reading depended on the discarded samples."));
+    info ("  One start and its neighbours, not five seeds of the frozen scatter: a lower figure may exist.");
+}
+
 } // namespace avtest
