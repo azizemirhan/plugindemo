@@ -534,4 +534,4 @@ appears in both the earlier logs and log 05 is equal to the printed digit
 
 ### 37. Commit
 
-Recorded by the commit after this one.
+Stage 6 is commit `41a2d3e`; this line was added by the commit after it.
