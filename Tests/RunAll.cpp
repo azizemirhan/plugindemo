@@ -252,6 +252,7 @@ int runAllSuites()
     // Stage 8, Ambient. Research measurements, named exactly.
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis);
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis2);
+    AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis3);
 
 
     if (suitesRun == 0)

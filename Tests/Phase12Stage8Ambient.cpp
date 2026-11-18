@@ -1162,4 +1162,180 @@ void runPhase12Stage8AmbientDiagnosis2()
     }
 }
 
+// ===========================================================================
+//  Addendum 2: DA11 - A1b with its arrival removed
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        /** Everything before the first 5 ms bin above -200 dB (against the
+            loudest bin) set to exactly zero; then moved earlier by
+            `advanceMs`, the length kept. Nothing above -200 dB is changed. */
+        [[nodiscard]] Stereo arrivalRemoved (Stereo x, double advanceMs)
+        {
+            const auto env = envelopeOf (x);
+            const double peak = *std::max_element (env.begin(), env.end());
+
+            size_t first = 0;
+
+            while (first < env.size() && ! (env[first] > peak * 1.0e-20))
+                ++first;
+
+            for (size_t n = 0; n < std::min (x.l.size(), first * kBin); ++n)
+                x.l[n] = x.r[n] = 0.0;
+
+            const auto shift = std::min (x.l.size(), static_cast<size_t> (std::lround (advanceMs * 0.001 * kRate)));
+
+            for (auto* channel : { &x.l, &x.r })
+            {
+                channel->erase (channel->begin(), channel->begin() + static_cast<std::ptrdiff_t> (shift));
+                channel->resize (channel->size() + shift, 0.0);
+            }
+
+            return x;
+        }
+
+        [[nodiscard]] Features arrivalRemovedFeatures (const Structure& s, const User& u, double advanceMs)
+        {
+            return analyse (arrivalRemoved (impulseResponse (s, u, irSecondsFor (u.decay)), advanceMs),
+                            arrivalRemoved (impulseResponse (s, u, kLeftOnlySeconds, true, false), advanceMs));
+        }
+
+        /** Hall's frozen search, five seeds, against one target per point. */
+        void hallSearch (const std::string& label, const Features target[3])
+        {
+            const char* const pointName[3] { "medium", "short", "long" };
+
+            std::vector<stage5::Search> searches;
+
+            for (int p = 0; p < kPointCount; ++p)
+                for (int k = 0; k < stage5::kSeeds; ++k)
+                {
+                    stage5::Search s;
+                    s.label = label;
+                    s.point = p;
+                    s.target = target[p];
+                    s.impostor = Structure {};
+                    s.start = userAt (kPoints[p]);
+                    s.seed = stage5::seedFor (k);
+                    searches.push_back (s);
+                }
+
+            stage5::runSearches (searches);
+
+            for (int p = 0; p < kPointCount; ++p)
+            {
+                std::vector<double> v;
+                std::string runs;
+                const stage5::Search* best = nullptr;
+
+                for (int k = 0; k < stage5::kSeeds; ++k)
+                {
+                    const auto& s = searches[static_cast<size_t> (p * stage5::kSeeds + k)];
+
+                    v.push_back (s.residual);
+                    runs += fx (s.residual) + " ";
+
+                    if (best == nullptr || s.residual < best->residual)
+                        best = &s;
+                }
+
+                std::sort (v.begin(), v.end());
+
+                const double median = v[v.size() / 2];
+
+                const std::string reading = v.front() <= kReproduced ? "REPRODUCED in at least one run"
+                                          : median >= kDistinct      ? "distinct"
+                                                                     : "WEAK";
+
+                info ("    " + pad (pointName[p], 9) + "median " + pad (fx (median), 8) + "lowest " + pad (fx (v.front()), 8)
+                      + "runs " + pad (runs, 34) + pad (reading, 32) + "stops on " + kFamilyNames[best->family]);
+                info ("    " + pad ("", 9) + "Hall's knobs in the lowest run: " + best->knobs);
+            }
+        }
+    }
+}
+
+void runPhase12Stage8AmbientDiagnosis3()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+    constexpr double advance[3] { 35.0, 15.0, 65.0 };      // D*, from DA7
+
+    const Candidate a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target;
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.10 - DA11a: A1b against Hall at the same knobs, arrival removed");
+    // =====================================================================
+
+    info ("  Target only. Dust zeroed: every sample before the first 5 ms bin above -200 dB is set");
+    info ("  to exactly zero. Advanced by D*: moved earlier by A1b's arrival minus Hall's (35 / 15 /");
+    info ("  65 ms) - which is Hall with that much Pre-Delay. Every centred family at or above 1.5.");
+    info ("");
+
+    Features zeroed[3], advanced[3];
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const Structure s = a1b.make (u);
+
+        const Features hall = featuresOf (Structure {}, u);
+
+        zeroed[p]   = arrivalRemovedFeatures (s, u, 0.0);
+        advanced[p] = arrivalRemovedFeatures (s, u, advance[p]);
+
+        const double control = stage5::centredWorst (stage5::sameKnobs (hall, arrivalRemovedFeatures (Structure {}, u, 0.0)));
+
+        info ("    " + std::string (pointName[p]) + "   (control: Hall dust-zeroed against Hall " + fx (control) + ")");
+
+        struct Row { const char* name; Features f; };
+
+        for (const auto& row : { Row { "as it is", featuresOf (s, u) }, Row { "dust zeroed", zeroed[p] },
+                                 Row { "zeroed, advanced by D*", advanced[p] } })
+        {
+            const auto sc = stage5::sameKnobs (hall, row.f);
+
+            int family = 0;
+            const double worst = stage5::centredWorst (sc, &family);
+
+            std::string all;
+
+            for (int f = 0; f < kFamilies; ++f)
+                if (f != stage5::kLateralFamily && sc.scaled[f] >= 1.5)
+                    all += std::string (kFamilyNames[f]) + " " + fx (sc.scaled[f]) + "; ";
+
+            info ("      " + pad (row.name, 26) + pad ("worst " + fx (worst) + " (" + kFamilyNames[family] + ")", 32) + all);
+        }
+
+        info ("      fluctuation 50-200 ms: Hall " + fx (hall.fluctuation[0]) + ", A1b zeroed " + fx (zeroed[p].fluctuation[0])
+              + ", A1b zeroed and advanced " + fx (advanced[p].fluctuation[0]) + " dB");
+        info ("");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.11 - DA11b: Hall's search against A1b, dust zeroed");
+    // =====================================================================
+
+    info ("  The frozen search, five seeds. The gate's reading with A1b's pre-arrival bins exact");
+    info ("  zeros, as Hall's are. Diagnostic; not G2. As recorded: 9.77 / 4.00 / 15.33.");
+    info ("");
+
+    hallSearch ("A1b, dust zeroed", zeroed);
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.12 - DA11c: Hall with Pre-Delay against A1b");
+    // =====================================================================
+
+    info ("  The same search against A1b dust-zeroed AND advanced by D* (35 / 15 / 65 ms). The");
+    info ("  product has a Pre-Delay control; the frozen search does not. Label: A1b, arrival");
+    info ("  removed. Diagnostic; reclassifies nothing. D* is one value per point, so this is, if");
+    info ("  anything, optimistic for A1b.");
+    info ("");
+
+    hallSearch ("A1b, arrival removed", advanced);
+}
+
 } // namespace avtest
