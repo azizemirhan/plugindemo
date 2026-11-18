@@ -249,6 +249,9 @@ int runAllSuites()
     AV_RUN_ON_REQUEST (runPhase12Stage7PlateStress);
     AV_RUN_ON_REQUEST (runPhase12Stage7PlateRates);
 
+    // Stage 8, Ambient. Research measurements, named exactly.
+    AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis);
+
 
     if (suitesRun == 0)
     {

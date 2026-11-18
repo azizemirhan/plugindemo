@@ -131,6 +131,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase12Stage7Listening.cpp
     Phase12Stage7Plate.cpp
     Phase12Stage7Platform.cpp
+    Phase12Stage8Ambient.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
