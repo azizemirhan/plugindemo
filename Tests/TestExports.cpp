@@ -19,6 +19,7 @@
 #include "Phase11Listening.h"
 #include "Phase12Listening.h"
 #include "Phase12Stage4.h"
+#include "Phase12Stage7Listening.h"
 #include "GainStaging.h"
 #include "WetGainStaging.h"
 #include "ModalMap.h"
@@ -469,6 +470,20 @@ __declspec (dllexport) int ExportAuroraVerbPhase12Stage4Pack (const char* direct
 
     return avtest::exportPhase12Stage4Pack (directory,
                                             sampleRate > 0.0 ? sampleRate : 48000.0);
+}
+
+/*
+    Renders the PHASE 12 Stage 7 Ambient blind pack: twenty-seven files, each
+    one comparison. See Phase12Stage7Listening.h.
+*/
+__declspec (dllexport) int ExportAuroraVerbPhase12Stage7AmbientPack (const char* directory,
+                                                                     double sampleRate)
+{
+    if (directory == nullptr)
+        return -1;
+
+    return avtest::exportPhase12Stage7AmbientPack (directory,
+                                                   sampleRate > 0.0 ? sampleRate : 48000.0);
 }
 
 } // extern "C"

@@ -128,6 +128,7 @@ set(AV_TEST_SUITE_SOURCES
     Phase12Stage6Fast.cpp
     Phase12Stage6.cpp
     Phase12Stage6Parts.cpp
+    Phase12Stage7Listening.cpp
     DiagnosticAnalyzer.cpp
     DiagnosticQueueTests.cpp
     DiagnosticSessionTests.cpp
