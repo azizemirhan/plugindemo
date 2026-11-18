@@ -1,0 +1,112 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage7PlateRates
+
+
+PHASE 12.7 PLATE - secondary rates: 44.1, 96 and 192 kHz
+--------------------------------------------------------
+          THE LAW. 240 sections at every rate; the coefficient is the one at which a section's
+          delay at zero frequency, in seconds, is the 48 kHz section's. No other number is fitted.
+        
+          S1. Group delay of the chain, ms, against the 48 kHz chain. Limit over 100 Hz - 10 kHz:
+          5 % or 0.5 ms, whichever is larger. 'total' adds the 15-sample pipeline delay.
+        
+            rate       coefficient  20      100     250     500     1000    2000    4000    8000    10000   16000   +pipeline  
+            44.1 kHz   -0.677744    28.33   28.30   28.10   27.43   25.02   18.56   9.25    3.29    2.33    1.26    0.340
+            48.0 kHz   -0.700000    28.33   28.30   28.10   27.42   25.01   18.52   9.19    3.23    2.26    1.16    0.312
+            96.0 kHz   -0.837838    28.33   28.29   28.09   27.40   24.93   18.34   8.93    2.97    2.00    0.86    0.156
+            192.0 kHz  -0.915493    28.33   28.29   28.09   27.39   24.91   18.29   8.87    2.91    1.94    0.80    0.078
+        
+            rate       worst chain error             worst total error             best single coefficient   its worst error
+            44.1 kHz   0.070 ms at 10000 Hz          0.098 ms at 10000 Hz          -0.678365                 0.065 ms
+              pipeline delay differs from 48 kHz by 0.028 ms at every frequency
+  PASS  S1 44.1 kHz: the chain's group delay is within the limit, 100 Hz - 10 kHz
+            96.0 kHz   0.262 ms at 10000 Hz          0.418 ms at 10000 Hz          -0.836532                 0.246 ms
+              pipeline delay differs from 48 kHz by -0.156 ms at every frequency
+  PASS  S1 96.0 kHz: the chain's group delay is within the limit, 100 Hz - 10 kHz
+            192.0 kHz  0.322 ms at 10000 Hz          0.556 ms at 10000 Hz          -0.914617                 0.303 ms
+              pipeline delay differs from 48 kHz by -0.234 ms at every frequency
+  PASS  S1 192.0 kHz: the chain's group delay is within the limit, 100 Hz - 10 kHz
+              FINDING: with the pipeline delay added the total is OUTSIDE the same limit at 192.0 kHz
+        
+          S6. PV3's wet path against the plain chain's, modulation off: the same response,
+          exactly 15 samples later.
+        
+            44.1 kHz   15 samples = 0.340 ms; worst difference / peak 0.000 e-12
+  PASS  S6 44.1 kHz: the wet path is the plain chain's, 15 samples later
+            48.0 kHz   15 samples = 0.312 ms; worst difference / peak 0.000 e-12
+  PASS  S6 48.0 kHz: the wet path is the plain chain's, 15 samples later
+            96.0 kHz   15 samples = 0.156 ms; worst difference / peak 0.000 e-12
+  PASS  S6 96.0 kHz: the wet path is the plain chain's, 15 samples later
+            192.0 kHz  15 samples = 0.078 ms; worst difference / peak 0.000 e-12
+  PASS  S6 192.0 kHz: the wet path is the plain chain's, 15 samples later
+        
+          S0 (control), S3, S4. Each response is rendered at its rate, band-limited to 20 kHz,
+          resampled to 48 kHz and read by the frozen metric at the same knobs.
+            S0  Hall at the rate against Hall at 48 kHz: <= 1.5, or the rig is not valid there
+                and S3 - S5 at that rate are NOT READ.
+            S3  Plate at the rate against Plate at 48 kHz: <= 1.5.
+            S4  RT60: Plate / Hall at the rate within 10 %; Plate at the rate / at 48 kHz within 5 %.
+        
+            the band limit alone (Hall, 48 kHz, filtered against unfiltered): 0.55 0.32 0.43
+            Plate against Hall at 48 kHz, both filtered (Stage 6 same-knob figure, for scale): 4.11 3.77 4.13
+        
+            rate       S0 Hall  med sma lar      S3 Plate  med sma lar     RT Plate/Hall         RT Plate/Plate48
+            44.1 kHz   0.69 0.79 1.19            0.52 0.69 0.65            1.007 1.027 1.004     1.006 1.010 1.009 
+  PASS  S0 44.1 kHz: Hall at this rate is Hall at 48 kHz (the rig is valid here)
+  PASS  S3 44.1 kHz: Plate at this rate is the 48 kHz Plate
+  PASS  S4 44.1 kHz: Decay holds
+            96.0 kHz   0.53 0.70 0.65            0.53 0.48 0.64            1.009 1.032 1.005     0.978 0.990 0.979 
+  PASS  S0 96.0 kHz: Hall at this rate is Hall at 48 kHz (the rig is valid here)
+  PASS  S3 96.0 kHz: Plate at this rate is the 48 kHz Plate
+  PASS  S4 96.0 kHz: Decay holds
+            192.0 kHz  0.80 0.74 1.14            0.73 0.75 0.60            1.011 1.030 1.006     0.975 0.986 0.973 
+  PASS  S0 192.0 kHz: Hall at this rate is Hall at 48 kHz (the rig is valid here)
+  PASS  S3 192.0 kHz: Plate at this rate is the 48 kHz Plate
+  PASS  S4 192.0 kHz: Decay holds
+        
+          S5. Time to 10 % of the energy, ms, at Size 10 / 30 / 50 / 70 / 90. Monotone, and the
+          ratio largest / smallest within 10 % of the 48 kHz ratio.
+        
+            44.1 kHz   42.0    46.8    51.1    60.3    72.4    ratio 1.723
+  PASS  S5 44.1 kHz: Size is monotone and spans what it spans at 48 kHz
+            48.0 kHz   42.2    45.8    50.8    59.4    71.6    ratio 1.697
+            96.0 kHz   40.2    43.9    49.4    58.9    70.8    ratio 1.761
+  PASS  S5 96.0 kHz: Size is monotone and spans what it spans at 48 kHz
+            192.0 kHz  39.7    43.3    48.9    58.0    70.4    ratio 1.772
+  PASS  S5 192.0 kHz: Size is monotone and spans what it spans at 48 kHz
+        
+          S7. CPU, seven interleaved pairs at the medium point, each rate. Limit: the median
+          no more than 0.15 above the 48 kHz median measured here, and under 1.75. A failure
+          calls for the full 31-pair campaign at that rate. Valid only on an idle machine.
+          high priority, pinned to one core.
+        
+          THE STATISTIC. One pair is one 2 s block of Hall and one of Plate, back to back,
+          order alternating; its figure is Plate time / Hall time. 3 warm-up pairs are discarded,
+          then exactly 7 are kept and sorted.
+            median     the middle ratio
+            upper      the 7th smallest. A distribution-free one-sided UPPER CONFIDENCE BOUND ON
+                       THE MEDIAN RATIO, confidence 99.2 % (two-sided with the 1th: 98.4 %),
+                       if the pairs are independent. It is NOT a bound on the 95th percentile of
+                       the ratio and says nothing about the worst block.
+            min/min    fastest Plate block over fastest Hall block
+            Hall max/min   slowest Hall block over fastest: how quiet the machine was. Near 1.00
+                       on an idle machine; a large value means the run should not be used.
+        
+            condition                 median   lower    upper    min/min  Hall ns   Plate ns  Hall max/min
+            44.1 kHz                  1.539    1.505    1.560    1.539    562.3     865.4     1.033
+            48.0 kHz                  1.550    1.529    1.598    1.591    547.7     871.4     1.047
+            96.0 kHz                  1.553    1.372    1.586    1.577    547.2     862.8     1.165
+            192.0 kHz                 1.550    1.540    1.607    1.551    552.4     856.9     1.025
+        
+  PASS  S7 44.1 kHz: no rate-specific CPU regression
+  PASS  S7 96.0 kHz: no rate-specific CPU regression
+  PASS  S7 192.0 kHz: no rate-specific CPU regression
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.7 PLATE - secondary rates: 44.1, 96 and 192 kHz    22 /   22   ok
+-----------------------------------------------------------------
+  22 / 22 checks passed.  ALL TESTS PASSED.

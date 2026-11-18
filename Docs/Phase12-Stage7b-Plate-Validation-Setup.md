@@ -4,6 +4,12 @@ Research only. `Source/` is unchanged. **Nothing here has been run.** This
 fixes the procedure of `Phase12-Stage7-Reset.md` section 5 with the
 sample-rate definition approved on 2026-11-18, before any measurement.
 
+**See `Phase12-Stage7b-Plate-Validation-Addendum-1.md` (2026-11-18).** It
+fixes the sample-rate rule as one closed-form law, replaces the phrase
+"95 % upper bound" below with a precise statement of what is bounded, and
+describes the tool. Where the two differ, the addendum governs. The text
+below is left as first written.
+
 The candidate is unchanged: the 240-section reference chain as 16
 sub-chains, two-wide, kept in registers (PV3). Plate is not redesigned
 unless this validation disproves it.

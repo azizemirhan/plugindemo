@@ -8,6 +8,11 @@ document governs.
 Nothing has been coded. Nothing will be until individual hypotheses are
 approved.
 
+**2026-11-18:** the inconsistency in the visibility-control rules (items
+1.1, 2.2 and 3.2 below, and section 4) has been ruled on. One rule now
+applies to all three hypotheses: `Phase12-Stage7b-Room-Visibility-Rule.md`.
+The items are left below as they were written.
+
 Each hypothesis is set out the same way: what is fixed by the registration,
 what the registration leaves to an addendum, what ends it, and the places
 where my own text is loose enough that a reviewer should press on it. The

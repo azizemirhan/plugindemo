@@ -4,6 +4,10 @@ Research only. `Source/` is unchanged. **Nothing in this document has been
 built, run or measured.** It is written and committed before any structure
 is designed against it.
 
+**Status: APPROVED on 2026-11-18 with one modification, and frozen.** The
+modification replaces limit 4 of section 2; the original wording and the
+reason are kept in section 10. The first version is commit `366d7e7`.
+
 ## 0. Scope
 
 - This criterion (called **MI** below) applies to **future** candidates
@@ -77,8 +81,20 @@ Everything else is *core*. Limits on that declaration:
 2. They must be **one edge or corner** of the grid (for example the
    short-Decay row), not scattered points.
 3. The medium point (60, 2.5 s) — the plugin's default — is never periphery.
-4. No point may be periphery for **two** references. Where a candidate is
-   allowed to resemble Room it must be distinct from Hall, and the reverse.
+4. *(As amended, section 10.)* A point may be declared periphery for
+   **more than one** reference only if those references are themselves
+   demonstrated to be mutually close or reproducible **at that same point**
+   under the frozen metric. Otherwise overlapping declarations are not
+   permitted.
+
+   How "demonstrated" is read here: before the candidate's declaration is
+   written, each of the two references' free seven-control searches is run
+   against the other as target at that point, five seeds, and the point is
+   REPRODUCED in **both** directions. The figures are recorded with the
+   declaration. A BETWEEN result does not qualify. (The approved wording is
+   "mutually close/reproducible"; taking it as REPRODUCED both ways is the
+   stricter reading and is mine. If BETWEEN should also qualify, that needs
+   a ruling before the first declaration that relies on it.)
 5. The declaration is made once, before the build, and is not revised after
    a measurement. A candidate that converges somewhere it did not declare
    fails; it does not get its periphery redrawn.
@@ -203,7 +219,8 @@ nine-point table per reference; the label never stands in for the table.
 | another Mode with a hidden constant changed (a different delay set, a different diffuser length) | MI-2: this is the "Hall's sibling" case, which the frozen search already reproduces |
 | distinct only by ringing or tone | MI-1 |
 | distinct in a narrow band of settings chosen to suit it | section 2: the core is six points or more, includes the default, is declared before the build and cannot be redrawn |
-| allowed to resemble Hall in one corner and Room in another until nothing is left | section 2, limit 4: no point is periphery twice |
+| allowed to resemble Hall in one corner and Room in another until nothing is left | section 2, limits 1–3: three points per reference, one edge each, never the default |
+| allowed to resemble two different Modes at one point, and so be nothing there | section 2, limit 4: only where those two Modes are measured to be the same thing at that point — in which case resembling both is resembling one |
 | distinct from its neighbours but not actually a chamber | MI-4 |
 | acceptable on paper and indistinguishable by ear | MI-5 |
 
@@ -214,6 +231,7 @@ nine-point table per reference; the label never stands in for the table.
 | at short Decay it is physically a room | the short-Decay row may be declared periphery against Room, with that reason; MI-3 |
 | one of three points decided everything | nine points; a declared corner cannot veto |
 | a BETWEEN score at an extreme was read as failure | permitted at declared periphery; still a failure in the core |
+| at small / short Hall, Room and Chamber all converge, so no single neighbour could be named | limit 4 as amended: the point may be periphery for both, once the two references are shown to reproduce each other there |
 
 **What MI deliberately does not relax.** The thresholds; the search; the
 default point; the core; the quality lines; the requirement of a positive
@@ -267,7 +285,8 @@ way, and none has been tested.
    MI stricter.
 3. **No point periphery twice.** This is my addition. At small / short all
    three acoustic-space Modes tend to converge physically, so this rule may
-   be the one that bites hardest.
+   be the one that bites hardest. — **Decided 2026-11-18: replaced.** See
+   limit 4 and section 10.
 4. **A reference that does not exist.** Chamber against Room needs a Room.
    If no RN hypothesis survives, MI for Chamber runs against Hall, Plate
    and Ambient only, and the Room-against-Chamber question is deferred, not
@@ -280,9 +299,47 @@ way, and none has been tested.
 6. **The signature thresholds** of MI-4 are owed in an addendum, from
    Hall-only measurements.
 
+Decisions of 2026-11-18 on the other points: the three-of-nine limit, the
+one-edge rule, the default point and the six-point minimum are kept as
+written (points 1 and 2). The signature thresholds (point 6) stay unfilled
+until Hall's baseline on the nine-point grid exists. Points 4 and 5 were
+not ruled on and remain open.
+
 ## 9. What this does not do
 
 It does not produce a Chamber. Stage 7's finding stands: as a late field a
 chamber is a point in Hall's Size–Decay plane, and MI-2 will test exactly
 that at six or more points. MI removes one wrong reason to reject a Chamber.
 It does not supply a mechanism, and none is proposed here.
+
+## 10. Amendment record
+
+**2026-11-18 — limit 4 of section 2 replaced, by decision.**
+
+As first written (commit `366d7e7`):
+
+> 4. No point may be periphery for **two** references. Where a candidate is
+>    allowed to resemble Room it must be distinct from Hall, and the reverse.
+
+As decided:
+
+> A grid point may be declared convergent with more than one reference Mode
+> only if those reference Modes are themselves demonstrated to be mutually
+> close/reproducible at that same operating point under the frozen metric.
+> Otherwise overlapping convergence declarations are not permitted.
+
+Reason given: the original rule would reject a candidate artificially at a
+point where existing acoustic-space families naturally converge; the
+replacement removes that without opening a loophole for fake Modes, because
+the overlap has to be earned by a measurement on the references and not
+asserted by the candidate.
+
+What did not change: three points per reference at most; one predeclared
+edge; never the default point; at least six points DISTINCT under the
+existing gates; the candidate's own signature valid at all nine points; no
+threshold; no earlier verdict.
+
+One consequence worth stating: the amended limit needs a measurement that
+does not exist yet — the references against each other on the grid. Until
+it is run for a given point, that point can be periphery for one reference
+only.

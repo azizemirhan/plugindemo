@@ -79,6 +79,24 @@ namespace
 #define AV_RUN_HEAVY(fn) do { if (fastOnly) { if (matches (#fn)) heavySkipped.emplace_back (#fn); } \
                               else if (wanted (#fn)) fn(); } while (false)
 
+// A suite that runs ONLY when a filter is exactly its name. For measurements
+// whose result depends on the state of the machine (the Plate CPU campaign):
+// they must never run as part of a regression, fast or full, and a substring
+// filter such as "Phase12" must not start one by accident.
+#define AV_RUN_ON_REQUEST(fn) do { if (requested (#fn)) { ++suitesRun; fn(); } } while (false)
+
+namespace
+{
+    [[nodiscard]] bool requested (const char* name)
+    {
+        for (const auto& filter : suiteFilters)
+            if (filter == name)
+                return true;
+
+        return false;
+    }
+}
+
 namespace avtest
 {
 
@@ -224,6 +242,12 @@ int runAllSuites()
     AV_RUN_HEAVY (runPhase12Stage5Tests);
     AV_RUN (runPhase12Stage6FastTests);
     AV_RUN_HEAVY (runPhase12Stage6Tests);
+    AV_RUN (runPhase12Stage7PlateFastTests);
+
+    // The Plate validation tool. Named exactly, or not run at all.
+    AV_RUN_ON_REQUEST (runPhase12Stage7PlateCpu);
+    AV_RUN_ON_REQUEST (runPhase12Stage7PlateStress);
+    AV_RUN_ON_REQUEST (runPhase12Stage7PlateRates);
 
 
     if (suitesRun == 0)

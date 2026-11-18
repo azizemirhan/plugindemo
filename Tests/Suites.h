@@ -121,6 +121,10 @@ void runPhase12Stage5FastTests();
 void runPhase12Stage5Tests();
 void runPhase12Stage6FastTests();
 void runPhase12Stage6Tests();
+void runPhase12Stage7PlateFastTests();
+void runPhase12Stage7PlateCpu();        // on request only: see RunAll.cpp
+void runPhase12Stage7PlateStress();     // on request only
+void runPhase12Stage7PlateRates();      // on request only
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

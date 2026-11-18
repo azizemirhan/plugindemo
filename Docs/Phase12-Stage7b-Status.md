@@ -63,3 +63,93 @@ are Stage 7's (fast 2583 / 2601, state 26 / 26, `Source` diff empty).
 3. Review of the Mode-identity criterion, in particular its section 8.
 4. A go-ahead to write the Plate harness, and an idle machine for the
    48 kHz campaign.
+
+---
+
+# Second round — decisions of 2026-11-18 on Stage 7b, and what was done
+
+## Decisions received
+
+- **Plate.** The sample-rate rule is approved: 240 sections fixed, the
+  coefficient derived per rate by one deterministic law, the same at every
+  rate, no manual tuning, the 15-sample pipeline delay explicit in the
+  group-delay analysis, no redesign. The measurement tool is authorized.
+  Primary closure unchanged: idle machine, 48 kHz, 31 interleaved pairs,
+  1.75 × Hall. The statistic must be worded precisely and must not be read
+  as a bound on the 95th percentile. Secondary validation mandatory at
+  44.1 / 96 / 192 kHz.
+- **Mode identity.** The nine-point criterion is approved with one
+  modification: a point may be convergent with more than one reference only
+  if those references are demonstrated mutually close / reproducible at
+  that point under the frozen metric. No retroactive reclassification.
+- **Room.** One visibility rule for all hypotheses: ≥ 3.0 VISIBLE;
+  1.5 – 3.0 INCONCLUSIVE; < 1.5 NOT VISIBLE TO THE CURRENT METRIC; the
+  number always reported; no special threshold for RN3; METRIC INCAPABLE /
+  REQUIRES DEDICATED METRIC where that is the case. RN1–RN3 not to be coded.
+- **Ambient.** No decision. Package untouched, `KEY.txt` closed, the
+  1.82 dB tonal-gate failure unchanged.
+- **Chamber.** No DSP. Signature thresholds unfilled until Hall's grid
+  baseline exists.
+- No Phase 13. No production Mode selector.
+
+## Done
+
+| | state | where |
+|---|---|---|
+| Approved definitions updated and frozen | Mode-identity criterion amended (limit 4), amendment recorded | `Phase12-Stage7b-Mode-Identity-Criterion.md`, sections 2 and 10 |
+| | Room visibility rule, as an addendum; the pre-registration itself not edited | `Phase12-Stage7b-Room-Visibility-Rule.md` |
+| | Plate: the law, the statistic's wording, the tool | `Phase12-Stage7b-Plate-Validation-Addendum-1.md` |
+| RN1 / RN2 / RN3 definitions for review | restated in the reply to this round; unchanged on file | `Phase12-Stage7-Room-Preregistration.md` |
+| Plate measurement tool | written, built, run once to verify it | `Tests/Phase12Stage7Plate.*`, `Tests/Phase12Stage7Platform.cpp` |
+| No Room candidate run | none built, none run | — |
+| Ambient package | untouched | — |
+
+## What the tool's check run showed
+
+Machine-independent, and so results: at 44.1, 96 and 192 kHz the rig is
+valid (S0), the Plate is the 48 kHz Plate by the frozen metric (S3,
+0.48 – 0.75), Decay and Size hold (S4, S5), and PV3 is the plain chain
+exactly 15 samples later (S6).
+
+Two findings for decision:
+
+1. The chain's group delay passes S1 on the 0.5 ms absolute allowance only;
+   at 10 kHz it is 12 – 14 % short at 96 and 192 kHz.
+2. With the pipeline delay added, the total at 192 kHz is 0.556 ms from the
+   48 kHz total at 10 kHz, outside the 0.5 ms allowance.
+
+CPU figures from that run are **not results** (the machine was in use).
+They are in the addendum only to show the tool runs, with two things to
+watch for when the real runs are made: modulation off (ratio about 1.9,
+because Hall gets cheaper) and the scalar form PV1 (about 1.85).
+
+## Open, mine to flag
+
+- The amended limit 4 reads "demonstrated" as REPRODUCED in both
+  directions. If BETWEEN should qualify, that needs a ruling.
+- The visibility rule does not say what follows an INCONCLUSIVE result. I
+  treat it as a stop.
+- For the visibility value I take the lowest of the three points against
+  Hall's free search. That reading is mine.
+
+## Regression
+
+Run on the final build, with nothing else building or measuring.
+
+| check | result |
+|---|---|
+| Fast regression (`AuroraVerbTests.exe --fast`) | 2593 / 2611 passed, 18 failures |
+| against Stage 7 (2583 / 2601) | ten checks added — the tool's arithmetic suite — and all ten pass |
+| the 18 failures | the same 18 as Stage 7's run, compared **line by line**: no difference |
+| State suite | 26 / 26 passed |
+| `git diff --stat 77f32fe -- Source`, `git status -- Source` | empty |
+
+Not covered: the heavy suites were not re-run. The three on-request Plate
+suites are not part of any regression by design.
+
+## Waiting for
+
+1. Listening results on the Ambient package.
+2. Individual approval or rejection of RN1, RN2, RN3.
+3. An idle machine for the three Plate closure runs.
+4. A decision on the two Plate findings above.
