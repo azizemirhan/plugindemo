@@ -253,6 +253,8 @@ int runAllSuites()
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis);
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis2);
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientDiagnosis3);
+    AV_RUN_ON_REQUEST (runPhase12Stage8AmbientScan);
+    AV_RUN_ON_REQUEST (runPhase12Stage8AmbientRootCause);
 
 
     if (suitesRun == 0)

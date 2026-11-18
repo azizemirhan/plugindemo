@@ -1,0 +1,143 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8AmbientRootCause
+
+
+PHASE 12.8.17 - step A: the coupling law as built (RC7)
+-------------------------------------------------------
+          A1b: four stages of two lines; neighbouring stages exchange by a rotation with
+          sin^2(theta) = stage loop time / tau, tau = 0.40 x RT60 / 3.
+        
+            medium   tau 333 ms    decayScale 0.880   stage 1: 31.9 ms, sin2 0.096   stage 2: 36.8 ms, sin2 0.110   stage 3: 45.7 ms, sin2 0.137   stage 4: 54.6 ms
+            short    tau 107 ms    decayScale 0.930   stage 1: 15.4 ms, sin2 0.145   stage 2: 17.8 ms, sin2 0.167   stage 3: 22.1 ms, sin2 0.207   stage 4: 26.4 ms
+            long     tau 667 ms    decayScale 0.899   stage 1: 53.7 ms, sin2 0.081   stage 2: 61.9 ms, sin2 0.093   stage 3: 76.9 ms, sin2 0.115   stage 4: 91.9 ms
+
+PHASE 12.8.18 - step A: where the fingerprint and the variance are created (RC1-RC5, RC8)
+-----------------------------------------------------------------------------------------
+          The tank's state read line by line over the whole response, twelve delay
+          perturbations. Each stage's octave balance is compared with Hall's (all eight lines,
+          unperturbed, read the same way). MEAN is systematic; SD is chance.
+        
+            medium, damping as the defaults
+                                              125     250     500     1k      2k      4k      8k      
+            RC2 stage 1 balance, MEAN         +0.34   +0.06   -0.08   -0.10   -0.04   -0.01   +0.04   
+            RC2 stage 2 balance, MEAN         -0.07   +0.55   +0.12   +0.12   +0.17   +0.01   -0.17   
+            RC2 stage 3 balance, MEAN         -0.11   +0.33   +0.30   +0.41   +0.33   +0.13   -0.46   
+            RC2 stage 4 balance, MEAN         -0.37   +0.60   +0.42   +0.48   +0.39   +0.21   -0.62   
+                the output, MEAN              -0.95   +0.53   +0.46   +0.46   +0.36   +0.28   -0.64   
+            RC3 stage 1 balance, SD           +0.07   +0.07   +0.07   +0.05   +0.03   +0.03   +0.02   
+            RC3 stage 2 balance, SD           +0.29   +0.30   +0.16   +0.17   +0.12   +0.07   +0.07   
+            RC3 stage 3 balance, SD           +0.65   +0.44   +0.56   +0.30   +0.19   +0.08   +0.13   
+            RC3 stage 4 balance, SD           +1.14   +0.83   +0.49   +0.45   +0.25   +0.16   +0.18   
+                the output, SD                +1.14   +0.83   +0.49   +0.45   +0.25   +0.16   +0.18   
+            RC8 output minus stage 4, MEAN    -0.59   -0.07   +0.04   -0.02   -0.03   +0.07   -0.02   
+            RC4 held in stage 2 / stage 1, dB -9.21   -8.31   -8.59   -8.58   -8.58   -8.78   -9.02     against 1-4k: -0.56 at 125, +0.34 at 250
+            RC4 held in stage 3 / stage 2, dB -6.78   -6.97   -6.56   -6.45   -6.58   -6.62   -7.03     against 1-4k: -0.23 at 125, -0.42 at 250
+            RC4 held in stage 4 / stage 3, dB -5.62   -5.09   -5.25   -5.30   -5.30   -5.29   -5.53     against 1-4k: -0.33 at 125, +0.20 at 250
+            RC1 stage 1 share of the band, %  86.8    84.2    84.9    84.8    84.9    85.5    86.4    
+            RC1 stage 2 share of the band, %  10.4    12.5    11.7    11.8    11.8    11.3    10.8    
+            RC1 stage 3 share of the band, %  2.2     2.5     2.6     2.7     2.6     2.5     2.2     
+            RC1 stage 4 share of the band, %  0.6     0.8     0.8     0.8     0.8     0.7     0.6     
+            RC5 stage 1 mean time, ms         156     164     171     173     169     158     142     
+            RC5 stage 2 mean time, ms         221     223     232     235     230     219     203     
+            RC5 stage 3 mean time, ms         271     278     287     296     291     278     256     
+            RC5 stage 4 mean time, ms         322     328     341     346     341     328     303     
+            READING: at 125 Hz the systematic deviation reaches half of the output's at stage - (none); the variance at stage 3.
+        
+            medium, DAMPING OFF
+                                              125     250     500     1k      2k      4k      8k      
+            RC2 stage 1 balance, MEAN         +0.34   +0.09   -0.03   -0.04   -0.00   +0.00   -0.00   
+            RC2 stage 2 balance, MEAN         -0.12   +0.45   -0.04   -0.05   +0.03   -0.03   -0.00   
+            RC2 stage 3 balance, MEAN         -0.19   +0.11   -0.03   +0.06   +0.06   +0.07   -0.08   
+            RC2 stage 4 balance, MEAN         -0.52   +0.30   -0.06   -0.03   +0.00   +0.11   -0.09   
+                the output, MEAN              -1.12   +0.23   -0.02   -0.05   -0.03   +0.18   -0.10   
+            RC3 stage 1 balance, SD           +0.07   +0.08   +0.07   +0.05   +0.03   +0.03   +0.01   
+            RC3 stage 2 balance, SD           +0.30   +0.31   +0.16   +0.17   +0.12   +0.07   +0.06   
+            RC3 stage 3 balance, SD           +0.73   +0.48   +0.57   +0.31   +0.20   +0.09   +0.11   
+            RC3 stage 4 balance, SD           +1.26   +0.91   +0.51   +0.48   +0.26   +0.14   +0.15   
+                the output, SD                +1.26   +0.91   +0.51   +0.48   +0.26   +0.14   +0.15   
+            RC8 output minus stage 4, MEAN    -0.60   -0.07   +0.04   -0.02   -0.03   +0.07   -0.01   
+            RC4 held in stage 2 / stage 1, dB -9.00   -8.17   -8.54   -8.54   -8.50   -8.56   -8.53     against 1-4k: -0.46 at 125, +0.36 at 250
+            RC4 held in stage 3 / stage 2, dB -6.61   -6.88   -6.52   -6.42   -6.51   -6.44   -6.61     against 1-4k: -0.15 at 125, -0.42 at 250
+            RC4 held in stage 4 / stage 3, dB -5.50   -4.99   -5.20   -5.26   -5.23   -5.14   -5.19     against 1-4k: -0.29 at 125, +0.22 at 250
+            RC1 stage 1 share of the band, %  86.0    83.7    84.7    84.6    84.6    84.7    84.7    
+            RC1 stage 2 share of the band, %  10.9    12.8    11.9    11.8    11.9    11.8    11.9    
+            RC1 stage 3 share of the band, %  2.4     2.6     2.7     2.7     2.7     2.7     2.6     
+            RC1 stage 4 share of the band, %  0.7     0.8     0.8     0.8     0.8     0.8     0.8     
+            RC5 stage 1 mean time, ms         175     174     176     176     176     175     176     
+            RC5 stage 2 mean time, ms         242     233     236     238     236     235     236     
+            RC5 stage 3 mean time, ms         294     290     292     299     299     298     297     
+            RC5 stage 4 mean time, ms         346     341     347     349     349     350     349     
+            READING: at 125 Hz the systematic deviation reaches half of the output's at stage - (none); the variance at stage 3.
+        
+            short, damping as the defaults
+                                              125     250     500     1k      2k      4k      8k      
+            RC2 stage 1 balance, MEAN         -0.12   +0.10   -0.03   -0.06   -0.04   +0.02   +0.01   
+            RC2 stage 2 balance, MEAN         -0.90   -0.07   +0.50   +0.30   +0.23   +0.03   -0.26   
+            RC2 stage 3 balance, MEAN         -1.43   +0.16   +0.38   +0.43   +0.44   +0.10   -0.45   
+            RC2 stage 4 balance, MEAN         -1.54   +0.15   +0.77   +0.65   +0.59   +0.01   -0.59   
+                the output, MEAN              -1.50   -0.52   +0.77   +0.86   +0.79   +0.02   -0.70   
+            RC3 stage 1 balance, SD           +0.12   +0.24   +0.15   +0.15   +0.13   +0.10   +0.10   
+            RC3 stage 2 balance, SD           +0.54   +0.34   +0.43   +0.34   +0.14   +0.15   +0.13   
+            RC3 stage 3 balance, SD           +0.40   +0.47   +0.30   +0.33   +0.18   +0.16   +0.14   
+            RC3 stage 4 balance, SD           +0.57   +0.79   +0.64   +0.49   +0.15   +0.22   +0.19   
+                the output, SD                +0.57   +0.79   +0.64   +0.49   +0.15   +0.22   +0.19   
+            RC8 output minus stage 4, MEAN    +0.05   -0.68   +0.01   +0.21   +0.21   +0.01   -0.10   
+            RC4 held in stage 2 / stage 1, dB -9.42   -8.80   -8.10   -8.28   -8.36   -8.62   -8.90     against 1-4k: -1.00 at 125, -0.38 at 250
+            RC4 held in stage 3 / stage 2, dB -6.59   -5.83   -6.18   -5.92   -5.85   -5.99   -6.24     against 1-4k: -0.67 at 125, +0.09 at 250
+            RC4 held in stage 4 / stage 3, dB -4.58   -4.47   -4.08   -4.25   -4.32   -4.56   -4.62     against 1-4k: -0.21 at 125, -0.10 at 250
+            RC1 stage 1 share of the band, %  87.0    84.8    82.8    83.2    83.5    84.4    85.5    
+            RC1 stage 2 share of the band, %  10.0    11.2    12.8    12.4    12.2    11.6    11.0    
+            RC1 stage 3 share of the band, %  2.2     2.9     3.1     3.2     3.2     2.9     2.6     
+            RC1 stage 4 share of the band, %  0.8     1.1     1.2     1.2     1.2     1.0     0.9     
+            RC5 stage 1 mean time, ms         61      64      68      68      67      64      59      
+            RC5 stage 2 mean time, ms         92      94      96      96      95      92      87      
+            RC5 stage 3 mean time, ms         111     114     117     119     117     113     105     
+            RC5 stage 4 mean time, ms         131     133     132     133     132     127     120     
+            READING: at 125 Hz the systematic deviation reaches half of the output's at stage 2; the variance at stage 2.
+        
+            short, DAMPING OFF
+                                              125     250     500     1k      2k      4k      8k      
+            RC2 stage 1 balance, MEAN         -0.20   +0.13   +0.04   +0.02   +0.02   +0.04   -0.05   
+            RC2 stage 2 balance, MEAN         -1.00   -0.23   +0.30   +0.08   +0.06   -0.01   -0.04   
+            RC2 stage 3 balance, MEAN         -1.65   -0.13   +0.01   +0.03   +0.12   +0.02   -0.03   
+            RC2 stage 4 balance, MEAN         -1.72   -0.20   +0.27   +0.11   +0.15   -0.08   -0.03   
+                the output, MEAN              -1.66   -0.86   +0.29   +0.33   +0.36   -0.06   -0.12   
+            RC3 stage 1 balance, SD           +0.14   +0.24   +0.15   +0.15   +0.13   +0.11   +0.10   
+            RC3 stage 2 balance, SD           +0.62   +0.36   +0.44   +0.35   +0.14   +0.14   +0.11   
+            RC3 stage 3 balance, SD           +0.44   +0.49   +0.28   +0.32   +0.19   +0.16   +0.13   
+            RC3 stage 4 balance, SD           +0.66   +0.88   +0.68   +0.50   +0.16   +0.19   +0.15   
+                the output, SD                +0.66   +0.88   +0.68   +0.50   +0.16   +0.19   +0.15   
+            RC8 output minus stage 4, MEAN    +0.06   -0.66   +0.02   +0.22   +0.21   +0.02   -0.10   
+            RC4 held in stage 2 / stage 1, dB -9.10   -8.65   -8.04   -8.23   -8.26   -8.34   -8.28     against 1-4k: -0.82 at 125, -0.38 at 250
+            RC4 held in stage 3 / stage 2, dB -6.48   -5.73   -6.12   -5.89   -5.78   -5.80   -5.83     against 1-4k: -0.66 at 125, +0.09 at 250
+            RC4 held in stage 4 / stage 3, dB -4.39   -4.39   -4.05   -4.23   -4.28   -4.42   -4.31     against 1-4k: -0.08 at 125, -0.08 at 250
+            RC1 stage 1 share of the band, %  86.0    84.2    82.6    83.1    83.1    83.4    83.2    
+            RC1 stage 2 share of the band, %  10.7    11.5    13.0    12.5    12.4    12.2    12.4    
+            RC1 stage 3 share of the band, %  2.4     3.1     3.2     3.2     3.3     3.2     3.2     
+            RC1 stage 4 share of the band, %  0.9     1.1     1.3     1.2     1.2     1.2     1.2     
+            RC5 stage 1 mean time, ms         66      67      69      69      69      69      69      
+            RC5 stage 2 mean time, ms         99      98      97      97      97      97      97      
+            RC5 stage 3 mean time, ms         120     118     118     120     119     119     119     
+            RC5 stage 4 mean time, ms         142     139     134     135     135     135     135     
+            READING: at 125 Hz the systematic deviation reaches half of the output's at stage 2; the variance at stage 2.
+
+PHASE 12.8.19 - step A: conservation (RC6)
+------------------------------------------
+          Damping off, broadband. The decay rate of the total energy held in the tank, dB per
+          second, fitted from 0.3 x Decay to 1.0 x Decay, against the rate the control asks
+          for (60 / RT60) and against Hall measured the same way.
+        
+            medium   asked -24.00   Hall -23.98   A1b -27.24   (A1b's tank is asked for RT60 x 0.880)
+            short    asked -75.00   Hall -74.81   A1b -80.32   (A1b's tank is asked for RT60 x 0.930)
+            long     asked -12.00   Hall -12.00   A1b -13.35   (A1b's tank is asked for RT60 x 0.899)
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.17 - step A: the coupling law as built (RC7)                                       0 /    0   ok
+  PHASE 12.8.18 - step A: where the fingerprint and the variance are created (RC1-RC5, RC8)     0 /    0   ok
+  PHASE 12.8.19 - step A: conservation (RC6)                                                    0 /    0   ok
+-----------------------------------------------------------------
+  0 / 0 checks passed.  ALL TESTS PASSED.

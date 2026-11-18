@@ -1338,4 +1338,857 @@ void runPhase12Stage8AmbientDiagnosis3()
     hallSearch ("A1b, arrival removed", advanced);
 }
 
+// ===========================================================================
+//  Addendum 3: the scan of earlier Ambient structures, and step A
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        /** Section 2 of addendum 3. Everything is measured from the onset:
+            the time at which the running energy first reaches 0.1 % of the
+            total. */
+        struct Shape
+        {
+            size_t onsetSample = 0;
+            double onset = 0, t10 = 0, t50 = 0, ratio = 0, centroid = 0, early = 0;
+            std::vector<double> cumulative;     // one value per millisecond after the onset
+        };
+
+        [[nodiscard]] Shape shapeOf (const Stereo& ir)
+        {
+            const auto e = detail::energyOfBoth (ir);
+
+            double total = 0.0;
+
+            for (double v : e)
+                total += v;
+
+            Shape s;
+
+            double running = 0.0;
+
+            for (size_t n = 0; n < e.size(); ++n)
+            {
+                running += e[n];
+
+                if (running >= 1.0e-3 * total)
+                {
+                    s.onsetSample = n;
+                    break;
+                }
+            }
+
+            s.onset = 1000.0 * static_cast<double> (s.onsetSample) / kRate;
+
+            double after = 0.0;
+
+            for (size_t n = s.onsetSample; n < e.size(); ++n)
+                after += e[n];
+
+            after = std::max (1.0e-300, after);
+
+            const size_t perMs = static_cast<size_t> (kRate / 1000.0);
+            const size_t early = static_cast<size_t> (0.050 * kRate);
+
+            double sum = 0.0, moment = 0.0;
+            bool got10 = false, got50 = false;
+
+            for (size_t n = s.onsetSample; n < e.size(); ++n)
+            {
+                const size_t i = n - s.onsetSample;
+
+                sum += e[n];
+                moment += e[n] * static_cast<double> (i);
+
+                if (i == early)
+                    s.early = sum / after;
+
+                if (! got10 && sum >= 0.10 * after) { s.t10 = 1000.0 * static_cast<double> (i) / kRate; got10 = true; }
+                if (! got50 && sum >= 0.50 * after) { s.t50 = 1000.0 * static_cast<double> (i) / kRate; got50 = true; }
+
+                if (i % perMs == perMs - 1)
+                    s.cumulative.push_back (sum / after);
+            }
+
+            s.centroid = 1000.0 * moment / after / kRate;
+            s.ratio = s.t10 / std::max (1.0e-9, s.t50);
+
+            return s;
+        }
+
+        [[nodiscard]] double trajectoryDistance (const Shape& a, const Shape& b)
+        {
+            const size_t n = std::max (a.cumulative.size(), b.cumulative.size());
+
+            double worst = 0.0;
+
+            for (size_t i = 0; i < n; ++i)
+                worst = std::max (worst, std::abs ((i < a.cumulative.size() ? a.cumulative[i] : 1.0)
+                                                   - (i < b.cumulative.size() ? b.cumulative[i] : 1.0)));
+
+            return worst;
+        }
+
+        /** Everything before `own` set to zero, and the response moved so
+            that `own` falls on `target`. Length kept. */
+        [[nodiscard]] Stereo onsetAligned (Stereo x, size_t own, size_t target)
+        {
+            for (size_t n = 0; n < std::min (own, x.l.size()); ++n)
+                x.l[n] = x.r[n] = 0.0;
+
+            for (auto* channel : { &x.l, &x.r })
+            {
+                const size_t length = channel->size();
+
+                if (own > target)
+                {
+                    channel->erase (channel->begin(), channel->begin() + static_cast<std::ptrdiff_t> (std::min (length, own - target)));
+                    channel->resize (length, 0.0);
+                }
+                else if (target > own)
+                {
+                    channel->insert (channel->begin(), target - own, 0.0);
+                    channel->resize (length);
+                }
+            }
+
+            return x;
+        }
+
+        [[nodiscard]] double spearman (const std::vector<double>& a, const std::vector<double>& b)
+        {
+            const size_t n = a.size();
+
+            if (n < 3)
+                return 0.0;
+
+            auto ranks = [n] (const std::vector<double>& v)
+            {
+                std::vector<size_t> order (n);
+
+                for (size_t i = 0; i < n; ++i)
+                    order[i] = i;
+
+                std::sort (order.begin(), order.end(), [&] (size_t x, size_t y) { return v[x] < v[y]; });
+
+                std::vector<double> r (n);
+
+                for (size_t i = 0; i < n; ++i)
+                    r[order[i]] = static_cast<double> (i);
+
+                return r;
+            };
+
+            const auto ra = ranks (a), rb = ranks (b);
+            const double mean = 0.5 * static_cast<double> (n - 1);
+
+            double num = 0.0, da = 0.0, db = 0.0;
+
+            for (size_t i = 0; i < n; ++i)
+            {
+                num += (ra[i] - mean) * (rb[i] - mean);
+                da += (ra[i] - mean) * (ra[i] - mean);
+                db += (rb[i] - mean) * (rb[i] - mean);
+            }
+
+            return num / std::sqrt (std::max (1.0e-300, da * db));
+        }
+
+        struct Entry
+        {
+            std::string name;
+            Maker make;
+            std::string recorded;       // Hall's search as the stage reports give it
+            bool staged = true;         // an Ambient structure (enters the correlations)
+            int shapeOnly = 0;          // 1: Hall with Attack at maximum; 2: Hall, pure shift
+        };
+
+        struct Cell
+        {
+            Shape shape;
+            double distance = 0, buildup = 0, profile = 0, echo = 0, late = 0, fluct[2] {};
+            double mean125 = 0, sd125 = 0, worstMean = 0, rough = 0, spread = 0, residence = 0;
+        };
+    }
+}
+
+void runPhase12Stage8AmbientScan()
+{
+    using namespace stage8;
+    using stage6::AmbientSpec;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    auto chain = [] (const AmbientSpec& spec)
+    {
+        return stage6::familyOf ("Ambient " + spec.name, stage6::ambientRaw (spec), true).target.make;
+    };
+
+    auto through = [] (double angle, int stages, double lossy, bool generic)
+    {
+        Structure s;
+        s.matrix = MatrixKind::coupledBlocks;
+        s.coupling = angle;
+        s.injection = InjectionKind::blockA;
+        s.readout = ReadoutKind::blockB;
+        s.diffuserStages = stages;
+        s.blockDecayRatio = lossy;
+        s.genericVectors = generic;
+
+        return Maker ([s] (const User&) { return s; });
+    };
+
+    std::vector<Entry> entries;
+
+    entries.push_back ({ "S3 Ambient A", through (0.15, 4, 1.0, false), "12.32 / 3.51 / 58.58" });
+    entries.push_back ({ "S3 Ambient B", through (0.30, 8, 1.0, false), "19.87 / 3.09 / 22.85" });
+    entries.push_back ({ "S3 Ambient C", through (0.15, 4, 0.35, false), "13.99 / 4.81 / 61.45" });
+    entries.push_back ({ "S3 Ambient D", through (0.15, 4, 1.0, true), "10.74 / 2.02 / 14.07" });
+    entries.push_back ({ "S3 Ambient E", through (0.30, 4, 1.0, true), "9.02 / 1.21 / 18.46" });
+
+    { AmbientSpec s; s.name = "A1a"; s.k = 0.25; entries.push_back ({ "S5 A1a k 0.25", chain (s), "7.77 / 2.90 / 16.73" }); }
+    { AmbientSpec s; entries.push_back ({ "S5 A1b (REFERENCE)", chain (s), "9.77 / 4.00 / 15.33" }); }
+    { AmbientSpec s; s.name = "A3"; s.k = 0.30; s.stages = { { 0, 4 }, { 1, 5 }, { 2, 3, 6, 7 } };
+      entries.push_back ({ "S5 A3 2-2-4 k 0.30", chain (s), "7.76 / 4.12 / 35.93" }); }
+
+    { AmbientSpec s; s.name = "AT2"; s.hear = { 0.25, 0.5, 0.75, 1.0 }; entries.push_back ({ "S6 AT2 all heard", chain (s), "not searched" }); }
+    { AmbientSpec s; s.name = "AT3"; s.direct = 0.25; entries.push_back ({ "S6 AT3 25 % direct", chain (s), "4.03 / 1.98 / 5.97" }); }
+    { AmbientSpec s; s.name = "AT5a"; s.direct = 0.08; entries.push_back ({ "S6 AT5a 8 % direct", chain (s), "3.97 / 2.06 / 4.63" }); }
+    { AmbientSpec s; s.name = "AT6"; s.hear = { 0.0, 0.0, 0.5, 1.0 }; entries.push_back ({ "S6 AT6 last two heard", chain (s), "not searched" }); }
+    { AmbientSpec s; s.name = "AT7"; s.stages = { { 0, 4 }, { 1, 5 }, { 2, 3, 6, 7 } }; entries.push_back ({ "S6 AT7 2-2-4 k 0.40", chain (s), "not searched" }); }
+    { AmbientSpec s; s.name = "asc"; s.stages = { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 } }; entries.push_back ({ "S6 D5 ascending", chain (s), "not searched" }); }
+    { AmbientSpec s; s.name = "fold"; s.stages = { { 0, 7 }, { 1, 6 }, { 2, 5 }, { 3, 4 } }; entries.push_back ({ "S6 D5 folded", chain (s), "not searched" }); }
+
+    const Structure sibling = withDelays ("sibling", mode12::hallSibling().delaysMs);
+
+    entries.push_back ({ "control: Hall's sibling", [sibling] (const User&) { return sibling; }, "-", false, 0 });
+    entries.push_back ({ "control: Hall, Attack max", [] (const User&) { return Structure {}; }, "-", false, 1 });
+    entries.push_back ({ "control: Hall, pure shift", [] (const User&) { return Structure {}; }, "-", false, 2 });
+
+    const size_t referenceIndex = 6;
+
+    std::vector<std::vector<Cell>> cells (entries.size(), std::vector<Cell> (3));
+    Shape hallShape[3];
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const double seconds = irSecondsFor (u.decay);
+
+        const auto hallCentre = impulseResponse (Structure {}, u, seconds);
+        const Features hallFeatures = featuresOf (Structure {}, u);
+        const auto hallThird = thirdOctaveShares (hallCentre);
+
+        hallShape[p] = shapeOf (hallCentre);
+
+        // A1b's onset, for the pure-shift control.
+        const size_t a1bOnset = shapeOf (impulseResponse (entries[referenceIndex].make (u), u, seconds)).onsetSample;
+
+        for (size_t k = 0; k < entries.size(); ++k)
+        {
+            const auto& entry = entries[k];
+            auto& cell = cells[k][static_cast<size_t> (p)];
+
+            User own = u;
+
+            if (entry.shapeOnly == 1)
+                own.attack = 1.0;
+
+            const Structure s = entry.make (own);
+
+            auto centre = impulseResponse (s, own, seconds);
+            auto left   = impulseResponse (s, own, kLeftOnlySeconds, true, false);
+
+            if (entry.shapeOnly == 2)
+            {
+                const size_t shift = a1bOnset > hallShape[p].onsetSample ? a1bOnset - hallShape[p].onsetSample : 0;
+
+                for (auto* x : { &centre, &left })
+                    for (auto* channel : { &x->l, &x->r })
+                    {
+                        channel->insert (channel->begin(), shift, 0.0);
+                        channel->resize (channel->size() - shift);
+                    }
+            }
+
+            cell.shape = shapeOf (centre);
+            cell.distance = trajectoryDistance (cell.shape, hallShape[p]);
+            cell.residence = (cell.shape.onset + cell.shape.centroid) / (hallShape[p].onset + hallShape[p].centroid);
+
+            const size_t leftOnset = shapeOf (left).onsetSample;
+            const size_t hallLeftOnset = shapeOf (impulseResponse (Structure {}, u, kLeftOnlySeconds, true, false)).onsetSample;
+
+            const Features aligned = analyse (onsetAligned (centre, cell.shape.onsetSample, hallShape[p].onsetSample),
+                                              onsetAligned (left, leftOnset, hallLeftOnset));
+            const auto sc = stage5::sameKnobs (hallFeatures, aligned);
+
+            cell.buildup = sc.scaled[0];
+            cell.profile = sc.scaled[1];
+            cell.echo = sc.scaled[2];
+            cell.late = sc.scaled[6];
+            cell.fluct[0] = aligned.fluctuation[0];
+            cell.fluct[1] = aligned.fluctuation[1];
+
+            if (entry.shapeOnly != 0)
+                continue;
+
+            const auto m = perturbedMoments (entry.make, u);
+
+            cell.mean125 = m.mean[0];
+            cell.sd125 = m.sd[0];
+
+            for (double v : m.mean)
+                if (std::abs (v) > std::abs (cell.worstMean))
+                    cell.worstMean = v;
+
+            cell.rough = roughness (thirdOctaveShares (centre), hallThird);
+            cell.spread = spreadOf (sourceGains (s, u));
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.13 - the scan: buildup shape, measured from the onset");
+    // =====================================================================
+
+    info ("  Onset: the running energy first reaches 0.1 % of the total. Everything after is");
+    info ("  measured from it. t10 / t50 has no time scale: 0.152 for an instant rise and an");
+    info ("  exponential decay whatever the decay time; more for a staged build. 'traj' is the");
+    info ("  largest gap between the cumulative-energy curve and Hall's. The four family columns");
+    info ("  are the frozen metric against Hall at the same knobs with the onsets aligned.");
+    info ("  'recorded' is Hall's seven-control search as the stage reports give it (medium / small");
+    info ("  / large); it was not re-run.");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        info ("");
+        info ("    " + std::string (pointName[p]) + "   Hall: onset " + fx (hallShape[p].onset, 0) + " ms, t10 " + fx (hallShape[p].t10, 0)
+              + ", t50 " + fx (hallShape[p].t50, 0) + ", t10/t50 " + fx (hallShape[p].ratio, 3) + ", centroid "
+              + fx (hallShape[p].centroid, 0) + ", early " + fx (hallShape[p].early, 2));
+        info ("    " + pad ("structure", 28) + pad ("onset", 7) + pad ("t10", 6) + pad ("t50", 6) + pad ("t10/t50", 9) + pad ("centr", 7)
+              + pad ("early", 7) + pad ("traj", 7) + pad ("buildup", 9) + pad ("profile", 9) + pad ("echo", 7) + pad ("late", 7)
+              + pad ("fl 50-200", 11) + pad ("fl 200-500", 12) + "recorded");
+
+        for (size_t k = 0; k < entries.size(); ++k)
+        {
+            const auto& c = cells[k][static_cast<size_t> (p)];
+
+            info ("    " + pad (entries[k].name, 28) + pad (fx (c.shape.onset, 0), 7) + pad (fx (c.shape.t10, 0), 6)
+                  + pad (fx (c.shape.t50, 0), 6) + pad (fx (c.shape.ratio, 3), 9) + pad (fx (c.shape.centroid, 0), 7)
+                  + pad (fx (c.shape.early, 2), 7) + pad (fx (c.distance, 2), 7) + pad (fx (c.buildup), 9) + pad (fx (c.profile), 9)
+                  + pad (fx (c.echo), 7) + pad (fx (c.late), 7) + pad (fx (c.fluct[0]), 11) + pad (fx (c.fluct[1]), 12)
+                  + entries[k].recorded);
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.14 - the scan: tone, variance, level, residence");
+    // =====================================================================
+
+    info ("  125 Hz mean and standard deviation over twelve delay perturbations; the worst band's");
+    info ("  mean; third-octave roughness; the spread over vocal, snare and percussion; and the");
+    info ("  whole response's mean time against Hall's.");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        info ("");
+        info ("    " + pad (pointName[p], 28) + pad ("125 mean", 10) + pad ("125 SD", 9) + pad ("worst mean", 12) + pad ("rough", 8)
+              + pad ("spread", 8) + "residence");
+
+        for (size_t k = 0; k < entries.size(); ++k)
+        {
+            if (entries[k].shapeOnly != 0)
+                continue;
+
+            const auto& c = cells[k][static_cast<size_t> (p)];
+
+            info ("    " + pad (entries[k].name, 28) + pad (signedText (c.mean125), 10) + pad (fx (c.sd125), 9)
+                  + pad (signedText (c.worstMean), 12) + pad (fx (c.rough), 8) + pad (fx (c.spread), 8) + fx (c.residence));
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.15 - the scan: relationships");
+    // =====================================================================
+
+    info ("  Spearman rank correlation across the fifteen Ambient structures, each point apart.");
+    info ("  Descriptive: fifteen is few, and a relationship is not a cause.");
+    info ("");
+
+    {
+        const char* const names[8] { "t10/t50", "traj", "residence", "125 mean", "125 SD", "rough", "spread", "buildup" };
+
+        for (int p = 0; p < 3; ++p)
+        {
+            std::vector<std::vector<double>> v (8);
+
+            for (size_t k = 0; k < entries.size(); ++k)
+            {
+                if (! entries[k].staged)
+                    continue;
+
+                const auto& c = cells[k][static_cast<size_t> (p)];
+
+                v[0].push_back (c.shape.ratio);
+                v[1].push_back (c.distance);
+                v[2].push_back (c.residence);
+                v[3].push_back (c.mean125);
+                v[4].push_back (c.sd125);
+                v[5].push_back (c.rough);
+                v[6].push_back (c.spread);
+                v[7].push_back (c.buildup);
+            }
+
+            std::string head = "    " + pad (pointName[p], 12);
+
+            for (const char* n : names)
+                head += pad (n, 11);
+
+            info (head);
+
+            for (int a = 0; a < 8; ++a)
+            {
+                std::string row = "    " + pad (names[a], 12);
+
+                for (int b = 0; b < 8; ++b)
+                    row += pad (b < a ? std::string ("") : signedText (spearman (v[static_cast<size_t> (a)], v[static_cast<size_t> (b)])), 11);
+
+                info (row);
+            }
+
+            info ("");
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.16 - Hall's reach: a baseline for thresholds");
+    // =====================================================================
+
+    info ("  300 random settings of Hall's controls (Size 0-100, Decay 0.3-8 s, Early/Late,");
+    info ("  Early Diffusion, Attack, modulation; fixed seed). Pre-Delay is irrelevant: everything");
+    info ("  is measured from the onset. Then A1b at the nine grid settings. No threshold is set");
+    info ("  here.");
+    info ("");
+
+    {
+        constexpr size_t count = 300;
+
+        std::vector<Shape> reach (count);
+        std::vector<User> users (count);
+
+        unsigned int state = 0x5EED1234u;
+
+        auto uniform = [&state]
+        {
+            state = state * 1664525u + 1013904223u;
+            return static_cast<double> (state >> 8) / static_cast<double> (1u << 24);
+        };
+
+        for (auto& u : users)
+        {
+            u.size = uniform();
+            u.decay = 0.3 * std::pow (8.0 / 0.3, uniform());
+            u.earlyLate = uniform();
+            u.earlyDiff = uniform();
+            u.attack = uniform();
+            u.modDepth = uniform();
+        }
+
+        runParallel (count, [&] (size_t i)
+        {
+            reach[i] = shapeOf (impulseResponse (Structure {}, users[i], irSecondsFor (users[i].decay)));
+        });
+
+        auto summarise = [&] (const std::string& name, const std::function<double (const Shape&)>& of)
+        {
+            std::vector<double> v;
+            size_t top = 0;
+
+            for (size_t i = 0; i < count; ++i)
+            {
+                v.push_back (of (reach[i]));
+
+                if (v[i] > v[top])
+                    top = i;
+            }
+
+            auto sorted = v;
+            std::sort (sorted.begin(), sorted.end());
+
+            info ("    " + pad (name, 16) + "min " + pad (fx (sorted.front(), 3), 8) + "5 % " + pad (fx (sorted[count / 20], 3), 8)
+                  + "median " + pad (fx (sorted[count / 2], 3), 8) + "95 % " + pad (fx (sorted[count - count / 20], 3), 8)
+                  + "max " + pad (fx (sorted.back(), 3), 8) + "(max at Size " + fx (100.0 * users[top].size, 0) + ", Decay "
+                  + fx (users[top].decay) + ", E/L " + fx (100.0 * users[top].earlyLate, 0) + ", EDiff "
+                  + fx (100.0 * users[top].earlyDiff, 0) + ", Atk " + fx (100.0 * users[top].attack, 0) + ")");
+        };
+
+        info ("    Hall, 300 settings:");
+        summarise ("t10 / t50",      [] (const Shape& s) { return s.ratio; });
+        summarise ("centroid / t50", [] (const Shape& s) { return s.centroid / std::max (1.0e-9, s.t50); });
+        summarise ("t10, ms",        [] (const Shape& s) { return s.t10; });
+        summarise ("early fraction", [] (const Shape& s) { return s.early; });
+
+        info ("");
+        info ("    A1b and Hall at the same knobs, Size 25 / 60 / 85 (rows) x Decay 0.8 / 2.5 / 5.0:");
+        info ("    " + pad ("", 22) + pad ("t10/t50  A1b / Hall", 26) + pad ("t10 ms  A1b / Hall", 26) + "early  A1b / Hall");
+
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        const Maker a1b = entries[referenceIndex].make;
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+
+                const double seconds = irSecondsFor (u.decay);
+                const Shape a = shapeOf (impulseResponse (a1b (u), u, seconds));
+                const Shape h = shapeOf (impulseResponse (Structure {}, u, seconds));
+
+                info ("    " + pad ("Size " + fx (100.0 * size, 0) + ", Decay " + fx (decay, 1), 22)
+                      + pad (fx (a.ratio, 3) + " / " + fx (h.ratio, 3), 26) + pad (fx (a.t10, 0) + " / " + fx (h.t10, 0), 26)
+                      + fx (a.early, 3) + " / " + fx (h.early, 3));
+            }
+    }
+}
+
+// ===========================================================================
+//  Step A: root cause, stage by stage
+// ===========================================================================
+void runPhase12Stage8AmbientRootCause()
+{
+    using namespace stage8;
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Maker a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target.make;
+
+    struct Held
+    {
+        double stage[4][7] {};      // energy held, by stage and octave
+        double moment[4][7] {};     // its first moment, samples
+        double out[7] {};           // the output's energy by octave
+    };
+
+    /** One response with the tank's state read line by line. `pairs` lines
+        per stage: 2 for A1b; Hall is read as four pairs and summed later. */
+    auto hold = [] (const Structure& s, const User& u)
+    {
+        const auto length = static_cast<size_t> (irSecondsFor (u.decay) * kRate);
+
+        auto rig = std::make_unique<Rig> (s, u);
+
+        std::vector<Stereo> lines (4);
+        Stereo out;
+
+        for (auto& l : lines)
+        {
+            l.l.assign (length, 0.0);
+            l.r.assign (length, 0.0);
+        }
+
+        out.l.assign (length, 0.0);
+        out.r.assign (length, 0.0);
+
+        {
+            ScopedFtz ftz;
+
+            for (size_t n = 0; n < length; ++n)
+            {
+                double l = n == 0 ? 1.0 : 0.0, r = l;
+                rig->processSample (l, r);
+
+                out.l[n] = l;
+                out.r[n] = r;
+
+                const double* state = rig->getLastState();
+
+                for (size_t k = 0; k < 4; ++k)
+                {
+                    lines[k].l[n] = state[2 * k];
+                    lines[k].r[n] = state[2 * k + 1];
+                }
+            }
+        }
+
+        Held h;
+
+        for (size_t b = 0; b < 7; ++b)
+        {
+            for (size_t k = 0; k < 4; ++k)
+            {
+                const auto e = detail::bandEnergy (lines[k], kBands[b], length);
+
+                for (size_t n = 0; n < e.size(); ++n)
+                {
+                    h.stage[k][b] += e[n];
+                    h.moment[k][b] += e[n] * static_cast<double> (n);
+                }
+            }
+
+            for (double v : detail::bandEnergy (out, kBands[b], length))
+                h.out[b] += v;
+        }
+
+        return h;
+    };
+
+    auto balance = [] (const double* band)
+    {
+        Bands share {};
+        double total = 0.0;
+
+        for (size_t b = 0; b < 7; ++b)
+            total += band[b];
+
+        for (size_t b = 0; b < 7; ++b)
+            share[b] = band[b] / std::max (1.0e-300, total);
+
+        return share;
+    };
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.17 - step A: the coupling law as built (RC7)");
+    // =====================================================================
+
+    info ("  A1b: four stages of two lines; neighbouring stages exchange by a rotation with");
+    info ("  sin^2(theta) = stage loop time / tau, tau = 0.40 x RT60 / 3.");
+    info ("");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+
+        auto base = Structure {}.delaysMs;
+        std::sort (base.begin(), base.end());
+
+        const double scale = mapping::sizeScaleFor (u.size);
+        const double tau = 0.40 * mapping::rt60For (u.decay) / 3.0;
+
+        std::string row = "    " + pad (pointName[p], 9) + "tau " + pad (fx (1000.0 * tau, 0) + " ms", 10) + "decayScale "
+                        + pad (fx (a1b (u).decayScale, 3), 8);
+
+        for (size_t s = 0; s < 4; ++s)
+        {
+            const double loop = 0.5 * (base[s] + base[s + 4]) * scale;
+
+            row += "stage " + std::to_string (s + 1) + ": " + fx (loop, 1) + " ms"
+                 + (s < 3 ? ", sin2 " + fx (std::min (0.5, 0.001 * loop / tau), 3) + "   " : "");
+        }
+
+        info (row);
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.18 - step A: where the fingerprint and the variance are created (RC1-RC5, RC8)");
+    // =====================================================================
+
+    info ("  The tank's state read line by line over the whole response, twelve delay");
+    info ("  perturbations. Each stage's octave balance is compared with Hall's (all eight lines,");
+    info ("  unperturbed, read the same way). MEAN is systematic; SD is chance.");
+
+    for (int p = 0; p < 2; ++p)
+        for (int damping = 0; damping < 2; ++damping)
+        {
+            User u = userAt (kPoints[p]);
+
+            if (damping == 1)
+            {
+                u.lowDamp = 0.0;
+                u.highDamp = 0.0;
+            }
+
+            const Held hall = hold (Structure {}, u);
+
+            double hallAll[7] {};
+
+            for (size_t b = 0; b < 7; ++b)
+                for (size_t k = 0; k < 4; ++k)
+                    hallAll[b] += hall.stage[k][b];
+
+            const Bands hallBalance = balance (hallAll), hallOut = balance (hall.out);
+
+            constexpr size_t seeds = 12;
+
+            std::vector<Held> held (seeds);
+
+            runParallel (seeds, [&] (size_t k)
+            {
+                held[k] = hold (perturbed (a1b (u), static_cast<unsigned int> (k + 1)), u);
+            });
+
+            std::vector<Bands> stageDb[4], outDb (seeds), joinDb[3];
+            double share[4][7] {}, centroid[4][7] {};
+
+            for (auto& v : stageDb) v.resize (seeds);
+            for (auto& v : joinDb)  v.resize (seeds);
+
+            for (size_t k = 0; k < seeds; ++k)
+            {
+                for (size_t s = 0; s < 4; ++s)
+                {
+                    stageDb[s][k] = dbBetween (balance (held[k].stage[s]), hallBalance);
+
+                    for (size_t b = 0; b < 7; ++b)
+                    {
+                        double total = 0.0;
+
+                        for (size_t t = 0; t < 4; ++t)
+                            total += held[k].stage[t][b];
+
+                        share[s][b] += 100.0 * held[k].stage[s][b] / total / seeds;
+                        centroid[s][b] += 1000.0 * held[k].moment[s][b] / held[k].stage[s][b] / kRate / seeds;
+                    }
+                }
+
+                for (size_t s = 0; s < 3; ++s)
+                    for (size_t b = 0; b < 7; ++b)
+                        joinDb[s][k][b] = 10.0 * std::log10 (held[k].stage[s + 1][b] / held[k].stage[s][b]);
+
+                outDb[k] = dbBetween (balance (held[k].out), hallOut);
+            }
+
+            info ("");
+            info ("    " + std::string (pointName[p]) + (damping == 1 ? ", DAMPING OFF" : ", damping as the defaults"));
+            info ("    " + pad ("", 34) + kBandHead);
+
+            const auto outM = momentsOf (outDb);
+
+            Moments stageM[4];
+
+            for (size_t s = 0; s < 4; ++s)
+                stageM[s] = momentsOf (stageDb[s]);
+
+            for (size_t s = 0; s < 4; ++s)
+                info ("    " + pad ("RC2 stage " + std::to_string (s + 1) + " balance, MEAN", 34) + bandRow (stageM[s].mean));
+
+            info ("    " + pad ("    the output, MEAN", 34) + bandRow (outM.mean));
+
+            for (size_t s = 0; s < 4; ++s)
+                info ("    " + pad ("RC3 stage " + std::to_string (s + 1) + " balance, SD", 34) + bandRow (stageM[s].sd));
+
+            info ("    " + pad ("    the output, SD", 34) + bandRow (outM.sd));
+
+            {
+                Bands diff {};
+
+                for (size_t b = 0; b < 7; ++b)
+                    diff[b] = outM.mean[b] - stageM[3].mean[b];
+
+                info ("    " + pad ("RC8 output minus stage 4, MEAN", 34) + bandRow (diff));
+            }
+
+            for (size_t s = 0; s < 3; ++s)
+            {
+                const auto m = momentsOf (joinDb[s]);
+
+                Bands relative {};
+
+                for (size_t b = 0; b < 7; ++b)
+                    relative[b] = m.mean[b] - (m.mean[3] + m.mean[4] + m.mean[5]) / 3.0;
+
+                info ("    " + pad ("RC4 held in stage " + std::to_string (s + 2) + " / stage " + std::to_string (s + 1) + ", dB", 34)
+                      + bandRow (m.mean) + "  against 1-4k: " + signedText (relative[0]) + " at 125, " + signedText (relative[1]) + " at 250");
+            }
+
+            for (size_t s = 0; s < 4; ++s)
+            {
+                std::string row = "    " + pad ("RC1 stage " + std::to_string (s + 1) + " share of the band, %", 34);
+
+                for (size_t b = 0; b < 7; ++b)
+                    row += pad (fx (share[s][b], 1), 8);
+
+                info (row);
+            }
+
+            for (size_t s = 0; s < 4; ++s)
+            {
+                std::string row = "    " + pad ("RC5 stage " + std::to_string (s + 1) + " mean time, ms", 34);
+
+                for (size_t b = 0; b < 7; ++b)
+                    row += pad (fx (centroid[s][b], 0), 8);
+
+                info (row);
+            }
+
+            // The registered reading: the first stage at which the 125 Hz mean
+            // (and SD) reaches half of the output's.
+            int meanAt = 0, sdAt = 0;
+
+            for (int s = 3; s >= 0; --s)
+            {
+                if (std::abs (stageM[static_cast<size_t> (s)].mean[0]) >= 0.5 * std::abs (outM.mean[0]))
+                    meanAt = s + 1;
+
+                if (stageM[static_cast<size_t> (s)].sd[0] >= 0.5 * outM.sd[0])
+                    sdAt = s + 1;
+            }
+
+            info ("    READING: at 125 Hz the systematic deviation reaches half of the output's at stage "
+                  + (meanAt > 0 ? std::to_string (meanAt) : std::string ("- (none)")) + "; the variance at stage "
+                  + (sdAt > 0 ? std::to_string (sdAt) : std::string ("- (none)")) + ".");
+        }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.8.19 - step A: conservation (RC6)");
+    // =====================================================================
+
+    info ("  Damping off, broadband. The decay rate of the total energy held in the tank, dB per");
+    info ("  second, fitted from 0.3 x Decay to 1.0 x Decay, against the rate the control asks");
+    info ("  for (60 / RT60) and against Hall measured the same way.");
+    info ("");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        User u = userAt (kPoints[p]);
+        u.lowDamp = 0.0;
+        u.highDamp = 0.0;
+
+        auto slopeOf = [&] (const Structure& s)
+        {
+            const auto length = static_cast<size_t> (irSecondsFor (u.decay) * kRate);
+            const size_t bin = static_cast<size_t> (0.050 * kRate);
+
+            auto rig = std::make_unique<Rig> (s, u);
+
+            std::vector<double> e (length / bin, 0.0);
+
+            {
+                ScopedFtz ftz;
+
+                for (size_t n = 0; n < e.size() * bin; ++n)
+                {
+                    double l = n == 0 ? 1.0 : 0.0, r = l;
+                    rig->processSample (l, r);
+
+                    const double* state = rig->getLastState();
+
+                    for (int i = 0; i < 8; ++i)
+                        e[n / bin] += state[i] * state[i];
+                }
+            }
+
+            const auto from = static_cast<size_t> (0.3 * u.decay / 0.050), to = std::min (e.size(), static_cast<size_t> (1.0 * u.decay / 0.050));
+
+            double sx = 0, sy = 0, sxx = 0, sxy = 0, count = 0;
+
+            for (size_t b = from; b < to; ++b)
+            {
+                const double x = 0.050 * static_cast<double> (b), y = 10.0 * std::log10 (std::max (1.0e-300, e[b]));
+
+                sx += x; sy += y; sxx += x * x; sxy += x * y; count += 1.0;
+            }
+
+            return (count * sxy - sx * sy) / std::max (1.0e-300, count * sxx - sx * sx);
+        };
+
+        const double asked = -60.0 / mapping::rt60For (u.decay);
+
+        info ("    " + pad (pointName[p], 9) + "asked " + pad (fx (asked, 2), 9) + "Hall " + pad (fx (slopeOf (Structure {}), 2), 9)
+              + "A1b " + pad (fx (slopeOf (a1b (u)), 2), 9) + "(A1b's tank is asked for RT60 x " + fx (a1b (u).decayScale, 3) + ")");
+    }
+}
+
 } // namespace avtest
