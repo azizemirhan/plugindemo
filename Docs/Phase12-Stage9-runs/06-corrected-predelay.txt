@@ -1,0 +1,47 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8PreDelayVerification
+
+
+PHASE 12.8.30 - the Pre-Delay confound: A1b at the default, full-support alignment
+----------------------------------------------------------------------------------
+          The earlier reading (1.93, run 1.88) moved A1b EARLIER by 63 ms and so discarded about
+          8 ms after its first arrival. Here nothing of the target is discarded: Hall is delayed
+          by zero padding instead. Start: the Hall solution found then. A methodological
+          verification; it restores nothing and changes no verdict.
+        
+          D* = 43.1 ms. Start: Size 3 Decay 2.37 E/L 1 EDiff 72 Atk 59 Mod 21 Width 145 Pre-Delay 63.1 ms
+        
+            AT THE START, three ways:
+              target advanced (the earlier method)        worst 3.30    buildup 1.33; stereo 1.82; decay 1.58; recurrence 1.60; loop repetition 3.30; modal structure 1.86; band arrival 1.34; 
+              FULL SUPPORT, dust zeroed                    worst 5.60    decay 1.33; recurrence 4.77; late texture 5.60; loop repetition 3.26; modal structure 1.79; band arrival 1.21; 
+              FULL SUPPORT, target exactly as it is        worst 153.25  stereo 8.66; decay 1.33; recurrence 5.11; late texture 153.25; loop repetition 3.26; modal structure 1.79; band arrival 1.21; 
+        
+            REFINED from that solution (a pattern search over the seven controls and Pre-Delay),
+            started at Pre-Delay D* + 0 / 10 / 20 / 30 / 40 ms:
+        
+              FULL SUPPORT (target whole, dust zeroed; Hall delayed):
+                from D* +0   worst 1.28   buildup 1.01; stereo 1.27; decay 1.17; loop repetition 1.18; modal str Size 15 Decay 2.43 E/L 0 EDiff 62 Atk 63 Mod 0 Width 143 Pre-Delay 55.1 ms
+                from D* +10  worst 1.60   buildup 1.53; echo density 1.56; stereo 1.55; decay 1.39; recurrence 1 Size 27 Decay 2.57 E/L 2 EDiff 34 Atk 37 Mod 0 Width 159 Pre-Delay 65.1 ms
+                from D* +20  worst 2.19   buildup 1.81; energy profile 1.58; echo density 1.87; stereo 1.69; rec Size 27 Decay 2.50 E/L 9 EDiff 59 Atk 76 Mod 62 Width 159 Pre-Delay 75.1 ms
+                from D* +30  worst 2.09   buildup 1.06; energy profile 1.40; stereo 2.07; decay 1.73; recurrence Size 27 Decay 2.25 E/L 2 EDiff 35 Atk 76 Mod 41 Width 171 Pre-Delay 49.1 ms
+                from D* +40  worst 4.42   energy profile 4.42; echo density 2.45; stereo 1.04; recurrence 1.68;  Size 27 Decay 2.50 E/L 3 EDiff 40 Atk 76 Mod 66 Width 135 Pre-Delay 86.1 ms
+        
+              target advanced (the earlier method), for comparison:
+                from D* +0   worst 1.67   energy profile 1.18; stereo 1.67; decay 1.67; recurrence 1.32; loop re Size 3 Decay 2.25 E/L 0 EDiff 86 Atk 67 Mod 17 Width 143 Pre-Delay 76.1 ms
+                from D* +10  worst 1.74   energy profile 1.70; stereo 1.74; decay 1.64; recurrence 1.72; loop re Size 8 Decay 2.25 E/L 0 EDiff 80 Atk 75 Mod 19 Width 150 Pre-Delay 71.1 ms
+                from D* +20  worst 1.85   buildup 1.01; echo density 1.49; stereo 1.85; decay 1.85; loop repetit Size 11 Decay 2.25 E/L 0 EDiff 60 Atk 59 Mod 0 Width 150 Pre-Delay 76.6 ms
+                from D* +30  worst 1.87   buildup 1.06; echo density 1.62; stereo 1.87; decay 1.58; recurrence 1 Size 11 Decay 2.31 E/L 0 EDiff 57 Atk 59 Mod 0 Width 149 Pre-Delay 73.1 ms
+                from D* +40  worst 1.85   echo density 1.60; stereo 1.83; decay 1.82; loop repetition 1.85;      Size 11 Decay 2.25 E/L 0 EDiff 60 Atk 59 Mod 0 Width 150 Pre-Delay 78.6 ms
+        
+          READING. Lowest found with full support: 1.28. With the target advanced: 1.67.
+          At the default point Hall + Pre-Delay + visible controls is a MIMIC of A1b (<= 1.5).
+          One start and its neighbours, not five seeds of the frozen scatter: a lower figure may exist.
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.30 - the Pre-Delay confound: A1b at the default, full-support alignment     0 /    0   ok
+-----------------------------------------------------------------
+  0 / 0 checks passed.  ALL TESTS PASSED.

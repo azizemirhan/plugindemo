@@ -1,0 +1,65 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8AmbientDiagnosis3
+
+
+PHASE 12.8.10 - DA11a: A1b against Hall at the same knobs, arrival removed
+--------------------------------------------------------------------------
+          Target only. Dust zeroed: every sample before the first 5 ms bin above -200 dB is set
+          to exactly zero. Advanced by D*: moved earlier by A1b's arrival minus Hall's (35 / 15 /
+          65 ms) - which is Hall with that much Pre-Delay. Every centred family at or above 1.5.
+        
+            medium   (control: Hall dust-zeroed against Hall 0.00)
+              as it is                  worst 154.99 (late texture)     buildup 11.39; energy profile 7.95; echo density 5.05; stereo 9.45; decay 5.28; late texture 154.99; loop repetition 3.53; modal structure 6.75; 
+              dust zeroed               worst 11.39 (buildup)           buildup 11.39; energy profile 7.95; echo density 5.05; stereo 1.78; decay 5.28; late texture 7.34; loop repetition 3.53; modal structure 6.75; 
+              zeroed, advanced by D*    worst 9.40 (stereo)             buildup 8.21; energy profile 3.28; stereo 9.40; decay 3.86; loop repetition 3.56; modal structure 6.75; 
+              fluctuation 50-200 ms: Hall 0.48, A1b zeroed 4.12, A1b zeroed and advanced 0.35 dB
+        
+            short   (control: Hall dust-zeroed against Hall 0.00)
+              as it is                  worst 8.29 (buildup)            buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+              dust zeroed               worst 8.29 (buildup)            buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+              zeroed, advanced by D*    worst 5.91 (buildup)            buildup 5.91; energy profile 2.78; stereo 2.70; decay 2.73; modal structure 3.24; band arrival 1.54; 
+              fluctuation 50-200 ms: Hall 0.33, A1b zeroed 0.31, A1b zeroed and advanced 0.29 dB
+        
+            long   (control: Hall dust-zeroed against Hall 0.00)
+              as it is                  worst 298.39 (late texture)     buildup 14.10; energy profile 8.50; echo density 4.74; stereo 4.16; decay 5.63; late texture 298.39; loop repetition 3.55; modal structure 6.21; 
+              dust zeroed               worst 14.65 (buildup)           buildup 14.65; energy profile 8.50; echo density 4.74; stereo 4.16; decay 5.63; late texture 4.42; loop repetition 3.55; modal structure 6.21; 
+              zeroed, advanced by D*    worst 10.42 (buildup)           buildup 10.42; energy profile 2.98; stereo 6.72; decay 4.21; late texture 2.76; loop repetition 3.67; modal structure 6.55; 
+              fluctuation 50-200 ms: Hall 0.71, A1b zeroed 2.89, A1b zeroed and advanced 2.07 dB
+        
+
+PHASE 12.8.11 - DA11b: Hall's search against A1b, dust zeroed
+-------------------------------------------------------------
+          The frozen search, five seeds. The gate's reading with A1b's pre-arrival bins exact
+          zeros, as Hall's are. Diagnostic; not G2. As recorded: 9.77 / 4.00 / 15.33.
+        
+            medium   median 5.32    lowest 4.98    runs 4.98 5.37 5.32 5.70 4.99          distinct                        stops on modal structure
+                     Hall's knobs in the lowest run: Size 84 Decay 1.78 E/L 0 EDiff 14 Atk 41 Mod 1 Width 200
+            short    median 3.98    lowest 3.56    runs 4.00 3.56 4.04 3.79 3.98          distinct                        stops on modal structure
+                     Hall's knobs in the lowest run: Size 72 Decay 0.85 E/L 0 EDiff 65 Atk 22 Mod 65 Width 156
+            long     median 8.75    lowest 8.29    runs 8.75 8.83 8.29 8.69 8.79          distinct                        stops on energy profile
+                     Hall's knobs in the lowest run: Size 100 Decay 6.70 E/L 2 EDiff 58 Atk 65 Mod 100 Width 136
+
+PHASE 12.8.12 - DA11c: Hall with Pre-Delay against A1b
+------------------------------------------------------
+          The same search against A1b dust-zeroed AND advanced by D* (35 / 15 / 65 ms). The
+          product has a Pre-Delay control; the frozen search does not. Label: A1b, arrival
+          removed. Diagnostic; reclassifies nothing. D* is one value per point, so this is, if
+          anything, optimistic for A1b.
+        
+            medium   median 4.90    lowest 4.72    runs 4.72 4.85 4.90 5.41 7.20          distinct                        stops on modal structure
+                     Hall's knobs in the lowest run: Size 74 Decay 1.88 E/L 0 EDiff 0 Atk 15 Mod 14 Width 194
+            short    median 1.93    lowest 1.87    runs 1.90 2.10 1.87 2.00 1.93          WEAK                            stops on stereo
+                     Hall's knobs in the lowest run: Size 0 Decay 0.81 E/L 0 EDiff 69 Atk 49 Mod 2 Width 115
+            long     median 3.28    lowest 3.26    runs 3.26 3.28 3.33 3.32 3.26          distinct                        stops on buildup
+                     Hall's knobs in the lowest run: Size 77 Decay 4.74 E/L 0 EDiff 15 Atk 28 Mod 1 Width 166
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.10 - DA11a: A1b against Hall at the same knobs, arrival removed     0 /    0   ok
+  PHASE 12.8.11 - DA11b: Hall's search against A1b, dust zeroed                  0 /    0   ok
+  PHASE 12.8.12 - DA11c: Hall with Pre-Delay against A1b                         0 /    0   ok
+-----------------------------------------------------------------
+  0 / 0 checks passed.  ALL TESTS PASSED.

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -342,7 +343,23 @@ namespace structural
     /** The largest residual any negative control left. Set by 12.3.3. */
     double strongestNegative = 0.0;
 
-    const Floor& floorOf() { return gFloor; }
+    /** The floor, MEASURED IF IT HAS NOT BEEN. Until 2026-11-19 this returned
+        whatever was there, which in a run filtered to a later stage was an
+        empty floor: every family then divided by 1 and the scores came out
+        unscaled, silently (Docs/Phase12-Stage9-Metric-Baseline-Correction.md).
+        No caller can now read an unmeasured floor. The values are those
+        ensureFloor() has always produced; nothing about the metric changes.
+        The lock is for the searches, which read the floor from many threads. */
+    const Floor& floorOf()
+    {
+        static std::mutex guard;
+        const std::lock_guard<std::mutex> lock (guard);
+
+        if (! gFloorMeasured)
+            ensureFloor();
+
+        return gFloor;
+    }
 
     // =======================================================================
     //  A batch of impostor searches

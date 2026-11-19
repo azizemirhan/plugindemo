@@ -1,0 +1,133 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8AmbientDiagnosis
+
+
+PHASE 12.8.0 - DA0: is A1b with Hall's tone still A1b to the metric?
+--------------------------------------------------------------------
+          Stage 7's control: A1b's own response through a linear-phase filter that moves its
+          octave shares onto Hall's. Structure untouched. Frozen metric, same knobs, against
+          A1b. Requirement 2 asks a repair for <= 1.5; if this control is over 1.5, no tonal
+          repair can meet it. 'filter alone' is the same process with a flat filter.
+        
+            [medium] flat filter: worst |difference| / peak 25.52 e-15; first non-zero sample 1779; identical input scores 0.00; families: recurrence 1.09; late texture 58.21; 
+            [short] flat filter: worst |difference| / peak 22.08 e-15; first non-zero sample 859; identical input scores 0.00; families: recurrence 0.11; 
+            [long] flat filter: worst |difference| / peak 24.87 e-15; first non-zero sample 2992; identical input scores 0.00; families: buildup 0.56; stereo 8.61; recurrence 1.02; late texture 75.42; 
+                                        medium    short     long
+            filter alone                58.21     0.11      75.42
+            A1b, fingerprint off        134.82    1.76      144.12
+              separating family         late texture / echo density / late texture
+              tone left after the filter0.04      0.07      0.04  dB
+        
+          READING: requirement 2 is NOT REACHABLE by a tonal repair as the metric reads it.
+  FAIL  FINDING: A1b with Hall's tone reads as A1b (<= 1.5) at all three points
+
+PHASE 12.8.1 - DA1, DA2: systematic or variance?
+------------------------------------------------
+          Octave deviation from Hall, dB, with every delay perturbed by up to +/- 4 %: twelve
+          seeds. MEAN is what does not depend on where the modes fall (S). SD is what does (V).
+          Hall perturbed the same way, against itself, is the floor.
+          Rule: S present if |mean| >= 0.5 and >= 2 standard errors; V present if the SD is
+          >= 0.5 and >= twice Hall's.
+        
+            medium                        125     250     500     1k      2k      4k      8k      
+              A1b mean (S)                -0.95   +0.53   +0.46   +0.46   +0.36   +0.28   -0.64   
+              A1b SD (V)                  +1.14   +0.83   +0.49   +0.45   +0.25   +0.16   +0.18   
+              Hall SD (floor)             +0.36   +0.19   +0.10   +0.10   +0.05   +0.04   +0.03   
+              A1b mean, damping off       -1.12   +0.23   -0.02   -0.05   -0.03   +0.18   -0.10   
+              A1b SD, damping off         +1.26   +0.91   +0.51   +0.48   +0.26   +0.14   +0.15   
+              present                     SV      SV      --      --      --      --      S-      
+        
+            short                         125     250     500     1k      2k      4k      8k      
+              A1b mean (S)                -1.50   -0.52   +0.77   +0.86   +0.79   +0.02   -0.70   
+              A1b SD (V)                  +0.57   +0.79   +0.64   +0.49   +0.15   +0.22   +0.19   
+              Hall SD (floor)             +0.26   +0.25   +0.18   +0.18   +0.18   +0.08   +0.09   
+              A1b mean, damping off       -1.66   -0.86   +0.29   +0.33   +0.36   -0.06   -0.12   
+              A1b SD, damping off         +0.66   +0.88   +0.68   +0.50   +0.16   +0.19   +0.15   
+              present                     SV      SV      SV      S-      S-      --      S-      
+        
+            long                          125     250     500     1k      2k      4k      8k      
+              A1b mean (S)                +0.47   +0.50   +0.11   +0.39   +0.36   +0.14   -0.47   
+              A1b SD (V)                  +1.10   +0.57   +0.41   +0.41   +0.15   +0.20   +0.14   
+              Hall SD (floor)             +0.14   +0.11   +0.13   +0.09   +0.04   +0.01   +0.03   
+              A1b mean, damping off       +0.42   +0.23   -0.37   -0.13   -0.04   +0.04   +0.01   
+              A1b SD, damping off         +1.23   +0.59   +0.42   +0.41   +0.15   +0.18   +0.11   
+              present                     -V      -V      --      --      --      --      --      
+        
+          READING: S present in 9 of 21 band-points, V in 7 of 21.
+          Mean of the SD over the seven bands, A1b / Hall: medium 0.50 / 0.12, short 0.44 / 0.17, long 0.42 / 0.08
+  PASS  FINDING: the diagnosis finds something - S or V is present somewhere
+
+PHASE 12.8.2 - DA3: roughness at third-octave scale
+---------------------------------------------------
+          Standard deviation over 21 third-octave bands (100 Hz - 10 kHz) of the share against
+          Hall's, dB. What a source's spectrum samples.
+        
+                                  medium    short     long
+            Hall's sibling        0.32      0.34      0.15
+            A1b                   1.61      1.94      0.72
+            AT5a                  0.27      0.40      0.30
+
+PHASE 12.8.3 - DA4: which sparseness does the variance come from?
+-----------------------------------------------------------------
+          PROBES, NOT CANDIDATES. Mean over the seven bands of the SD across twelve seeds, dB,
+          and the mean deviation's worst band. Only how many lines are heard or fed changes.
+        
+            probe                       SD medium  SD short   SD long    worst |mean| medium / short / long
+            A1b: fed 1st, heard last    0.50       0.44       0.42       0.95 / 1.50 / 0.50
+            heard last two              0.32       0.30       0.28       0.65 / 1.41 / 0.56
+            heard all, weighted         0.09       0.20       0.09       0.40 / 0.49 / 0.46
+            fed first two               0.33       0.32       0.21       0.45 / 0.61 / 0.50
+            AT5a: 8 % direct            0.08       0.10       0.07       0.44 / 0.31 / 0.37
+            Hall (floor)                0.12       0.17       0.08
+
+PHASE 12.8.4 - DA5: source-to-source consistency, the baselines
+---------------------------------------------------------------
+          Requirement 4. Each structure is level-matched to Hall on its impulse response AT
+          THE SETTING; the gain still needed to match Hall on each source, dB. Spread: largest
+          minus smallest over vocal, snare, percussion. The piano phrase does not gate.
+          'law' is the level match itself: what a static level law over Size and Decay removes.
+        
+            structure         setting  vocal         snare         percussion    piano phrase  spread   law
+            Hall's sibling    medium   -0.12         -0.04         -0.08         +3.37         0.08     +0.05
+                              short    -0.20         -0.04         +0.08         -0.21         0.28     +0.03
+                              long     +0.55         +0.01         +0.00         -0.58         0.55     +0.17
+            A1b               medium   -1.43         -0.04         +0.85         +0.67         2.27     -0.00
+                              short    -1.79         -0.02         +1.04         +0.77         2.83     -2.43
+                              long     +0.35         +0.04         +0.68         -2.02         0.63     +0.47
+            AT5a              medium   -0.49         -0.06         +0.05         +3.37         0.54     -0.00
+                              short    -0.16         +0.03         +0.16         -1.47         0.32     +0.02
+                              long     +0.48         +0.00         +0.06         -1.55         0.48     +0.06
+        
+            The level law A1b would need, dB, Size 25 / 60 / 85 (rows) x Decay 0.8 / 2.5 / 5.0:
+              -2.43    +2.52    +5.70
+              -5.66    -0.00    +3.40
+              -5.82    -2.54    +0.47
+
+PHASE 12.8.5 - DA6: residence time by band
+------------------------------------------
+          Energy-weighted mean arrival time of each octave, ms, and A1b / Hall.
+        
+                                  125     250     500     1k      2k      4k      8k      
+            medium  Hall          191     201     210     211     208     198     176     
+                    A1b           304     312     338     350     350     329     299     
+                    ratio         1.59    1.56    1.61    1.66    1.68    1.66    1.70    
+            short  Hall           78      76      78      82      82      76      71      
+                    A1b           135     131     135     138     139     132     122     
+                    ratio         1.73    1.73    1.72    1.69    1.70    1.72    1.72    
+            long  Hall            360     383     392     400     393     367     329     
+                    A1b           603     648     667     676     652     632     584     
+                    ratio         1.67    1.69    1.70    1.69    1.66    1.72    1.78    
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.0 - DA0: is A1b with Hall's tone still A1b to the metric?     0 /    1   FAILED
+  PHASE 12.8.1 - DA1, DA2: systematic or variance?                         1 /    1   ok
+  PHASE 12.8.2 - DA3: roughness at third-octave scale                      0 /    0   ok
+  PHASE 12.8.3 - DA4: which sparseness does the variance come from?        0 /    0   ok
+  PHASE 12.8.4 - DA5: source-to-source consistency, the baselines          0 /    0   ok
+  PHASE 12.8.5 - DA6: residence time by band                               0 /    0   ok
+-----------------------------------------------------------------
+  1 / 2 checks passed.  1 FAILURE(S).

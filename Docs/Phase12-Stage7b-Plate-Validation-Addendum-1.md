@@ -1,5 +1,7 @@
 # Phase 12 Stage 7b — Plate validation: addendum 1 (the fitting law, the statistic, the tool)
 
+> **Correction, 2026-11-19.** The frozen-metric scores in this document were read without the same-family baseline and are unscaled: buildup is overstated by 25 %, energy profile by 83 %, echo density by 25 %; the other families are correct. Timing, tone, level and CPU figures are unaffected. Every affected figure, before and after, is in `Phase12-Stage9-Metric-Baseline-Correction.md`, which governs where the two differ. This document is otherwise left as written.
+
 Decided 2026-11-18. Addendum to
 `Docs/Phase12-Stage7b-Plate-Validation-Setup.md`. Where the two differ,
 this page governs. Research only; `Source/` is unchanged.

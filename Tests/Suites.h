@@ -134,6 +134,10 @@ void runPhase12Stage8AmbientWide();         // on request only
 void runPhase12Stage8AmbientSibling();          // on request only
 void runPhase12Stage8AmbientSiblingSearch();    // on request only
 void runPhase12Stage8PreDelayVerification();    // on request only
+void runPhase12MetricBaselineTests();           // fast, in the regression
+void runPhase12Stage9As2Design();               // on request only
+void runPhase12Stage9As2();                     // on request only
+void runPhase12Stage9As2Final();                // on request only
 
 /** Runs every suite and returns the process exit code (0 = all passed). */
 int runAllSuites();

@@ -718,6 +718,10 @@ void runPhase12Stage7PlateRates()
 {
     using namespace stage7;
 
+    // The same-family floor every frozen score is divided by. The first run
+    // of this suite did not measure it (found 2026-11-19).
+    ensureFloor();
+
     beginSuite ("PHASE 12.7 PLATE - secondary rates: 44.1, 96 and 192 kHz");
 
     // --- the law and S1 -----------------------------------------------------------

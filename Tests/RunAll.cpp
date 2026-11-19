@@ -243,6 +243,7 @@ int runAllSuites()
     AV_RUN (runPhase12Stage6FastTests);
     AV_RUN_HEAVY (runPhase12Stage6Tests);
     AV_RUN (runPhase12Stage7PlateFastTests);
+    AV_RUN (runPhase12MetricBaselineTests);
 
     // The Plate validation tool. Named exactly, or not run at all.
     AV_RUN_ON_REQUEST (runPhase12Stage7PlateCpu);
@@ -259,6 +260,11 @@ int runAllSuites()
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientSibling);
     AV_RUN_ON_REQUEST (runPhase12Stage8AmbientSiblingSearch);
     AV_RUN_ON_REQUEST (runPhase12Stage8PreDelayVerification);
+
+    // Stage 9, Ambient AS2.
+    AV_RUN_ON_REQUEST (runPhase12Stage9As2Design);
+    AV_RUN_ON_REQUEST (runPhase12Stage9As2);
+    AV_RUN_ON_REQUEST (runPhase12Stage9As2Final);
 
 
     if (suitesRun == 0)

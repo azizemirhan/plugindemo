@@ -1,5 +1,7 @@
 # Phase 12 Stage 8 — Ambient: addendum 2 (DA7 – DA10 read; DA11 registered)
 
+> **Correction, 2026-11-19.** The frozen-metric scores in this document were read without the same-family baseline and are unscaled: buildup is overstated by 25 %, energy profile by 83 %, echo density by 25 %; the other families are correct. Timing, tone, level and CPU figures are unaffected. Every affected figure, before and after, is in `Phase12-Stage9-Metric-Baseline-Correction.md`, which governs where the two differ. This document is otherwise left as written.
+
 Addendum to `Phase12-Stage8-Ambient-Repair-Preregistration.md`. Written
 after DA7 – DA10 were run (log
 `Phase12-Stage8-runs/02-ambient-diagnosis-floor.txt`) and **before** DA11.

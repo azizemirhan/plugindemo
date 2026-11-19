@@ -1,5 +1,7 @@
 # Phase 12 Stage 8 — Ambient: what the diagnosis found. Report, and a stop
 
+> **Correction, 2026-11-19.** The frozen-metric scores in this document were read without the same-family baseline and are unscaled: buildup is overstated by 25 %, energy profile by 83 %, echo density by 25 %; the other families are correct. Timing, tone, level and CPU figures are unaffected. Every affected figure, before and after, is in `Phase12-Stage9-Metric-Baseline-Correction.md`, which governs where the two differ. This document is otherwise left as written.
+
 Research only. `Source/` is unchanged. No Mode selector, no Phase 13.
 **No repair candidate was built.** The diagnosis that was to come before
 the repair found something about A1b itself that the repair cannot go

@@ -1,0 +1,97 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage8AmbientDiagnosis2
+
+
+PHASE 12.8.6 - DA7: are the late-texture bins in numerical dust?
+----------------------------------------------------------------
+          The 5 ms energy envelope against each response's loudest bin: the time, ms, at which
+          it first passes -200, -120 and -60 dB. The late-texture family reads bins from 30 ms.
+          Then the family's two figures (dB of spread, 50-200 ms and 200-500 ms).
+        
+                                      first   -200 dB   -120 dB   -60 dB    loudest at  fluct 50-200  fluct 200-500
+            medium  Hall              22.9    20        20        20        50          0.48          0.33
+                    A1b               37.1    55        55        55        215         77.20         0.31
+                    A1b, flat filter  0.0     55        55        55        215         48.38         0.31
+            short  Hall               11.0    10        10        10        30          0.33          0.42
+                    A1b               17.9    25        25        25        100         0.31          0.35
+                    A1b, flat filter  0.0     25        25        25        100         0.31          0.35
+            long  Hall                38.5    35        35        35        75          0.71          0.46
+                    A1b               62.3    100       100       100       385         148.40        0.35
+                    A1b, flat filter  19.7    100       100       100       385         111.07        0.35
+
+PHASE 12.8.7 - DA8: the separation with everything below a level masked
+-----------------------------------------------------------------------
+          A1b against Hall at the same knobs, frozen metric, with the same white noise added to
+          both responses L dB below each one's loudest 5 ms bin. Worst centred family, its name,
+          and the late-texture figure. -120 dB is 24 dB under the floor of 16-bit audio.
+        
+            medium
+              no floor          worst 154.99 (late texture)       late texture 154.99     others >= 1.5: buildup 11.39; energy profile 7.95; echo density 5.05; stereo 9.45; decay 5.28; loop repetition 3.53; modal structure 6.75; 
+              floor -200 dB     worst 66.07 (late texture)        late texture 66.07      others >= 1.5: buildup 11.39; energy profile 7.95; echo density 5.05; stereo 1.78; decay 5.28; loop repetition 3.53; modal structure 6.75; 
+              floor -160 dB     worst 51.70 (late texture)        late texture 51.70      others >= 1.5: buildup 11.39; energy profile 7.95; echo density 5.78; stereo 1.78; decay 5.28; loop repetition 3.53; modal structure 6.75; 
+              floor -120 dB     worst 37.44 (late texture)        late texture 37.44      others >= 1.5: buildup 11.39; energy profile 7.95; echo density 5.78; stereo 1.78; decay 5.28; loop repetition 3.53; modal structure 6.75; 
+              floor -100 dB     worst 30.39 (late texture)        late texture 30.39      others >= 1.5: buildup 11.39; energy profile 7.95; echo density 5.78; stereo 1.78; decay 5.28; loop repetition 3.53; modal structure 6.75; 
+              controls at -120 dB: Hall against Hall + floor 2.46; A1b + floor against A1b + a different floor 0.24
+        
+            short
+              no floor          worst 8.29 (buildup)              late texture 0.16       others >= 1.5: buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+              floor -200 dB     worst 8.29 (buildup)              late texture 0.16       others >= 1.5: buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+              floor -160 dB     worst 8.29 (buildup)              late texture 0.16       others >= 1.5: buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+              floor -120 dB     worst 8.29 (buildup)              late texture 0.16       others >= 1.5: buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.20; band arrival 1.54; 
+              floor -100 dB     worst 8.29 (buildup)              late texture 0.16       others >= 1.5: buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.37; band arrival 1.54; 
+              controls at -120 dB: Hall against Hall + floor 0.24; A1b + floor against A1b + a different floor 0.02
+        
+            long
+              no floor          worst 298.39 (late texture)       late texture 298.39     others >= 1.5: buildup 14.10; energy profile 8.50; echo density 4.74; stereo 4.16; decay 5.63; loop repetition 3.55; modal structure 6.21; 
+              floor -200 dB     worst 122.58 (late texture)       late texture 122.58     others >= 1.5: buildup 14.22; energy profile 8.50; echo density 4.74; stereo 4.16; decay 5.63; loop repetition 3.55; modal structure 6.21; 
+              floor -160 dB     worst 95.15 (late texture)        late texture 95.15      others >= 1.5: buildup 14.22; energy profile 8.50; echo density 2.34; stereo 4.16; decay 5.63; loop repetition 3.55; modal structure 6.21; 
+              floor -120 dB     worst 67.76 (late texture)        late texture 67.76      others >= 1.5: buildup 14.22; energy profile 8.50; echo density 2.34; stereo 4.16; decay 5.63; loop repetition 3.55; modal structure 6.21; 
+              floor -100 dB     worst 54.09 (late texture)        late texture 54.09      others >= 1.5: buildup 14.22; energy profile 8.50; echo density 2.34; stereo 4.16; decay 5.63; loop repetition 3.55; modal structure 6.21; 
+              controls at -120 dB: Hall against Hall + floor 5.94; A1b + floor against A1b + a different floor 0.28
+        
+          READING: A1b's unfloored late-texture distance from Hall is PREDOMINANTLY BELOW -120 dB wherever it exceeds 3.0.
+
+PHASE 12.8.8 - DA10: is the low-frequency deficit missing phase scrambling?
+---------------------------------------------------------------------------
+          DA1's mean deviation, damping off, at three modulation depths. If modulation is what
+          lets the high bands migrate, then with it off every band migrates alike and the gap
+          between 125 Hz and 1-4 kHz closes. Holds if the gap at depth 0 is under half the
+          gap at the default.
+        
+                                  125     250     500     1k      2k      4k      8k      125 minus 1-4k
+            medium, depth 0.00    -1.17   -0.19   -0.31   -0.05   +0.05   +0.02   +0.03   -1.18
+            medium, depth 0.30    -1.12   +0.23   -0.02   -0.05   -0.03   +0.18   -0.10   -1.15
+            medium, depth 0.60    -1.02   +0.28   -0.02   -0.04   -0.04   +0.17   -0.10   -1.05
+            short, depth 0.00     -1.89   -0.66   +0.08   -0.30   +0.10   +0.05   +0.02   -1.84
+            short, depth 0.30     -1.66   -0.86   +0.29   +0.33   +0.36   -0.06   -0.12   -1.87
+            short, depth 0.60     -1.64   -0.86   +0.28   +0.35   +0.36   -0.06   -0.12   -1.86
+        
+          READING: the hypothesis DOES NOT HOLD.
+  FAIL  FINDING: with modulation off the low-frequency deficit closes by at least half
+
+PHASE 12.8.9 - DA9: Hall's search against A1b read with a -120 dB floor
+-----------------------------------------------------------------------
+          The frozen search, five seeds, three points. ONLY THE TARGET IS FLOORED: the search
+          reads Hall without a floor, as the frozen code does. A diagnostic reading, not G2; it
+          changes no recorded verdict. Unfloored, Stage 5 and 6: 9.77 / 4.00 / 15.33, lowest 3.56.
+        
+            medium   median 15.15   runs 15.15 14.29 17.24 14.03 15.45     stops on energy profile
+                     Hall's knobs in the lowest run: Size 100 Decay 4.21 E/L 97 EDiff 54 Atk 99 Mod 99 Width 12
+            short    median 3.95    runs 3.95 3.49 3.89 4.14 4.19          stops on echo density
+                     Hall's knobs in the lowest run: Size 72 Decay 0.94 E/L 0 EDiff 71 Atk 22 Mod 53 Width 150
+            long     median 17.20   runs 17.20 18.40 48.30 17.18 17.17     stops on echo density
+                     Hall's knobs in the lowest run: Size 99 Decay 5.07 E/L 0 EDiff 4 Atk 16 Mod 52 Width 2
+        
+          A1b, floor -120 dB: SURVIVES, lowest run 3.49
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.8.6 - DA7: are the late-texture bins in numerical dust?                0 /    0   ok
+  PHASE 12.8.7 - DA8: the separation with everything below a level masked         0 /    0   ok
+  PHASE 12.8.8 - DA10: is the low-frequency deficit missing phase scrambling?     0 /    1   FAILED
+  PHASE 12.8.9 - DA9: Hall's search against A1b read with a -120 dB floor         0 /    0   ok
+-----------------------------------------------------------------
+  0 / 1 checks passed.  1 FAILURE(S).

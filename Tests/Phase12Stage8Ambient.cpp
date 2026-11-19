@@ -475,6 +475,11 @@ namespace stage8
 void runPhase12Stage8AmbientDiagnosis()
 {
     using namespace stage8;
+
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
     using stage6::AmbientSpec;
 
     const char* const pointName[3] { "medium", "short", "long" };
@@ -915,6 +920,11 @@ void runPhase12Stage8AmbientDiagnosis2()
 {
     using namespace stage8;
 
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
+
     const char* const pointName[3] { "medium", "short", "long" };
 
     const Candidate a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target;
@@ -1261,6 +1271,11 @@ void runPhase12Stage8AmbientDiagnosis3()
 {
     using namespace stage8;
 
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
+
     const char* const pointName[3] { "medium", "short", "long" };
     constexpr double advance[3] { 35.0, 15.0, 65.0 };      // D*, from DA7
 
@@ -1516,6 +1531,11 @@ namespace stage8
 void runPhase12Stage8AmbientScan()
 {
     using namespace stage8;
+
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
     using stage6::AmbientSpec;
 
     const char* const pointName[3] { "medium", "short", "long" };
@@ -1861,6 +1881,11 @@ void runPhase12Stage8AmbientRootCause()
 {
     using namespace stage8;
 
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
+
     const char* const pointName[3] { "medium", "short", "long" };
 
     const Maker a1b = stage6::familyOf ("Ambient A1b", stage6::ambientRaw (stage6::AmbientSpec {}), true).target.make;
@@ -2197,6 +2222,11 @@ void runPhase12Stage8AmbientRootCause()
 void runPhase12Stage8AmbientWide()
 {
     using namespace stage8;
+
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
 
     const char* const pointName[3] { "medium", "short", "long" };
 
@@ -2553,6 +2583,11 @@ void runPhase12Stage8AmbientSibling()
 {
     using namespace stage8;
 
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
+
     const char* const pointName[3] { "medium", "short", "long" };
 
     const Maker a1b = frozenA1b();
@@ -2830,6 +2865,11 @@ void runPhase12Stage8AmbientSibling()
 void runPhase12Stage8AmbientSiblingSearch()
 {
     using namespace stage8;
+
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
 
     const char* const pointName[3] { "medium", "short", "long" };
 
@@ -3134,6 +3174,11 @@ void runPhase12Stage8PreDelayVerification()
 {
     using namespace stage8;
 
+    // The same-family floor every frozen score is divided by. Without this a
+    // filtered run reads the metric unscaled (found 2026-11-19; see the
+    // correction report).
+    ensureFloor();
+
     // =====================================================================
     beginSuite ("PHASE 12.8.30 - the Pre-Delay confound: A1b at the default, full-support alignment");
     // =====================================================================
@@ -3244,6 +3289,1207 @@ void runPhase12Stage8PreDelayVerification()
              : bestPadded < kDistinct  ? "WEAK against A1b (between 1.5 and 3.0): the earlier reading is not an artefact of the discarded samples."
                                        : "NOT a mimic of A1b (>= 3.0): the earlier reading depended on the discarded samples."));
     info ("  One start and its neighbours, not five seeds of the frozen scatter: a lower figure may exist.");
+}
+
+// ===========================================================================
+//  STAGE 9: AS2, the sixteen-line four-stage dense migration network
+//  Docs/Phase12-Stage9-Ambient-AS2-Preregistration.md, approved 2026-11-19.
+// ===========================================================================
+namespace stage8
+{
+    namespace
+    {
+        // The vectors of the pre-registration's ADDENDUM 1 (2026-11-19), which
+        // replaces section 2.5. The first pair - unequal magnitudes, all of
+        // one sign - was 0.972 coherent with rows of the stage's Hadamard mix
+        // and was rejected before any AS2 result existed. These are the four
+        // odd-parity sign vectors: the only balanced vectors whose coherence
+        // with every row of the mix is the minimum possible, 0.5. Assigned in
+        // order of the line carrying the minus sign: in L, in R, out L, out R.
+        const double kAs2InL[4]  { -0.5,  0.5,  0.5,  0.5 };
+        const double kAs2InR[4]  {  0.5, -0.5,  0.5,  0.5 };
+        const double kAs2OutL[4] {  0.5,  0.5, -0.5,  0.5 };
+        const double kAs2OutR[4] {  0.5,  0.5,  0.5, -0.5 };
+
+        constexpr double kHadamard4[4][4]
+        {
+            { 0.5,  0.5,  0.5,  0.5 },
+            { 0.5, -0.5,  0.5, -0.5 },
+            { 0.5,  0.5, -0.5, -0.5 },
+            { 0.5, -0.5, -0.5,  0.5 }
+        };
+
+        /** Hall's eight delays and its sibling set's eight, ascending. */
+        [[nodiscard]] std::array<double, 16> as2Delays()
+        {
+            std::array<double, 16> d {};
+
+            const auto hall = Structure {}.delaysMs;
+            const auto sibling = mode12::hallSibling().delaysMs;
+
+            for (size_t i = 0; i < 8; ++i)
+            {
+                d[i] = hall[i];
+                d[8 + i] = sibling[i];
+            }
+
+            std::sort (d.begin(), d.end());
+            return d;
+        }
+
+        /** Line 4 s + j of the tank is sorted delay s + 4 j: stage s holds
+            sorted indices s, s + 4, s + 8, s + 12. */
+        [[nodiscard]] double as2LineMs (const std::array<double, 16>& sorted, int stage, int j)
+        {
+            return sorted[static_cast<size_t> (stage + 4 * j)];
+        }
+
+        [[nodiscard]] std::array<double, 3> as2SinSquared (const User& u, double k)
+        {
+            const auto sorted = as2Delays();
+            const double scale = mapping::sizeScaleFor (u.size);
+            const double tau = k * mapping::rt60For (u.decay) / 3.0;
+
+            std::array<double, 3> s2 {};
+
+            for (int s = 0; s < 3; ++s)
+            {
+                double mean = 0.0;
+
+                for (int j = 0; j < 4; ++j)
+                    mean += as2LineMs (sorted, s, j);
+
+                s2[static_cast<size_t> (s)] = std::min (0.5, 0.25 * mean * scale * 0.001 / tau);
+            }
+
+            return s2;
+        }
+
+        [[nodiscard]] std::vector<double> as2Matrix (const User& u, double k)
+        {
+            std::vector<double> m (256, 0.0);
+
+            for (int s = 0; s < 4; ++s)
+                for (int r = 0; r < 4; ++r)
+                    for (int c = 0; c < 4; ++c)
+                        m[static_cast<size_t> ((4 * s + r) * 16 + 4 * s + c)] = kHadamard4[r][c];
+
+            const auto s2 = as2SinSquared (u, k);
+
+            // Line i of stage s against line i of stage s + 1; stage 1 - 2 first.
+            for (int s = 0; s < 3; ++s)
+            {
+                const double theta = std::asin (std::sqrt (s2[static_cast<size_t> (s)]));
+                const double c = std::cos (theta), sn = std::sin (theta);
+
+                for (int i = 0; i < 4; ++i)
+                {
+                    const int ra = 4 * s + i, rb = 4 * (s + 1) + i;
+
+                    for (int col = 0; col < 16; ++col)
+                    {
+                        const double ma = m[static_cast<size_t> (ra * 16 + col)], mb = m[static_cast<size_t> (rb * 16 + col)];
+
+                        m[static_cast<size_t> (ra * 16 + col)] =  c * ma + sn * mb;
+                        m[static_cast<size_t> (rb * 16 + col)] = -sn * ma + c * mb;
+                    }
+                }
+            }
+
+            return m;
+        }
+
+        [[nodiscard]] std::shared_ptr<const stage6::OpenSpec> as2Spec (const User& u, double k)
+        {
+            auto spec = std::make_shared<stage6::OpenSpec>();
+
+            spec->lines = 16;
+
+            const auto sorted = as2Delays();
+
+            for (int s = 0; s < 4; ++s)
+                for (int j = 0; j < 4; ++j)
+                    spec->delayMs.push_back (as2LineMs (sorted, s, j));
+
+            const auto m = as2Matrix (u, k);
+
+            for (int r = 0; r < 16; ++r)
+                for (int c = 0; c < 16; ++c)
+                    if (m[static_cast<size_t> (r * 16 + c)] != 0.0)
+                        spec->matrix.push_back ({ r, c, m[static_cast<size_t> (r * 16 + c)] });
+
+            for (int i = 0; i < 4; ++i)
+            {
+                spec->feeds.push_back ({ i, 0.0, kAs2InL[i], kAs2InR[i] });
+                spec->reads.push_back ({ 12 + i, 1.0, 0.0, kAs2OutL[i], kAs2OutR[i] });
+            }
+
+            return spec;
+        }
+
+        [[nodiscard]] Maker as2Raw (double k)
+        {
+            return [k] (const User& u)
+            {
+                Structure s;
+                s.name = "AS2 4-4-4-4";
+                s.open = as2Spec (u, k);
+                return s;
+            };
+        }
+
+        [[nodiscard]] Maker as2At (double k)
+        {
+            return stage6::familyOf ("Ambient AS2", as2Raw (k), true).target.make;
+        }
+
+        /** Frozen A1b's own structure, run in the open tank instead of the
+            eight-line core: the instrument check of section 3. */
+        [[nodiscard]] Maker a1bInOpenTank()
+        {
+            return [make = frozenA1b()] (const User& u)
+            {
+                Structure s = make (u);
+
+                auto spec = std::make_shared<stage6::OpenSpec>();
+
+                spec->lines = 8;
+
+                for (double d : s.delaysMs)
+                    spec->delayMs.push_back (d);
+
+                for (int r = 0; r < 8; ++r)
+                    for (int c = 0; c < 8; ++c)
+                        if (s.customMatrix[static_cast<size_t> (r * 8 + c)] != 0.0)
+                            spec->matrix.push_back ({ r, c, s.customMatrix[static_cast<size_t> (r * 8 + c)] });
+
+                for (int i = 0; i < 8; ++i)
+                {
+                    if (s.customInL[static_cast<size_t> (i)] != 0.0 || s.customInR[static_cast<size_t> (i)] != 0.0)
+                        spec->feeds.push_back ({ i, 0.0, s.customInL[static_cast<size_t> (i)], s.customInR[static_cast<size_t> (i)] });
+
+                    if (s.customOutL[static_cast<size_t> (i)] != 0.0 || s.customOutR[static_cast<size_t> (i)] != 0.0)
+                        spec->reads.push_back ({ i, 1.0, 0.0, s.customOutL[static_cast<size_t> (i)], s.customOutR[static_cast<size_t> (i)] });
+                }
+
+                s.open = spec;
+                return s;
+            };
+        }
+
+        [[nodiscard]] double as2CalibratedK (double targetT50, std::string* trace)
+        {
+            const User u = userAt (kPoints[0]);
+
+            auto t50 = [&] (double k) { return shapeAt (as2At (k), u).t50; };
+
+            double low = 0.10, high = 1.50;
+            const double atLow = t50 (low), atHigh = t50 (high);
+
+            if (trace != nullptr)
+                *trace = "t50 at k 0.10: " + fx (atLow, 1) + " ms; at k 1.50: " + fx (atHigh, 1) + " ms; target " + fx (targetT50, 1) + " ms";
+
+            if (targetT50 <= atLow)
+                return low;
+
+            if (targetT50 >= atHigh)
+                return high;
+
+            for (int i = 0; i < 28; ++i)
+            {
+                const double mid = std::sqrt (low * high);
+                const double value = t50 (mid);
+
+                if (std::abs (value / targetT50 - 1.0) < 0.005)
+                    return mid;
+
+                (value < targetT50 ? low : high) = mid;
+            }
+
+            return std::sqrt (low * high);
+        }
+
+        // --- the final mimic search: Hall with Pre-Delay ------------------------------
+        /** The frozen search, statement for statement, with one difference:
+            Hall's response is read through `preDelayMs` of zeros in front.
+            At 0 ms it is the frozen search. The target is never touched. */
+        [[nodiscard]] SearchResult mimicDelayed (const Features& target, const Controls& startAt, unsigned int seed,
+                                                 double preDelayMs)
+        {
+            const Floor& floor = floorOf();
+
+            SearchResult result;
+
+            auto evaluate = [&] (const Controls& c)
+            {
+                ++result.evaluations;
+
+                const User u = toUser (c);
+
+                auto d = distance (target, analyse (preDelayed (impulseResponse (Structure {}, u, irSecondsFor (u.decay)), preDelayMs),
+                                                    preDelayed (impulseResponse (Structure {}, u, kLeftOnlySeconds, true, false), preDelayMs)));
+
+                d.family[stage5::kLateralFamily] = 0.0;
+
+                return score (d, floor);
+            };
+
+            struct Scored { Controls c; Score s; };
+
+            std::vector<Scored> starts;
+            starts.push_back ({ startAt, evaluate (startAt) });
+
+            result.start = starts[0].s;
+
+            unsigned int state = seed | 1u;
+
+            auto next01 = [&state]
+            {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+
+                return static_cast<double> (state & 0xffffffu) / 16777215.0;
+            };
+
+            constexpr double kDecayLow = 0.1, kDecayHigh = 20.0;
+
+            for (int i = 0; i < 24; ++i)
+            {
+                Controls c;
+
+                for (auto& v : c.v)
+                    v = next01();
+
+                if (i % 2 == 0) c.v[4] = 0.0;
+                if (i % 4 == 0) c.v[2] = 0.0;
+                if (i % 3 != 0) c.v[6] = 0.5;
+
+                if (i % 2 == 1 && target.base.rt60 > 0.0)
+                    c.v[1] = std::clamp (std::log (target.base.rt60 / kDecayLow) / std::log (kDecayHigh / kDecayLow), 0.0, 1.0);
+
+                starts.push_back ({ c, evaluate (c) });
+            }
+
+            std::sort (starts.begin(), starts.end(), [] (const Scored& a, const Scored& b)
+            {
+                return a.s.objective() < b.s.objective();
+            });
+
+            result.best.worst = 1.0e9;
+
+            for (int s = 0; s < 3; ++s)
+            {
+                Controls current = starts[static_cast<size_t> (s)].c;
+                Score currentS   = starts[static_cast<size_t> (s)].s;
+
+                double step = 0.16;
+                int budget = 260;
+
+                while (step >= 0.0049 && budget > 0)
+                {
+                    bool improved = false;
+
+                    for (int k = 0; k < kControls && budget > 0; ++k)
+                        for (double direction : { 1.0, -1.0 })
+                        {
+                            Controls trial = current;
+                            trial.v[k] = std::clamp (trial.v[k] + direction * step, 0.0, 1.0);
+
+                            if (trial.v[k] == current.v[k])
+                                continue;
+
+                            const auto sc = evaluate (trial);
+                            --budget;
+
+                            if (sc.objective() < currentS.objective())
+                            {
+                                current = trial;
+                                currentS = sc;
+                                improved = true;
+                            }
+                        }
+
+                    if (! improved)
+                    {
+                        for (int attempt = 0; attempt < 8 && budget > 0 && ! improved; ++attempt)
+                        {
+                            Controls trial = current;
+
+                            for (auto& v : trial.v)
+                                v = std::clamp (v + step * (2.0 * next01() - 1.0), 0.0, 1.0);
+
+                            const auto sc = evaluate (trial);
+                            --budget;
+
+                            if (sc.objective() < currentS.objective())
+                            {
+                                current = trial;
+                                currentS = sc;
+                                improved = true;
+                            }
+                        }
+                    }
+
+                    if (! improved)
+                        step *= 0.5;
+                }
+
+                if (currentS.objective() < result.best.objective())
+                {
+                    result.best = currentS;
+                    result.controls = current;
+                }
+            }
+
+            return result;
+        }
+
+        struct DelayedFound
+        {
+            double preDelay = 0, median = 1.0e30, lowest = 1.0e30;
+            int family = 0;
+            std::string knobs, trace;
+        };
+
+        /** Five seeds at each of a list of Pre-Delays; every search in parallel. */
+        void searchAt (const Features& target, const User& start, const std::vector<double>& delays, std::vector<DelayedFound>& out)
+        {
+            std::vector<SearchResult> results (delays.size() * static_cast<size_t> (stage5::kSeeds));
+
+            runParallel (results.size(), [&] (size_t i)
+            {
+                results[i] = mimicDelayed (target, toControls (start), stage5::seedFor (static_cast<int> (i % stage5::kSeeds)),
+                                           delays[i / static_cast<size_t> (stage5::kSeeds)]);
+            });
+
+            for (size_t d = 0; d < delays.size(); ++d)
+            {
+                DelayedFound f;
+                f.preDelay = delays[d];
+
+                std::vector<double> v;
+
+                for (int k = 0; k < stage5::kSeeds; ++k)
+                {
+                    const auto& r = results[d * static_cast<size_t> (stage5::kSeeds) + static_cast<size_t> (k)];
+
+                    v.push_back (r.best.worst);
+
+                    if (r.best.worst < f.lowest)
+                    {
+                        f.lowest = r.best.worst;
+                        f.family = r.best.worstFamily;
+                        f.knobs = describe (r.controls);
+                    }
+                }
+
+                std::sort (v.begin(), v.end());
+                f.median = v[v.size() / 2];
+
+                out.push_back (f);
+            }
+        }
+
+        /** Section 4.3: Pre-Delay 0 - 150 ms in steps of 15, then 5 ms and
+            1 ms around the best. The result is the Pre-Delay with the lowest
+            median; `anyLowest` is the lowest run at any Pre-Delay tried. */
+        [[nodiscard]] DelayedFound finalMimic (const Features& target, const User& start, double* anyLowest)
+        {
+            std::vector<DelayedFound> all;
+
+            auto best = [&]
+            {
+                size_t at = 0;
+
+                for (size_t i = 1; i < all.size(); ++i)
+                    if (all[i].median < all[at].median)
+                        at = i;
+
+                return all[at];
+            };
+
+            std::vector<double> coarse;
+
+            for (int d = 0; d <= 150; d += 15)
+                coarse.push_back (static_cast<double> (d));
+
+            searchAt (target, start, coarse, all);
+
+            auto around = [&] (double centre, std::initializer_list<double> offsets)
+            {
+                std::vector<double> next;
+
+                for (double o : offsets)
+                {
+                    const double d = centre + o;
+
+                    bool seen = d < 0.0 || d > 150.0;
+
+                    for (const auto& f : all)
+                        if (std::abs (f.preDelay - d) < 1.0e-9)
+                            seen = true;
+
+                    if (! seen)
+                        next.push_back (d);
+                }
+
+                if (! next.empty())
+                    searchAt (target, start, next, all);
+            };
+
+            around (best().preDelay, { -10.0, -5.0, 5.0, 10.0 });
+            around (best().preDelay, { -3.0, -2.0, -1.0, 1.0, 2.0, 3.0 });
+
+            DelayedFound result = best();
+
+            std::sort (all.begin(), all.end(), [] (const DelayedFound& a, const DelayedFound& b) { return a.preDelay < b.preDelay; });
+
+            double lowest = 1.0e30;
+
+            for (const auto& f : all)
+            {
+                lowest = std::min (lowest, f.lowest);
+                result.trace += fx (f.preDelay, 0) + ":" + fx (f.median) + " ";
+            }
+
+            if (anyLowest != nullptr)
+                *anyLowest = lowest;
+
+            return result;
+        }
+
+        /** The target of the final search: the whole response, with only the
+            sub -200 dB pre-arrival dust set to exact zero. */
+        [[nodiscard]] Features wholeTarget (const Structure& s, const User& u)
+        {
+            return arrivalRemovedFeatures (s, u, 0.0);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+void runPhase12Stage9As2Design()
+{
+    using namespace stage8;
+
+    ensureFloor();
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.0 - the same-family floor in use, and AS2's design checked before it is measured");
+    // =====================================================================
+
+    {
+        const Floor& floor = floorOf();
+
+        std::string row = "  floor (each family is divided by the larger of this and 1):";
+
+        for (int f = 0; f < kFamilies; ++f)
+            row += std::string (" ") + kFamilyNames[f] + " " + fx (floor.family[f]) + ";";
+
+        info (row);
+        info ("");
+    }
+
+    const auto sorted = as2Delays();
+
+    info ("  DELAYS (approval condition 4). Hall's eight and its sibling set's eight, ascending, ms:");
+
+    {
+        std::string row = "   ";
+
+        for (double d : sorted)
+            row += " " + fx (d, 2);
+
+        info (row);
+
+        double closest = 1.0e30;
+        size_t at = 0;
+
+        for (size_t i = 1; i < 16; ++i)
+            if (sorted[i] / sorted[i - 1] < closest)
+            {
+                closest = sorted[i] / sorted[i - 1];
+                at = i;
+            }
+
+        info ("    closest neighbours: " + fx (sorted[at - 1], 2) + " and " + fx (sorted[at], 2) + " ms, ratio " + fx (closest, 4)
+              + " (" + fx (100.0 * (closest - 1.0), 2) + " % apart)");
+
+        check (closest > 1.005, "no two of the sixteen delays are within 0.5 % of each other");
+
+        info ("");
+        info ("    " + pad ("stage", 8) + pad ("lines, ms", 40) + pad ("mean", 9) + pad ("geometric mean", 16) + "closest pair inside the stage");
+
+        double means[4] {}, withinWorst = 1.0e30;
+
+        for (int s = 0; s < 4; ++s)
+        {
+            std::string lines;
+            double sum = 0.0, logSum = 0.0, within = 1.0e30;
+
+            for (int j = 0; j < 4; ++j)
+            {
+                const double d = as2LineMs (sorted, s, j);
+
+                lines += fx (d, 2) + "  ";
+                sum += d;
+                logSum += std::log (d);
+
+                if (j > 0)
+                    within = std::min (within, d / as2LineMs (sorted, s, j - 1));
+            }
+
+            means[s] = 0.25 * sum;
+            withinWorst = std::min (withinWorst, within);
+
+            info ("    " + pad (std::to_string (s + 1), 8) + pad (lines, 40) + pad (fx (means[s], 2), 9) + pad (fx (std::exp (0.25 * logSum), 2), 16)
+                  + "ratio " + fx (within, 3));
+        }
+
+        info ("    stage 4 mean / stage 1 mean: " + fx (means[3] / means[0], 3) + "   (A1b's pairs: 54.6 / 31.9 = 1.71 at the medium point)");
+
+        check (withinWorst > 1.10, "inside every stage the lines are at least 10 % apart: near-equal delays are not clustered in a stage");
+        check (means[3] / means[0] < 1.71, "the slope of stage length along the chain is no steeper than A1b's");
+    }
+
+    info ("");
+    info ("  VECTORS (approval condition 5).");
+
+    {
+        auto dot = [] (const double* a, const double* b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; };
+
+        bool balanced = true;
+
+        for (int i = 0; i < 4; ++i)
+            if (std::abs (std::abs (kAs2InL[i]) - std::abs (kAs2InR[i])) > 1.0e-15
+                || std::abs (std::abs (kAs2OutL[i]) - std::abs (kAs2OutR[i])) > 1.0e-15)
+                balanced = false;
+
+        // Coherence with the mixing basis: the largest |v . row| over the four
+        // vectors and the four rows of the stage's Hadamard mix (rows have unit
+        // norm). After one mix the vector is H v, whose entries ARE those dot
+        // products, so the largest share of the energy on one line is the
+        // square of the same figure.
+        double coherence = 0.0;
+
+        for (const double* v : { kAs2InL, kAs2InR, kAs2OutL, kAs2OutR })
+            for (const auto& row : kHadamard4)
+                coherence = std::max (coherence, std::abs (v[0] * row[0] + v[1] * row[1] + v[2] * row[2] + v[3] * row[3]));
+
+        const double inOut = std::max (std::max (std::abs (dot (kAs2InL, kAs2OutL)), std::abs (dot (kAs2InR, kAs2OutR))),
+                                       std::max (std::abs (dot (kAs2InL, kAs2OutR)), std::abs (dot (kAs2InR, kAs2OutL))));
+
+        bool unit = true;
+
+        for (const double* v : { kAs2InL, kAs2InR, kAs2OutL, kAs2OutR })
+            if (std::abs (dot (v, v) - 1.0) > 1.0e-12)
+                unit = false;
+
+        info ("    in L  (-0.5, +0.5, +0.5, +0.5)   in R  (+0.5, -0.5, +0.5, +0.5)   out L (+0.5, +0.5, -0.5, +0.5)   out R (+0.5, +0.5, +0.5, -0.5)");
+        info ("    left . right: in " + fx (dot (kAs2InL, kAs2InR), 6) + ", out " + fx (dot (kAs2OutL, kAs2OutR), 6));
+        info ("    largest coherence with a row of the mix: " + fx (coherence, 4) + "  (limit 0.70; preferred 0.60; the least possible is 0.50)");
+        info ("    largest share of a vector's energy on one line after one mix: " + fx (100.0 * coherence * coherence, 1) + " %  (limit 50 %)");
+        info ("    largest |input . output| over the four pairings: " + fx (inOut, 4) + "  (limit 0.50)");
+        info ("    centred input (L + R) = (0, 0, 1, 1): lines 3 and 4 of stage 1, energy 2. Side (L - R) = (-1, 1, 0, 0): lines 1 and 2, energy 2.");
+        info ("    mono fold of the output (L + R) = (1, 1, 0, 0): lines 1 and 2 of stage 4; -3.0 dB if the four lines hold equal energy.");
+
+        // The whole candidate set, for the record: every vector with entries
+        // +/- 0.5. Even parity = a row of the mix (coherence 1); odd = 0.5.
+        {
+            std::string even, odd;
+
+            for (int bits = 0; bits < 8; ++bits)
+            {
+                const double v[4] { 0.5, (bits & 1) != 0 ? -0.5 : 0.5, (bits & 2) != 0 ? -0.5 : 0.5, (bits & 4) != 0 ? -0.5 : 0.5 };
+
+                double worst = 0.0;
+
+                for (const auto& row : kHadamard4)
+                    worst = std::max (worst, std::abs (v[0] * row[0] + v[1] * row[1] + v[2] * row[2] + v[3] * row[3]));
+
+                const std::string name = std::string ("(+") + (v[1] > 0 ? "+" : "-") + (v[2] > 0 ? "+" : "-") + (v[3] > 0 ? "+" : "-") + ") " + fx (worst, 2) + "  ";
+
+                (worst > 0.75 ? even : odd) += name;
+            }
+
+            info ("    all equal-magnitude sign vectors (up to overall sign), coherence:  rows of the mix: " + even + " |  odd parity: " + odd);
+        }
+
+        check (unit, "every vector has unit norm");
+        check (balanced, "left and right have the same magnitude on every line, in and out");
+        check (std::abs (dot (kAs2InL, kAs2InR)) < 1.0e-12 && std::abs (dot (kAs2OutL, kAs2OutR)) < 1.0e-12, "left and right are orthogonal, in and out");
+        check (coherence <= 0.70, "coherence with every row of the stage's mix is at most 0.70");
+        check (coherence <= 0.60, "coherence is at most 0.60 (preferred)");
+        check (coherence * coherence <= 0.50, "after one mix no line holds more than half of a vector's energy");
+        check (inOut <= 0.50, "no input vector is within 0.50 of an output vector; the readout is not a copy of the injection");
+    }
+
+    info ("");
+    info ("  MATRIX. Orthogonality at the three points and at the corners of the grid, k 0.40:");
+
+    {
+        double worst = 0.0;
+
+        for (double size : { 0.0, 0.25, 0.60, 0.85, 1.0 })
+            for (double decay : { 0.3, 0.8, 2.5, 5.0, 12.0 })
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+
+                worst = std::max (worst, as2Spec (u, 0.40)->orthogonalityError());
+            }
+
+        info ("    largest |M Mt - I|: " + fx (worst * 1.0e15, 2) + " e-15");
+        check (worst < 1.0e-12, "the 16 x 16 matrix is orthogonal at every setting tried");
+
+        // Four stages, not two Hall networks: stage 1 reaches stage 4 only through 2 and 3.
+        const auto m = as2Matrix (userAt (kPoints[0]), 0.40);
+
+        double direct14 = 0.0, direct13 = 0.0;
+
+        for (int r = 0; r < 4; ++r)
+            for (int c = 0; c < 4; ++c)
+            {
+                direct14 = std::max (direct14, std::max (std::abs (m[static_cast<size_t> ((12 + r) * 16 + c)]), std::abs (m[static_cast<size_t> (r * 16 + 12 + c)])));
+                direct13 = std::max (direct13, std::abs (m[static_cast<size_t> (r * 16 + 8 + c)]));
+            }
+
+        info ("    largest entry carrying stage 4 into stage 1 or stage 1 into stage 4 in one pass: " + fx (direct14, 4)
+              + "; stage 3 into stage 1: " + fx (direct13, 4));
+    }
+}
+
+// ---------------------------------------------------------------------------
+void runPhase12Stage9As2()
+{
+    using namespace stage8;
+
+    ensureFloor();
+
+    const char* const pointName[3] { "medium", "short", "long" };
+
+    const Maker a1b = frozenA1b();
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.1 - instrument check: is A1b in the open tank A1b?");
+    // =====================================================================
+
+    info ("  AS2 is built in the open tank. Before any AS2 figure is read: frozen A1b's own lines,");
+    info ("  matrix and vectors run in the open tank, against A1b in the eight-line core. Limit:");
+    info ("  frozen metric <= 1.5 at the same knobs and t10, t50 within 2 %, at the three points.");
+    info ("");
+
+    bool instrument = true;
+
+    {
+        const Maker open = a1bInOpenTank();
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+
+            const Shape a = shapeAt (a1b, u), b = shapeAt (open, u);
+
+            int family = 0;
+            const double worst = stage5::centredWorst (stage5::sameKnobs (wholeTarget (a1b (u), u), wholeTarget (open (u), u)), &family);
+
+            const bool here = worst <= kReproduced && std::abs (b.t10 / a.t10 - 1.0) <= 0.02 && std::abs (b.t50 / a.t50 - 1.0) <= 0.02;
+
+            if (! here)
+                instrument = false;
+
+            info ("    " + pad (pointName[p], 9) + "metric " + pad (fx (worst) + " (" + kFamilyNames[family] + ")", 26) + "t10 " + pad (fx (a.t10, 1) + " / " + fx (b.t10, 1), 16)
+                  + "t50 " + pad (fx (a.t50, 1) + " / " + fx (b.t50, 1), 18) + (here ? "valid" : "NOT VALID"));
+        }
+    }
+
+    check (instrument, "the open tank reads A1b as A1b: AS2's figures can be compared with A1b's");
+
+    if (! instrument)
+    {
+        info ("");
+        info ("  THE INSTRUMENT CHECK FAILED. By the pre-registration nothing further is read. STOP.");
+        return;
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.2 - AS2: the one calibration");
+    // =====================================================================
+
+    const Shape a1bMedium = shapeAt (a1b, userAt (kPoints[0]));
+
+    std::string trace;
+    const double k = as2CalibratedK (a1bMedium.t50, &trace);
+
+    const Maker as2 = as2At (k);
+
+    info ("  k is the value, 0.10 - 1.50, at which AS2's onset-normalised t50 at the medium point is A1b's.");
+    info ("  " + trace);
+    info ("  k = " + fx (k, 4) + "   (A1b's own k is 0.40)");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const auto s2 = as2SinSquared (userAt (kPoints[p]), k);
+
+        info ("    " + pad (pointName[p], 9) + "sin^2(theta) at the three joins: " + fx (s2[0], 3) + "  " + fx (s2[1], 3) + "  " + fx (s2[2], 3)
+              + "   decay scale " + fx (as2 (userAt (kPoints[p])).decayScale, 3));
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.3 - AS2: does it preserve A1b? (gate 4.1)");
+    // =====================================================================
+
+    info ("  Onset-normalised, same knobs. Pass: t10 and t50 within 10 % of A1b's, t10 / t50 within");
+    info ("  0.03, buildup and energy-profile families against A1b (onsets aligned) <= 1.5, at the");
+    info ("  three operating points. t50 at medium is the calibration.");
+    info ("");
+    info ("    " + pad ("", 22) + pad ("t10 A1b / AS2", 24) + pad ("t50 A1b / AS2", 24) + pad ("shape A1b / AS2", 24)
+          + pad ("buildup", 9) + pad ("profile", 9) + "result");
+
+    bool preserved = true;
+    std::string failed;
+
+    {
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        struct Setting { std::string name; User u; bool gates; };
+        std::vector<Setting> settings;
+
+        for (int p = 0; p < 3; ++p)
+            settings.push_back ({ std::string (pointName[p]) + " (gate)", userAt (kPoints[p]), true });
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+
+                bool legacy = false;
+
+                for (const auto& point : kPoints)
+                    if (std::abs (point.size - size) < 1.0e-9 && std::abs (point.decay - decay) < 1.0e-9)
+                        legacy = true;
+
+                if (! legacy)
+                    settings.push_back ({ "Size " + fx (100.0 * size, 0) + ", Decay " + fx (decay, 1), u, false });
+            }
+
+        for (const auto& setting : settings)
+        {
+            const User& u = setting.u;
+            const double seconds = irSecondsFor (u.decay);
+
+            const auto refCentre = impulseResponse (a1b (u), u, seconds);
+            const auto refLeft   = impulseResponse (a1b (u), u, kLeftOnlySeconds, true, false);
+            const auto ownCentre = impulseResponse (as2 (u), u, seconds);
+            const auto ownLeft   = impulseResponse (as2 (u), u, kLeftOnlySeconds, true, false);
+
+            const Shape ref = shapeOf (refCentre), own = shapeOf (ownCentre);
+            const size_t refLeftOnset = shapeOf (refLeft).onsetSample;
+
+            const Features fr = analyse (onsetAligned (refCentre, ref.onsetSample, ref.onsetSample),
+                                         onsetAligned (refLeft, refLeftOnset, refLeftOnset));
+            const Features fo = analyse (onsetAligned (ownCentre, own.onsetSample, ref.onsetSample),
+                                         onsetAligned (ownLeft, shapeOf (ownLeft).onsetSample, refLeftOnset));
+
+            const auto sc = stage5::sameKnobs (fr, fo);
+
+            const bool t10 = std::abs (own.t10 / ref.t10 - 1.0) <= 0.10, t50 = std::abs (own.t50 / ref.t50 - 1.0) <= 0.10;
+            const bool shape = std::abs (own.ratio - ref.ratio) <= 0.03, build = sc.scaled[0] <= 1.5, profile = sc.scaled[1] <= 1.5;
+            const bool pass = t10 && t50 && shape && build && profile;
+
+            if (setting.gates && ! pass)
+            {
+                preserved = false;
+                failed += setting.name + ":" + (t10 ? "" : " t10") + (t50 ? "" : " t50") + (shape ? "" : " shape") + (build ? "" : " buildup")
+                        + (profile ? "" : " energy-profile") + ";  ";
+            }
+
+            info ("    " + pad (setting.name, 22)
+                  + pad (fx (ref.t10, 1) + " / " + fx (own.t10, 1) + " (" + signedText (100.0 * (own.t10 / ref.t10 - 1.0), 0) + " %)", 24)
+                  + pad (fx (ref.t50, 1) + " / " + fx (own.t50, 1) + " (" + signedText (100.0 * (own.t50 / ref.t50 - 1.0), 0) + " %)", 24)
+                  + pad (fx (ref.ratio, 3) + " / " + fx (own.ratio, 3) + " (" + signedText (own.ratio - ref.ratio, 3) + ")", 24)
+                  + pad (fx (sc.scaled[0]), 9) + pad (fx (sc.scaled[1]), 9) + (pass ? "within" : "OUTSIDE"));
+        }
+    }
+
+    info ("");
+    info (std::string ("  GATE 4.1: AS2 ") + (preserved ? "PRESERVES A1b's buildup." : "DOES NOT PRESERVE A1b's buildup. Failed: " + failed));
+    check (preserved, "FINDING: AS2 preserves A1b's onset-normalised buildup at the three operating points");
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.4 - AS2: tone and its variance (gate 4.4)");
+    // =====================================================================
+
+    info ("  Octave deviation from Hall, dB. Gate: <= 1.0 at the defaults and over 27 settings.");
+    info ("");
+
+    {
+        double defaultsA = 0, defaultsS = 0;
+        const double gridA = toneOverGrid (a1b, &defaultsA), gridS = toneOverGrid (as2, &defaultsS);
+
+        info ("    " + pad ("", 12) + pad ("defaults", 10) + "worst of 27");
+        info ("    " + pad ("A1b", 12) + pad (fx (defaultsA), 10) + fx (gridA));
+        info ("    " + pad ("AS2", 12) + pad (fx (defaultsS), 10) + fx (gridS) + (gridS <= 1.0 && defaultsS <= 1.0 ? "   within 1.0" : "   OVER 1.0"));
+        info ("");
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+
+            const auto na = perturbedMoments (a1b, u), ns = perturbedMoments (as2, u);
+            const auto wa = wideMoments (a1b, u), ws = wideMoments (as2, u);
+            const auto hallN = perturbedMoments ([] (const User&) { return Structure {}; }, u);
+
+            info ("    " + pad (pointName[p], 30) + kBandHead);
+            info ("    " + pad ("  A1b mean, +/- 4 %", 30) + bandRow (na.mean));
+            info ("    " + pad ("  AS2 mean, +/- 4 %", 30) + bandRow (ns.mean));
+            info ("    " + pad ("  A1b SD, +/- 4 %", 30) + bandRow (na.sd));
+            info ("    " + pad ("  AS2 SD, +/- 4 %", 30) + bandRow (ns.sd));
+            info ("    " + pad ("  Hall SD, +/- 4 % (floor)", 30) + bandRow (hallN.sd));
+            info ("    " + pad ("  A1b mean, +/- 30 %", 30) + bandRow (wa.mean));
+            info ("    " + pad ("  AS2 mean, +/- 30 %", 30) + bandRow (ws.mean));
+            info ("    " + pad ("  A1b SD, +/- 30 %", 30) + bandRow (wa.sd));
+            info ("    " + pad ("  AS2 SD, +/- 30 %", 30) + bandRow (ws.sd));
+            info ("");
+        }
+
+        check (gridS <= 1.0 && defaultsS <= 1.0, "FINDING: AS2 is within 1.0 dB of Hall's tone at the defaults and over the grid");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.5 - AS2: source-dependent level (gate 4.5)");
+    // =====================================================================
+
+    info ("  Baseline (measured for AS1, re-measured here): the largest spread among Hall's sibling");
+    info ("  and Hall under twelve +/- 4 % perturbations. Pass: excess <= 0.5 dB at every point and");
+    info ("  at most half of A1b's where that exceeds 1.0 dB. AN ENGINEERING CRITERION, not a");
+    info ("  psychoacoustically validated perceptual threshold.");
+    info ("");
+    info ("    " + pad ("", 9) + pad ("baseline", 10) + pad ("A1b spread", 12) + pad ("A1b excess", 12) + pad ("AS2 spread", 12)
+          + pad ("AS2 excess", 12) + pad ("rough A1b / AS2", 18) + "result");
+
+    {
+        const Structure sibling = withDelays ("sibling", mode12::hallSibling().delaysMs);
+
+        bool pass = true;
+
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+            const double seconds = irSecondsFor (u.decay);
+
+            double baseline = spreadOf (sourceGains (sibling, u));
+
+            for (unsigned int seed = 1; seed <= 12; ++seed)
+                baseline = std::max (baseline, spreadOf (sourceGains (perturbed (Structure {}, seed), u)));
+
+            const double spreadA = spreadOf (sourceGains (a1b (u), u)), spreadS = spreadOf (sourceGains (as2 (u), u));
+            const double excessA = std::max (0.0, spreadA - baseline), excessS = std::max (0.0, spreadS - baseline);
+
+            const bool here = excessS <= 0.5 && (excessA <= 1.0 || excessS <= 0.5 * excessA);
+
+            if (! here)
+                pass = false;
+
+            const auto hallThird = thirdOctaveShares (impulseResponse (Structure {}, u, seconds));
+
+            info ("    " + pad (pointName[p], 9) + pad (fx (baseline), 10) + pad (fx (spreadA), 12) + pad (fx (excessA), 12)
+                  + pad (fx (spreadS), 12) + pad (fx (excessS), 12)
+                  + pad (fx (roughness (thirdOctaveShares (impulseResponse (a1b (u), u, seconds)), hallThird)) + " / "
+                         + fx (roughness (thirdOctaveShares (impulseResponse (as2 (u), u, seconds)), hallThird)), 18)
+                  + (here ? "within" : "OUTSIDE"));
+        }
+
+        info ("");
+        check (pass, "FINDING: AS2's excess source-dependent level is within the registered limit");
+
+        info ("    The level law each would need, dB, Size 25 / 60 / 85 (rows) x Decay 0.8 / 2.5 / 5.0, A1b | AS2:");
+
+        constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+        double law[2][9] {};
+
+        runParallel (18, [&] (size_t i)
+        {
+            User u;
+            u.size = sizes[(i % 9) / 3];
+            u.decay = decays[i % 3];
+
+            const double seconds = irSecondsFor (u.decay);
+
+            law[i / 9][i % 9] = 10.0 * std::log10 (energyOf (impulseResponse (Structure {}, u, seconds))
+                                                   / energyOf (impulseResponse ((i / 9 == 0 ? a1b : as2) (u), u, seconds)));
+        });
+
+        for (int r = 0; r < 3; ++r)
+            info ("      " + pad (signedText (law[0][r * 3]), 8) + pad (signedText (law[0][r * 3 + 1]), 8) + pad (signedText (law[0][r * 3 + 2]), 10)
+                  + "|   " + pad (signedText (law[1][r * 3]), 8) + pad (signedText (law[1][r * 3 + 1]), 8) + signedText (law[1][r * 3 + 2]));
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.6 - AS2: Size, Decay, stereo and mono; CPU and memory");
+    // =====================================================================
+
+    info ("  Stage 5's G3 tables, Decay limit 5 %. CPU there is Stage 5's timer on a machine in use.");
+
+    {
+        const std::vector<Candidate> list { { "AS2 4-4-4-4", as2 }, { "A1b (reference)", a1b } };
+        const auto g3 = stage5::semantics (list, 0.05, 1.0e9);
+
+        info ("");
+        info (std::string ("  G3 without the CPU line: AS2 ") + (g3[0].pass ? "PASSES" : "FAILS") + "; A1b " + (g3[1].pass ? "passes" : "fails")
+              + " (A1b's recorded failure is tone).");
+
+        User large;
+        large.size = 1.0;
+
+        const auto rigA = std::make_unique<Rig> (as2 (large), large);
+        const double kib = rigA->getOpenTank() != nullptr ? static_cast<double> (rigA->getOpenTank()->memoryDoubles()) * 8.0 / 1024.0 : 0.0;
+
+        info ("  Tank memory at the largest Size: AS2 " + fx (kib, 0) + " KiB (Hall and A1b: 498 KiB as Stage 6 measured them).");
+        info ("  CPU x Hall, Stage 5's timer: AS2 " + fx (g3[0].cpu) + ", A1b " + fx (g3[1].cpu) + ". INDICATIVE: the machine was in use.");
+
+        // Pre-warm: how far a response started `ms` after the tank was fed is
+        // from the settled one is the switching design's question; here, the
+        // time AS2 takes to reach 90 % of its energy, against Hall's and A1b's.
+        for (int p = 0; p < 3; ++p)
+        {
+            const User u = userAt (kPoints[p]);
+
+            auto t90 = [&] (const Structure& s)
+            {
+                const auto e = detail::energyOfBoth (impulseResponse (s, u, irSecondsFor (u.decay)));
+
+                double total = 0.0, running = 0.0;
+
+                for (double v : e)
+                    total += v;
+
+                for (size_t n = 0; n < e.size(); ++n)
+                {
+                    running += e[n];
+
+                    if (running >= 0.90 * total)
+                        return 1000.0 * static_cast<double> (n) / kRate;
+                }
+
+                return 0.0;
+            };
+
+            info ("    " + pad (pointName[p], 9) + "time to 90 % of the energy, ms: Hall " + fx (t90 (Structure {}), 0) + ", A1b " + fx (t90 (a1b (u)), 0)
+                  + ", AS2 " + fx (t90 (as2 (u)), 0));
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.7 - AS2 against Hall at the same knobs, and the onset-aligned search (diagnostic)");
+    // =====================================================================
+
+    info ("  Same knobs, whole response (dust zeroed): every centred family at or above 1.5.");
+    info ("");
+
+    for (int p = 0; p < 3; ++p)
+    {
+        const User u = userAt (kPoints[p]);
+        const Features hall = featuresOf (Structure {}, u);
+
+        for (int which = 0; which < 2; ++which)
+        {
+            const auto sc = stage5::sameKnobs (hall, wholeTarget ((which == 0 ? a1b : as2) (u), u));
+
+            int family = 0;
+            const double worst = stage5::centredWorst (sc, &family);
+
+            info ("    " + pad (std::string (pointName[p]) + (which == 0 ? "  A1b" : "  AS2"), 14) + pad ("worst " + fx (worst) + " (" + kFamilyNames[family] + ")", 32)
+                  + familiesOf (sc, 1.5));
+        }
+    }
+
+    info ("");
+    info ("  THE CHEAP PART OF THE RESULT IS COMPLETE. k = " + fx (k, 4) + ". Preservation: " + (preserved ? "PASSED" : "FAILED") + ".");
+}
+
+// ---------------------------------------------------------------------------
+void runPhase12Stage9As2Final()
+{
+    using namespace stage8;
+
+    ensureFloor();
+
+    const Maker a1b = frozenA1b();
+    const double k = as2CalibratedK (shapeAt (a1b, userAt (kPoints[0])).t50, nullptr);
+    const Maker as2 = as2At (k);
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.8 - the final search is the frozen search at Pre-Delay 0");
+    // =====================================================================
+
+    {
+        const User u = userAt (kPoints[0]);
+        const Features target = wholeTarget (as2 (u), u);
+
+        bool same = true;
+        std::string rows;
+
+        for (int seed = 0; seed < 2; ++seed)
+        {
+            const auto frozen = mimic (target, Structure {}, floorOf(), toControls (u), stage5::seedFor (seed), stage5::kLateralFamily);
+            const auto copy = mimicDelayed (target, toControls (u), stage5::seedFor (seed), 0.0);
+
+            rows += "seed " + std::to_string (seed) + ": frozen " + fx (frozen.best.worst, 6) + ", copy " + fx (copy.best.worst, 6) + ";  ";
+
+            if (frozen.best.worst != copy.best.worst || frozen.evaluations != copy.evaluations)
+                same = false;
+        }
+
+        info ("  AS2 at the medium point, two seeds: " + rows);
+        check (same, "at Pre-Delay 0 the new search returns the frozen search's result exactly");
+
+        if (! same)
+        {
+            info ("  THE COPY IS NOT THE FROZEN SEARCH. Nothing further is read. STOP.");
+            return;
+        }
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.9 - nine-point Mode identity, final search with Pre-Delay (gates 4.2, 4.3)");
+    // =====================================================================
+
+    info ("  AS2 with k = " + fx (k, 4) + ". Hall's response delayed by zeros; the target whole, never moved or");
+    info ("  cut. Pre-Delay 0 - 150 ms in steps of 15, then 5 ms and 1 ms around the best; five seeds");
+    info ("  at each; the frozen seven-control search at each. The reading is the Pre-Delay with the");
+    info ("  lowest median. REPRODUCED: any run <= 1.5 at any Pre-Delay. DISTINCT: none, and the");
+    info ("  lowest median >= 3.0. DECLARED CONVERGENCE REGION: the short-Decay edge. The six core");
+    info ("  points must be DISTINCT. Frozen A1b beside it; its status is not changed by this.");
+    info ("");
+
+    constexpr double sizes[3] { 0.25, 0.60, 0.85 }, decays[3] { 0.8, 2.5, 5.0 };
+
+    struct Subject { const char* name; Maker make; };
+    const Subject subjects[2] { { "AS2 4-4-4-4", as2 }, { "A1b (frozen)", a1b } };
+
+    for (const auto& subject : subjects)
+    {
+        info ("    " + std::string (subject.name));
+
+        int distinct = 0, reproduced = 0;
+        bool coreDistinct = true, defaultReproduced = false;
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+
+                const bool periphery = decay < 1.0;
+
+                // Diagnostic: the onset-aligned search, one seed set, for comparison.
+                double anyLowest = 0.0;
+                const auto found = finalMimic (wholeTarget (subject.make (u), u), u, &anyLowest);
+
+                const std::string cls = anyLowest <= kReproduced ? "REPRODUCED" : found.median >= kDistinct ? "DISTINCT" : "BETWEEN";
+
+                if (cls == "DISTINCT")   ++distinct;
+                if (cls == "REPRODUCED") ++reproduced;
+
+                if (! periphery && cls != "DISTINCT")
+                    coreDistinct = false;
+
+                if (std::abs (size - 0.60) < 1.0e-9 && std::abs (decay - 2.5) < 1.0e-9 && cls == "REPRODUCED")
+                    defaultReproduced = true;
+
+                info ("      " + pad ("Size " + fx (100.0 * size, 0) + ", Decay " + fx (decay, 1), 22) + pad (periphery ? "convergence" : "CORE", 13)
+                      + "lowest median " + pad (fx (found.median), 7) + "at Pre-Delay " + pad (fx (found.preDelay, 0) + " ms", 9)
+                      + "lowest run anywhere " + pad (fx (anyLowest), 7) + pad (cls, 12) + "stops on " + kFamilyNames[found.family]);
+                info ("        Hall there: " + found.knobs);
+                info ("        medians by Pre-Delay (ms:median): " + found.trace);
+            }
+
+        const std::string verdict = defaultReproduced || reproduced >= 4 ? "PRESET-EQUIVALENT"
+                                  : ! coreDistinct                       ? "NOT DISTINCT (a core point fails)"
+                                  : distinct == 9                        ? "PASSES: every point DISTINCT"
+                                                                         : "PASSES: core DISTINCT, convergence only inside the declared edge";
+
+        info ("      -> " + std::to_string (distinct) + " of 9 DISTINCT, " + std::to_string (reproduced) + " REPRODUCED.  " + verdict);
+        info ("");
+
+        if (&subject == &subjects[0])
+            check (coreDistinct && ! defaultReproduced && reproduced < 4,
+                   "FINDING: AS2 is DISTINCT from Hall, Pre-Delay included, at the six core points");
+    }
+}
+
+// ===========================================================================
+//  FAST, IN THE REGRESSION: the metric baseline cannot be skipped
+// ===========================================================================
+/*
+    Until 2026-11-19 a run filtered to a named diagnostic command read the
+    frozen metric with an empty same-family floor: every family divided by 1,
+    silently. This suite deliberately does NOT call ensureFloor() before its
+    first score, exactly as those commands did not. It passes only if the
+    diagnostic path and the gate path give identical normalised family scores,
+    and if that normalisation is really applied.
+*/
+void runPhase12MetricBaselineTests()
+{
+    using stage3::Features;
+
+    beginSuite ("PHASE 12.9.B - the metric's family baseline cannot be skipped");
+
+    const User u;
+
+    const Features hall  = featuresOf (Structure {}, u);
+    const Features other = featuresOf (stage6::ambientRaw (stage6::AmbientSpec {}) (u), u);
+
+    // The diagnostic path, first, with no baseline asked for.
+    const Score diagnostic = stage5::sameKnobs (hall, other);
+
+    const Floor& floor = floorOf();
+
+    bool measured = false, anyAboveOne = false;
+
+    for (int f = 0; f < kFamilies; ++f)
+    {
+        if (floor.family[f] > 0.0) measured = true;
+        if (floor.family[f] > 1.0) anyAboveOne = true;
+    }
+
+    check (measured, "a score asked for with no baseline initialised finds the baseline measured, not empty");
+
+    // The gate path: baseline first, then distance and score.
+    ensureFloor();
+
+    const auto d = distance (hall, other);
+    const Score gate = score (d, floorOf());
+
+    bool identical = diagnostic.worst == gate.worst && diagnostic.worstFamily == gate.worstFamily;
+    bool normalised = true, differsFromRaw = false;
+
+    for (int f = 0; f < kFamilies; ++f)
+    {
+        if (diagnostic.scaled[f] != gate.scaled[f])
+            identical = false;
+
+        if (std::abs (gate.scaled[f] - d.family[f] / std::max (1.0, floor.family[f])) > 1.0e-12)
+            normalised = false;
+
+        if (std::abs (gate.scaled[f] - d.family[f]) > 1.0e-9)
+            differsFromRaw = true;
+    }
+
+    info ("    Hall against A1b's structure at the defaults: worst family " + fx (gate.worst) + " by the gate path, "
+          + fx (diagnostic.worst) + " by the diagnostic path.");
+
+    check (identical,  "the diagnostic path and the gate path give identical normalised scores, family by family");
+    check (normalised, "every family is its distance divided by the larger of its baseline and 1");
+    check (anyAboveOne && differsFromRaw,
+           "the baseline matters: at least one family is divided by more than 1, so an unscaled reading would differ");
 }
 
 } // namespace avtest
