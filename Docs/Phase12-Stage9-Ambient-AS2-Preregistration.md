@@ -369,3 +369,152 @@ measured without them. No second variant.
 ## 9. Stop
 
 This document is for review. Nothing is coded until it is approved.
+
+---
+
+# Addendum 1 (2026-11-19) — approval, clarifications, and the vectors replaced
+
+Written before AS2 is measured. No AS2 response, score, tone or level
+figure existed when any of this was decided; the only AS2 output seen was
+the algebraic design check that found the fault below.
+
+## A1. Approval and frozen clarifications
+
+AS2 is approved to be built and measured once, with these clarifications:
+
+- A1b failing the nine-point criterion does not invalidate AS2 in advance.
+  AS2 is not a clone of A1b: denser stages may add structural dimensions
+  A1b lacks. That has to be shown, not assumed either way.
+- **Preserving A1b is not sufficient.** The A1b-preservation measures
+  (t10, t50, shape, buildup and energy-profile families) are reported as
+  **temporal-continuity diagnostics, not as proof of Mode validity.** AS2
+  must independently pass every production gate: the nine-point criterion;
+  the final Hall mimic search including Pre-Delay; tone ≤ 1.0 dB; the
+  source-dependent level gate; Size and Decay; stereo and mono.
+- A1b is a temporal / sonic research reference only. At its default point
+  Hall with Pre-Delay reaches 1.28 (corrected): REPRODUCED.
+- The final search is a genuine adversarial Hall search with Pre-Delay
+  jointly optimised, coarse to fine, full support, no target sample
+  discarded (section 4.3). The onset-aligned search is a diagnostic.
+- If AS2 preserves A1b's temporal identity and still fails the same core
+  points: stop. No AS3 automatically.
+- Section 5's order is superseded on one point: **the full result is
+  measured in one cycle**, the final search included, whatever the
+  preservation diagnostics read, because preservation is no longer the
+  gate that decides whether the rest is worth measuring.
+- The fast regression is run after the AS2 cycle.
+
+## A2. Section 2.5 is withdrawn: the first vectors were wrong
+
+Section 2.5 specified unequal-magnitude vectors of one sign pattern and
+said that neither was a row of the stage's Hadamard mix. Literally true
+and in substance false: **they were 0.972 coherent with rows of the mix**
+— the left vector with (+,+,+,+)/2, the right with (+,+,−,−)/2 — so about
+94 % of a vector's energy would land on one line after one mix. That is
+Stage 3's defect again, and it violates the approval condition that the
+vectors not be aligned with the scattering basis. Found by the design
+check before any AS2 measurement. The error was mine: I did not compute
+the coherence when I wrote 2.5.
+
+## A3. The replacement, chosen by algebra alone
+
+**The mixing matrix is not changed.** The vectors are chosen by the
+following method, fixed here, using no audio, mimic, tone, buildup or
+quality result.
+
+**Requirements** (as set on 2026-11-19): unit norm; left and right
+injection orthogonal; left and right readout orthogonal; balanced
+per-line energy (left and right equal in magnitude on every line); no
+left / right bias for a centred or mono input; coherence with every row
+of the stage's Hadamard mix ≤ 0.70, ≤ 0.60 preferred; after one mix no
+line holds more than 50 % of a vector's energy; every |input · output|
+≤ 0.50; no output vector a ± copy of an input vector.
+
+**Objective.** Minimise the largest coherence of any of the four vectors
+with any row of the mix.
+
+**The solution set, derived.**
+
+- For a unit vector v the four coherences are the entries of H v, and
+  their squares sum to 1. So the largest is at least 0.5, with equality
+  only when all four are ± 0.5.
+- That happens exactly when v = ½ (± r₁ ± r₂ ± r₃ ± r₄) for the rows rᵢ:
+  sixteen vectors. Eight are single lines (± eᵢ); eight have entries
+  ± 0.5 with an **odd** number of minus signs.
+- A single-line vector cannot be balanced against an orthogonal partner.
+  So the minimum under the balance requirement is reached exactly by the
+  odd-parity sign vectors, of which there are four up to overall sign:
+
+      m₁ = (−,+,+,+)/2   m₂ = (+,−,+,+)/2   m₃ = (+,+,−,+)/2   m₄ = (+,+,+,−)/2
+
+- These four are mutually orthogonal. Using two for the input and the
+  other two for the output makes every input · output exactly zero.
+- Every value of the objective is then the same for all assignments of
+  the four to (input left, input right, output left, output right) and all
+  overall signs: 384 ties.
+
+**Tie-break, fixed here.** Overall sign: three entries positive. Order: by
+the line that carries the minus sign, ascending — input left, input right,
+output left, output right.
+
+| | line 1 | line 2 | line 3 | line 4 |
+|---|---|---|---|---|
+| input, left | −0.5 | +0.5 | +0.5 | +0.5 |
+| input, right | +0.5 | −0.5 | +0.5 | +0.5 |
+| output, left | +0.5 | +0.5 | −0.5 | +0.5 |
+| output, right | +0.5 | +0.5 | +0.5 | −0.5 |
+
+**What they give, by algebra:**
+
+| property | value | limit |
+|---|---|---|
+| norm | 1 | 1 |
+| left · right, input and output | 0 | 0 |
+| magnitude per line, left against right | equal (0.5) | equal |
+| coherence with any row of the mix | **0.50** | ≤ 0.70; ≤ 0.60 preferred; 0.50 is the least possible |
+| largest share on one line after one mix | **25 %** | ≤ 50 % |
+| largest \|input · output\| | **0** | ≤ 0.50 |
+| centred input, L + R | (0, 0, 1, 1): lines 3 and 4 of stage 1, energy 2 | no bias |
+| side input, L − R | (−1, 1, 0, 0): lines 1 and 2, energy 2 | no bias |
+| mono fold of the output | lines 1 and 2 of stage 4; −3.0 dB for equal line energies | |
+
+The fallback (changing a column sign of the mix) is not needed and is not
+used. **Approved 2026-11-19; the mixing matrix is not to be modified.**
+
+One thing the algebra does not settle and the measurement will: a centred
+source feeds two of stage 1's four lines and the mono fold hears two of
+stage 4's. After one mix each vector is spread evenly over all four lines,
+so this should not matter; it is the stereo and mono gate's business.
+
+## A4. A statement in section 2.4 corrected
+
+Section 2.4 said there is no path from stage 1 to stage 4 other than
+through stages 2 and 3. Over the response that is so. **Within a single
+pass of the matrix it is not exactly so:** the three sets of rotations are
+applied in sequence, so a small part of stage 1's signal crosses all three
+joins in one pass — an entry of about 0.021 in amplitude at the medium
+point (the product of the three sines and the Hadamard's 0.5), about
+0.05 % in energy per entry.
+
+This is a consequence of the frozen join rule, which is A1b's and is not
+changed. **A1b has the same property.** It is recorded as a known
+structural consequence and is not treated as a defect of AS2 unless a
+measurement shows a problem.
+
+## A5. Design conditions on the delay allocation, checked
+
+Algebraic only; from the design check, log
+`Docs/Phase12-Stage9-runs/10-as2-design-check.txt`.
+
+| condition | result |
+|---|---|
+| delays unique, non-degenerate | closest pair 41.58 and 42.58 ms, 2.4 % apart |
+| near-equal delays not clustered in one stage | inside every stage the lines are at least 29 % apart; the closest pairs of the sixteen fall in different stages |
+| no systematic slope by delay length alone | stage means 42.8 / 45.8 / 51.4 / 54.3 ms; last over first 1.27, against A1b's 1.71 |
+| Size scales all lines consistently | every delay is multiplied by the same Size scale |
+| a genuine four-stage network | block-diagonal mix with joins between neighbours only; the one-pass leak of A4 is the only exception |
+| matrix orthogonal | error 0.3 × 10⁻¹⁵ |
+
+The slope is not zero: later stages are about 9 % longer each. It is
+smaller than A1b's and is a property of the registered allocation; it is
+not adjusted.

@@ -1,0 +1,47 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage9As2Design
+
+
+PHASE 12.9.0 - the same-family floor in use, and AS2's design checked before it is measured
+-------------------------------------------------------------------------------------------
+          floor (each family is divided by the larger of this and 1): buildup 1.25; energy profile 1.83; echo density 1.25; stereo 0.41; decay 0.13; recurrence 0.72; late texture 0.75; loop repetition 0.78; modal structure 0.89; decay shape 0.18; band arrival 0.73; lateral spread 0.53; partial placement 0.23;
+        
+          DELAYS (approval condition 4). Hall's eight and its sibling set's eight, ascending, ms:
+            25.45 26.27 29.59 30.38 33.23 38.10 41.58 42.58 47.06 51.87 54.20 61.32 65.37 66.99 80.17 82.92
+            closest neighbours: 41.58 and 42.58 ms, ratio 1.0241 (2.41 % apart)
+  PASS  no two of the sixteen delays are within 0.5 % of each other
+        
+            stage   lines, ms                               mean     geometric mean  closest pair inside the stage
+            1       25.45  33.23  47.06  65.37              42.78    40.16           ratio 1.306
+            2       26.27  38.10  51.87  66.99              45.81    43.18           ratio 1.291
+            3       29.59  41.58  54.20  80.17              51.39    48.09           ratio 1.304
+            4       30.38  42.58  61.32  82.92              54.30    50.64           ratio 1.352
+            stage 4 mean / stage 1 mean: 1.269   (A1b's pairs: 54.6 / 31.9 = 1.71 at the medium point)
+  PASS  inside every stage the lines are at least 10 % apart: near-equal delays are not clustered in a stage
+  PASS  the slope of stage length along the chain is no steeper than A1b's
+        
+          VECTORS (approval condition 5).
+            norms: in L 1.000000, in R 1.000000, out L 1.000000, out R 1.000000
+            left . right: in -0.000000, out 0.000000
+            a centred input (L + R) reaches lines 1 and 2 of stage 1 only; a mono fold of the output hears lines 1 and 2 of stage 4 only,
+            each carrying half of the vector's energy: -3.0 dB if the lines hold equal energy.
+            largest alignment with a row of the Hadamard mix (1 = a row): 1.944
+            largest |input . output| (1 = the same vector): 0.976
+  PASS  left and right have the same magnitude on every line, in and out
+  PASS  left and right are orthogonal, in and out
+  FAIL  no vector is a row of the stage's own mix
+  PASS  the readout is not the injection, or its mirror
+        
+          MATRIX. Orthogonality at the three points and at the corners of the grid, k 0.40:
+            largest |M Mt - I|: 0.33 e-15
+  PASS  the 16 x 16 matrix is orthogonal at every setting tried
+            largest entry carrying stage 4 into stage 1 or stage 1 into stage 4 in one pass: 0.0212; stage 3 into stage 1: 0.0000
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.9.0 - the same-family floor in use, and AS2's design checked before it is measured     7 /    8   FAILED
+-----------------------------------------------------------------
+  7 / 8 checks passed.  1 FAILURE(S).
