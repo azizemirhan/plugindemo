@@ -1,0 +1,159 @@
+=================================================================
+AuroraVerb DSP core tests
+=================================================================
+Suite filter: runPhase12Stage9As2
+
+
+PHASE 12.9.1 - instrument check: is A1b in the open tank A1b?
+-------------------------------------------------------------
+          AS2 is built in the open tank. Before any AS2 figure is read: frozen A1b's own lines,
+          matrix and vectors run in the open tank, against A1b in the eight-line core. Limit:
+          frozen metric <= 1.5 at the same knobs and t10, t50 within 2 %, at the three points.
+        
+            medium   metric 0.41 (recurrence)         t10 77.9 / 77.9     t50 202.7 / 202.7     valid
+            short    metric 0.30 (recurrence)         t10 30.8 / 30.8     t50 79.7 / 79.7       valid
+            long     metric 0.00 (buildup)            t10 155.8 / 155.8   t50 404.1 / 404.1     valid
+  PASS  the open tank reads A1b as A1b: AS2's figures can be compared with A1b's
+
+PHASE 12.9.2 - AS2: the one calibration
+---------------------------------------
+          k is the value, 0.10 - 1.50, at which AS2's onset-normalised t50 at the medium point is A1b's.
+          t50 at k 0.10: 142.6 ms; at k 1.50: 285.2 ms; target 202.7 ms
+          k = 0.2537   (A1b's own k is 0.40)
+            medium   sin^2(theta) at the three joins: 0.176  0.189  0.212   decay scale 0.943
+            short    sin^2(theta) at the three joins: 0.266  0.285  0.319   decay scale 0.936
+            long     sin^2(theta) at the three joins: 0.148  0.159  0.178   decay scale 0.941
+
+PHASE 12.9.3 - AS2: does it preserve A1b? (gate 4.1)
+----------------------------------------------------
+          Onset-normalised, same knobs. Pass: t10 and t50 within 10 % of A1b's, t10 / t50 within
+          0.03, buildup and energy-profile families against A1b (onsets aligned) <= 1.5, at the
+          three operating points. t50 at medium is the calibration.
+        
+                                  t10 A1b / AS2           t50 A1b / AS2           shape A1b / AS2         buildup  profile  result
+            medium (gate)         77.9 / 73.5 (-6 %)      202.7 / 202.3 (-0 %)    0.384 / 0.363 (-0.021)  0.19     0.06     within
+            short (gate)          30.8 / 25.9 (-16 %)     79.7 / 68.6 (-14 %)     0.387 / 0.378 (-0.009)  0.76     0.63     OUTSIDE
+            long (gate)           155.8 / 147.0 (-6 %)    404.1 / 401.3 (-1 %)    0.386 / 0.366 (-0.019)  0.12     0.02     within
+            Size 25, Decay 2.5    81.9 / 76.4 (-7 %)      193.1 / 192.1 (-1 %)    0.424 / 0.398 (-0.026)  0.16     0.31     within
+            Size 25, Decay 5.0    133.3 / 130.2 (-2 %)    327.2 / 341.6 (+4 %)    0.407 / 0.381 (-0.026)  0.30     0.09     within
+            Size 60, Decay 0.8    20.1 / 17.8 (-11 %)     67.9 / 60.2 (-11 %)     0.296 / 0.296 (-0.000)  0.28     0.18     OUTSIDE
+            Size 60, Decay 5.0    146.4 / 147.9 (+1 %)    366.4 / 382.7 (+4 %)    0.399 / 0.386 (-0.013)  0.22     0.34     within
+            Size 85, Decay 0.8    12.0 / 15.9 (+32 %)     56.1 / 62.9 (+12 %)     0.215 / 0.253 (+0.038)  0.33     0.08     OUTSIDE
+            Size 85, Decay 2.5    69.5 / 60.9 (-12 %)     207.6 / 189.3 (-9 %)    0.335 / 0.321 (-0.013)  0.36     0.03     OUTSIDE
+        
+          GATE 4.1: AS2 DOES NOT PRESERVE A1b's buildup. Failed: short (gate): t10 t50;  
+  FAIL  FINDING: AS2 preserves A1b's onset-normalised buildup at the three operating points
+
+PHASE 12.9.4 - AS2: tone and its variance (gate 4.4)
+----------------------------------------------------
+          Octave deviation from Hall, dB. Gate: <= 1.0 at the defaults and over 27 settings.
+        
+                        defaults  worst of 27
+            A1b         1.82      3.02
+            AS2         1.70      4.60   OVER 1.0
+        
+            medium                        125     250     500     1k      2k      4k      8k      
+              A1b mean, +/- 4 %           -0.95   +0.53   +0.46   +0.46   +0.36   +0.28   -0.64   
+              AS2 mean, +/- 4 %           -1.70   -0.89   -0.50   -0.25   -0.00   +0.58   -0.25   
+              A1b SD, +/- 4 %             +1.14   +0.83   +0.49   +0.45   +0.25   +0.16   +0.18   
+              AS2 SD, +/- 4 %             +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+              Hall SD, +/- 4 % (floor)    +0.36   +0.19   +0.10   +0.10   +0.05   +0.04   +0.03   
+              A1b mean, +/- 30 %          -0.83   +0.14   +0.53   +0.56   +0.30   +0.15   -0.53   
+              AS2 mean, +/- 30 %          -1.70   -0.89   -0.50   -0.25   -0.00   +0.58   -0.25   
+              A1b SD, +/- 30 %            +1.30   +0.72   +0.81   +0.62   +0.40   +0.23   +0.21   
+              AS2 SD, +/- 30 %            +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+        
+            short                         125     250     500     1k      2k      4k      8k      
+              A1b mean, +/- 4 %           -1.50   -0.52   +0.77   +0.86   +0.79   +0.02   -0.70   
+              AS2 mean, +/- 4 %           -0.23   -1.24   -0.29   +0.04   +0.82   +0.25   -0.48   
+              A1b SD, +/- 4 %             +0.57   +0.79   +0.64   +0.49   +0.15   +0.22   +0.19   
+              AS2 SD, +/- 4 %             +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+              Hall SD, +/- 4 % (floor)    +0.26   +0.25   +0.18   +0.18   +0.18   +0.08   +0.09   
+              A1b mean, +/- 30 %          -0.66   -0.39   +0.55   +0.73   +0.78   +0.08   -0.72   
+              AS2 mean, +/- 30 %          -0.23   -1.24   -0.29   +0.04   +0.82   +0.25   -0.48   
+              A1b SD, +/- 30 %            +0.88   +1.05   +0.72   +0.57   +0.33   +0.26   +0.23   
+              AS2 SD, +/- 30 %            +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+        
+            long                          125     250     500     1k      2k      4k      8k      
+              A1b mean, +/- 4 %           +0.47   +0.50   +0.11   +0.39   +0.36   +0.14   -0.47   
+              AS2 mean, +/- 4 %           -0.73   -0.30   +0.30   +0.93   +0.27   -0.06   -0.35   
+              A1b SD, +/- 4 %             +1.10   +0.57   +0.41   +0.41   +0.15   +0.20   +0.14   
+              AS2 SD, +/- 4 %             +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+              Hall SD, +/- 4 % (floor)    +0.14   +0.11   +0.13   +0.09   +0.04   +0.01   +0.03   
+              A1b mean, +/- 30 %          -0.17   +0.32   +0.36   +0.43   +0.42   +0.10   -0.51   
+              AS2 mean, +/- 30 %          -0.73   -0.30   +0.30   +0.93   +0.27   -0.06   -0.35   
+              A1b SD, +/- 30 %            +1.22   +0.95   +0.79   +0.45   +0.26   +0.23   +0.25   
+              AS2 SD, +/- 30 %            +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   +0.00   
+        
+  FAIL  FINDING: AS2 is within 1.0 dB of Hall's tone at the defaults and over the grid
+
+PHASE 12.9.5 - AS2: source-dependent level (gate 4.5)
+-----------------------------------------------------
+          Baseline (measured for AS1, re-measured here): the largest spread among Hall's sibling
+          and Hall under twelve +/- 4 % perturbations. Pass: excess <= 0.5 dB at every point and
+          at most half of A1b's where that exceeds 1.0 dB. AN ENGINEERING CRITERION, not a
+          psychoacoustically validated perceptual threshold.
+        
+                     baseline  A1b spread  A1b excess  AS2 spread  AS2 excess  rough A1b / AS2   result
+            medium   0.66      2.27        1.61        0.64        0.00        1.61 / 1.10       within
+            short    0.82      2.83        2.01        0.62        0.00        1.94 / 1.01       within
+            long     0.72      0.63        0.00        1.65        0.93        0.72 / 0.85       OUTSIDE
+        
+  FAIL  FINDING: AS2's excess source-dependent level is within the registered limit
+            The level law each would need, dB, Size 25 / 60 / 85 (rows) x Decay 0.8 / 2.5 / 5.0, A1b | AS2:
+              -2.43   +2.52   +5.70     |   -1.67   +2.61   +5.54
+              -5.66   -0.00   +3.40     |   -3.43   +0.00   +2.90
+              -5.82   -2.54   +0.47     |   -0.19   -2.14   +0.51
+
+PHASE 12.9.6 - AS2: Size, Decay, stereo and mono; CPU and memory
+----------------------------------------------------------------
+          Stage 5's G3 tables, Decay limit 5 %. CPU there is Stage 5's timer on a machine in use.
+        
+            SIZE (time to 10 % of the energy, ms, Size 10 / 30 / 50 / 70 / 90) and DECAY
+            (measured RT60 / Hall's over nine settings, min .. max; limit +/- 5 %):
+              Hall                          36.2    39.6    44.9    52.8    64.9                  1.000 .. 1.000
+              AS2 4-4-4-4                   110.7   118.4   128.8   136.9   153.0                 0.999 .. 1.000
+              A1b (reference)               110.7   124.8   144.8   156.6   181.6                 1.000 .. 1.001
+        
+            STEREO AND MONO at the defaults (limits as in Stage 3, section 12.3.9), TONE (largest
+            octave-band deviation from Hall, dB; limit 1) and CPU (wet path, x Hall):
+              structure                     corr   fold   L/R    mirror  hard   tone worst/med  width 50/100/150  octave  CPU
+              Hall                          -0.03  -3.0   0.4    0.3     0.033  -15.0 / -3.0    -6.0 0.1 3.6      0.00    1.00
+              AS2 4-4-4-4                   0.08   -2.4   0.1    -0.0    0.056  -17.2 / -3.7    -7.3 -1.3 2.2     1.70    2.10
+              A1b (reference)               -0.12  -3.9   0.7    -0.5    0.055  -17.2 / -2.4    -4.5 1.6 5.1      1.82    1.00
+        
+              AS2 4-4-4-4                   G3 FAIL: tone;
+              A1b (reference)               G3 FAIL: tone;
+        
+          G3 without the CPU line: AS2 FAILS; A1b fails (A1b's recorded failure is tone).
+          Tank memory at the largest Size: AS2 768 KiB (Hall and A1b: 498 KiB as Stage 6 measured them).
+          CPU x Hall, Stage 5's timer: AS2 2.10, A1b 1.00. INDICATIVE: the machine was in use.
+            medium   time to 90 % of the energy, ms: Hall 357, A1b 504, AS2 507
+            short    time to 90 % of the energy, ms: Hall 129, A1b 192, AS2 177
+            long     time to 90 % of the energy, ms: Hall 688, A1b 983, AS2 977
+
+PHASE 12.9.7 - AS2 against Hall at the same knobs, and the onset-aligned search (diagnostic)
+--------------------------------------------------------------------------------------------
+          Same knobs, whole response (dust zeroed): every centred family at or above 1.5.
+        
+            medium  A1b   worst 11.39 (buildup)           buildup 11.39; energy profile 7.95; echo density 5.05; stereo 1.78; decay 5.28; late texture 7.34; loop repetition 3.53; modal structure 6.75; 
+            medium  AS2   worst 10.78 (buildup)           buildup 10.78; energy profile 7.64; echo density 2.96; stereo 1.90; decay 5.02; late texture 1.79; loop repetition 1.90; modal structure 1.51; band arrival 2.01; 
+            short  A1b    worst 8.29 (buildup)            buildup 8.29; energy profile 4.98; echo density 3.23; stereo 5.32; decay 3.79; modal structure 3.14; band arrival 1.54; 
+            short  AS2    worst 5.87 (buildup)            buildup 5.87; energy profile 4.16; echo density 2.49; stereo 3.42; decay 2.87; loop repetition 1.61; 
+            long  A1b     worst 14.65 (buildup)           buildup 14.65; energy profile 8.50; echo density 4.74; stereo 4.16; decay 5.63; late texture 4.42; loop repetition 3.55; modal structure 6.21; 
+            long  AS2     worst 13.04 (buildup)           buildup 13.04; energy profile 8.48; echo density 3.83; stereo 3.69; decay 5.27; late texture 6.88; loop repetition 1.76; modal structure 2.13; 
+        
+          THE CHEAP PART OF THE RESULT IS COMPLETE. k = 0.2537. Preservation: FAILED.
+
+=================================================================
+SUMMARY
+=================================================================
+  PHASE 12.9.1 - instrument check: is A1b in the open tank A1b?                                    1 /    1   ok
+  PHASE 12.9.2 - AS2: the one calibration                                                          0 /    0   ok
+  PHASE 12.9.3 - AS2: does it preserve A1b? (gate 4.1)                                             0 /    1   FAILED
+  PHASE 12.9.4 - AS2: tone and its variance (gate 4.4)                                             0 /    1   FAILED
+  PHASE 12.9.5 - AS2: source-dependent level (gate 4.5)                                            0 /    1   FAILED
+  PHASE 12.9.6 - AS2: Size, Decay, stereo and mono; CPU and memory                                 0 /    0   ok
+  PHASE 12.9.7 - AS2 against Hall at the same knobs, and the onset-aligned search (diagnostic)     0 /    0   ok
+-----------------------------------------------------------------
+  1 / 4 checks passed.  3 FAILURE(S).

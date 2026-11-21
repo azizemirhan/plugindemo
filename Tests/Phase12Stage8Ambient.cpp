@@ -399,6 +399,26 @@ namespace stage8
             ms *= 1.0 + 0.04 * u;
         }
 
+        // A structure in the open tank keeps its delays in its spec, not in
+        // the eight-line array above. Until this was added (2026-11-19) a
+        // perturbation left such a structure untouched, and its "variance"
+        // read as zero.
+        if (s.open != nullptr)
+        {
+            auto spec = std::make_shared<stage6::OpenSpec> (*s.open);
+
+            for (auto& ms : spec->delayMs)
+            {
+                state = state * 1664525u + 1013904223u;
+
+                const double u = static_cast<double> (state >> 8) / static_cast<double> (1u << 24) * 2.0 - 1.0;
+
+                ms *= 1.0 + 0.04 * u;
+            }
+
+            s.open = spec;
+        }
+
         return s;
     }
 
@@ -2452,6 +2472,23 @@ namespace stage8
                 ms *= std::pow (1.3, u);
             }
 
+            // As in perturbed(): an open-tank structure's delays are in its spec.
+            if (s.open != nullptr)
+            {
+                auto spec = std::make_shared<stage6::OpenSpec> (*s.open);
+
+                for (auto& ms : spec->delayMs)
+                {
+                    state = state * 1664525u + 1013904223u;
+
+                    const double u = static_cast<double> (state >> 8) / static_cast<double> (1u << 24) * 2.0 - 1.0;
+
+                    ms *= std::pow (1.3, u);
+                }
+
+                s.open = spec;
+            }
+
             return s;
         }
 
@@ -4422,6 +4459,38 @@ void runPhase12Stage9As2Final()
         if (&subject == &subjects[0])
             check (coreDistinct && ! defaultReproduced && reproduced < 4,
                    "FINDING: AS2 is DISTINCT from Hall, Pre-Delay included, at the six core points");
+    }
+
+    // =====================================================================
+    beginSuite ("PHASE 12.9.10 - DIAGNOSTIC: AS2 under the onset-aligned search");
+    // =====================================================================
+
+    info ("  Not the gate. The target zeroed before its onset and moved to Hall's onset; the frozen");
+    info ("  search, five seeds. Reported beside the final search, as the pre-registration says.");
+    info ("");
+
+    {
+        std::vector<User> users;
+
+        for (double size : sizes)
+            for (double decay : decays)
+            {
+                User u;
+                u.size = size;
+                u.decay = decay;
+                users.push_back (u);
+            }
+
+        std::vector<Features> targets (9);
+
+        runParallel (9, [&] (size_t i) { targets[i] = onsetNormalised (as2 (users[i]), users[i]); });
+
+        const auto found = hallSearchAll (targets, users);
+
+        for (size_t i = 0; i < 9; ++i)
+            info ("      " + pad ("Size " + fx (100.0 * users[i].size, 0) + ", Decay " + fx (users[i].decay, 1), 22)
+                  + "median " + pad (fx (found[i].median), 8) + "lowest " + pad (fx (found[i].lowest), 8) + pad (classOf (found[i]), 12)
+                  + pad (std::string ("stops on ") + kFamilyNames[found[i].family], 28) + found[i].knobs);
     }
 }
 
